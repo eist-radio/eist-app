@@ -1,40 +1,39 @@
 // context/AudioContext.tsx
-import React, { createContext, useContext, ReactNode } from 'react';
-import { useAudioPlayer } from 'expo-audio';
-//const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
-const STREAM_URL = 'https://stream-relay-geo.ntslive.net/stream';
+import React, { createContext, useContext, ReactNode, useState } from 'react'
+import { useAudioPlayer } from 'expo-audio'
+
+const STREAM_URL = 'https://stream-relay-geo.ntslive.net/stream'
 
 type AudioContextType = {
-  isPlaying: boolean;
-  togglePlay: () => void;
-};
+  isPlaying: boolean
+  togglePlay: () => void
+}
 
-const AudioContext = createContext<AudioContextType | null>(null);
+const AudioContext = createContext<AudioContextType | undefined>(undefined)
 
 export const AudioProvider = ({ children }: { children: ReactNode }) => {
-  // useAudioPlayer will load the stream and keep it alive
-  const player = useAudioPlayer({ uri: STREAM_URL });
+  const player = useAudioPlayer({ uri: STREAM_URL })
+  const [isPlaying, setIsPlaying] = useState(false)
 
-  // `player.playing` is a boolean
-  // `player.play()` and `player.pause()` control playback
-  const isPlaying = player.playing;
   const togglePlay = () => {
-    if (player.playing) {
-      player.pause();
+    if (isPlaying) {
+      player.pause()
+      setIsPlaying(false)
     } else {
-      player.play();
+      player.play()
+      setIsPlaying(true)
     }
-  };
+  }
 
   return (
     <AudioContext.Provider value={{ isPlaying, togglePlay }}>
       {children}
     </AudioContext.Provider>
-  );
-};
+  )
+}
 
-export const useAudio = () => {
-  const ctx = useContext(AudioContext);
-  if (!ctx) throw new Error('useAudio must be used within AudioProvider');
-  return ctx;
-};
+export const useAudio = (): AudioContextType => {
+  const ctx = useContext(AudioContext)
+  if (!ctx) throw new Error('useAudio must be used within AudioProvider')
+  return ctx
+}
