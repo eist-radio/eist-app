@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: 'center',
-    paddingTop: 32,
+    paddingTop: 128,
   },
   table: {
     width: '90%',

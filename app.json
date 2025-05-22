@@ -46,7 +46,8 @@
         }
       ],
       "expo-audio",
-      "expo-video"
+      "expo-video",
+      "react-native-google-cast"
     ],
     "experiments": {
       "typedRoutes": true
