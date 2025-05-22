@@ -48,3 +48,15 @@ Join our community of developers creating universal apps.
 
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+
+## Hack
+
+iOS device testing:
+
+Clear previous instance in expo go app, then:
+
+```cmd
+$ npx expo start --tunnel
+```
+
+Press s to switch to expo go, and open in app

@@ -17,7 +17,7 @@ export default function RootLayout() {
     : EistLightTheme;
 
   const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+    FunnelSans: require('../assets/fonts/FunnelSans-VariableFont_wght.ttf'),
   });
   if (!loaded) return null;
 
