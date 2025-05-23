@@ -60,3 +60,8 @@ $ npx expo start --tunnel
 ```
 
 Press s to switch to expo go, and open in app
+
+TODO
+Chromecast
+Lockscreen player
+Carkit (?)
