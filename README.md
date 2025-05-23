@@ -63,5 +63,5 @@ Press s to switch to expo go, and open in app
 
 **TODO**
 * Chromecast https://github.com/react-native-google-cast/react-native-google-cast
-* * Lockscreen player https://medium.com/@gionata.brunel/implementing-react-native-track-player-with-expo-including-lock-screen-part-1-ios-9552fea5178c
-Carkit (?)
+* Lockscreen player https://medium.com/@gionata.brunel/implementing-react-native-track-player-with-expo-including-lock-screen-part-1-ios-9552fea5178c
+* Carkit (?)
