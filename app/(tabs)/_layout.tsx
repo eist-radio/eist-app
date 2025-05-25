@@ -11,6 +11,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="listen"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: false,
@@ -19,20 +20,42 @@ export default function TabLayout() {
         tabBarStyle: { backgroundColor: colors.card },
       }}
     >
+      {/* Live tab */}
       <Tabs.Screen
         name="listen"
         options={{
-          // no title needed, label is hidden anyway
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="play" size={size ?? 24} color={color} />
+            <Ionicons name="radio-outline" size={size ?? 24} color={color} />
           ),
         }}
       />
+
+      {/* Schedule tab */}
       <Tabs.Screen
         name="schedule"
         options={{
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar" size={size ?? 24} color={color} />
+            <Ionicons name="calendar-outline" size={size ?? 24} color={color} />
+          ),
+        }}
+      />
+
+      {/* Website external link tab */}
+      <Tabs.Screen
+        name="website"
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="globe-outline" size={size ?? 24} color={color} />
+          ),
+        }}
+      />
+
+      {/* Discord external link tab */}
+      <Tabs.Screen
+        name="discord"
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="logo-discord" size={size ?? 24} color={color} />
           ),
         }}
       />

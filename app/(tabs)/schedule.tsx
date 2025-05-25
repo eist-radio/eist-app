@@ -14,7 +14,14 @@ export default function ScheduleScreen() {
   const { colors } = useTheme()
 
   return (
+
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+
+      {/* Page title */}
+      <Text style={[styles.title, { color: colors.primary }]}>
+        Schedule
+      </Text>
+
       <View style={styles.table}>
         {/* Header */}
         <View style={[styles.row, { backgroundColor: colors.card }]}>
@@ -52,8 +59,15 @@ export default function ScheduleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
+    alignItems: 'left',
     paddingTop: 128,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    alignItems: 'left',
+    marginBottom: 16,
+    paddingLeft: 8,
   },
   table: {
     width: '90%',
