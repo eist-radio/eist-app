@@ -31,7 +31,7 @@ export default function ListenScreen() {
           resizeMode="cover"
         />
 
-        {/* logo with drop shadow */}
+        {/* logo */}
         <View style={styles.logoContainer}>
           <Image
             source={logoImage}

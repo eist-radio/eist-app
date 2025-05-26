@@ -12,7 +12,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.oootini.eistapp",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [ "audio" ]
       }
     },
     "android": {
