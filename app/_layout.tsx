@@ -1,3 +1,4 @@
+// app/_layout.tsx
 import React, { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
@@ -47,10 +48,8 @@ export default function RootLayout() {
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <AudioProvider>
         <ThemeProvider value={theme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="+not-found" />
-          </Stack>
+          {/* ← Auto-wires all nested layouts & screens */}
+          <Stack screenOptions={{ headerShown: false }} />
           <StatusBar style="auto" />
         </ThemeProvider>
       </AudioProvider>
