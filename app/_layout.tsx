@@ -1,8 +1,8 @@
-// app/_layout.tsx
-
-import React from 'react';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { EistLightTheme, EistDarkTheme } from '../themes'
+import React, { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import { ThemeProvider } from '@react-navigation/native';
+import { EistLightTheme, EistDarkTheme } from '../themes';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -10,26 +10,50 @@ import 'react-native-reanimated';
 import { AudioProvider } from '../context/AudioContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-export default function RootLayout() {
-  const scheme = useColorScheme(); // 'light' | 'dark'
-  const theme = scheme === 'dark' 
-    ? EistDarkTheme 
-    : EistLightTheme;
+// Do NOT await here - just kick off the promise so the splash won't auto-hide
+SplashScreen.preventAutoHideAsync();
 
-  const [loaded] = useFonts({
+export default function RootLayout() {
+  // Hooks (always at top)
+  const [fontsLoaded] = useFonts({
     FunnelSans: require('../assets/fonts/FunnelSans-VariableFont_wght.ttf'),
   });
-  if (!loaded) return null;
+  const [isReady, setIsReady] = useState(false);
+  const scheme = useColorScheme();
+  const theme = scheme === 'dark' ? EistDarkTheme : EistLightTheme;
 
+  // Mark ready once fonts have loaded
+  useEffect(() => {
+    if (fontsLoaded) {
+      setIsReady(true);
+    }
+  }, [fontsLoaded]);
+
+  // Hide splash in an async callback on layout
+  const onLayoutRootView = useCallback(async () => {
+    if (isReady) {
+      // This is inside an async function, so await is OK
+      await SplashScreen.hideAsync();
+    }
+  }, [isReady]);
+
+  // Don't render anything and keep the native splash until ready
+  if (!isReady) {
+    return null;
+  }
+
+  // Once ready, render the app and hide the splash on first layout
   return (
-    <AudioProvider>
-      <ThemeProvider value={theme}>
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </AudioProvider>
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      <AudioProvider>
+        <ThemeProvider value={theme}>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="+not-found" />
+          </Stack>
+          <StatusBar style="auto" />
+        </ThemeProvider>
+      </AudioProvider>
+    </View>
   );
 }

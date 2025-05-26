@@ -57,7 +57,7 @@ export default function ListenScreen() {
       <View style={styles.bottom}>
         <View style={styles.controlContainer}>
           <TouchableOpacity onPress={togglePlay} style={styles.playButton}>
-            <Ionicons name={iconName} size={48} color={colors.primary} />
+            <Ionicons name={iconName} size={64} color={colors.primary} />
           </TouchableOpacity>
           <ThemedText
             type="subtitle"

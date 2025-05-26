@@ -13,7 +13,7 @@
       "bundleIdentifier": "com.oootini.eistapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": [ "audio" ]
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {
@@ -23,7 +23,6 @@
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.INTERNET",
         "android.permission.ACCESS_NETWORK_STATE"
@@ -35,12 +34,21 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "splash": {
+      "image": "./assets/images/eist-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4733FF",
+      "dark": {
+        "image": "./assets/images/eist-logo.png",
+        "backgroundColor": "#4733FF"
+      }
+    },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/eist-logo.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#4733FF"
