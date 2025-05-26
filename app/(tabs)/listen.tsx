@@ -1,5 +1,5 @@
 // listen.tsx
-import React from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import {
   View,
   StyleSheet,
@@ -8,42 +8,137 @@ import {
   Dimensions,
   ScrollView,
 } from 'react-native'
-import { useTheme } from '@react-navigation/native'
+import { useTheme, useFocusEffect } from '@react-navigation/native'
+import { API_KEY as apiKey } from '@env'
 import { ThemedText } from '@/components/ThemedText'
 import { useAudio } from '../../context/AudioContext'
 import { Ionicons } from '@expo/vector-icons'
 
-// Assets
-const artwork = require('../../assets/images/artist.jpeg')
+// Local assets & placeholders
+const placeholderArtistImage = require('../../assets/images/eist_online.png')
+const placeholderOfflineImage = require('../../assets/images/eist_offline.png')
 const logoImage = require('../../assets/images/eist-logo-header.png')
-// Gradient overlay
 const gradientOverlay = require('../../assets/images/gradient.png')
+
+// API constants
+const stationId = 'eist-radio'
+const apiUrl = `https://api.radiocult.fm/api/station/${stationId}`
 
 export default function ListenScreen() {
   const { colors } = useTheme()
   const { isPlaying, togglePlay } = useAudio()
   const { width, height } = Dimensions.get('window')
+
+  // UI state from API
+  const [showTitle, setShowTitle] = useState<string>('—')
+  const [showDescription, setShowDescription] = useState<string>(' ')
+  const [artistName, setArtistName] = useState<string>('éist · off air')
+  const [artistImage, setArtistImage] = useState<any>(placeholderOfflineImage)
+  const [broadcastStatus, setBroadcastStatus] = useState<string>('off air')
+
+  // Fetch artist details by ID
+  const getArtistDetails = async (artistId: string | null) => {
+    if (!artistId) {
+      return {
+        name: '—',
+        bio: ' ',
+        image: placeholderArtistImage,
+      }
+    }
+    try {
+      const res = await fetch(`${apiUrl}/artists/${artistId}`, {
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      const artist = json.artist || {}
+      return {
+        name: artist.name || '—',
+        bio:
+          artist.description?.content?.[0]?.content?.[0]?.text ||
+          'No description available',
+        image: artist.logo?.['256x256'] || placeholderArtistImage,
+      }
+    } catch (err) {
+      console.error('getArtistDetails failed', err)
+      return {
+        name: '—',
+        bio: ' ',
+        image: placeholderArtistImage,
+      }
+    }
+  }
+
+  // Fetch now‐playing + artist → update state
+  const fetchNowPlaying = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/schedule/live`, {
+        headers: {
+          'x-api-key': apiKey,
+          'Content-Type': 'application/json',
+        },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const { status, content } = data.result
+      setBroadcastStatus(status)
+
+      if (status !== 'schedule') {
+        // Off air: show offline placeholder
+        setShowTitle('—')
+        setArtistName('éist · off air')
+        setArtistImage(placeholderOfflineImage)
+        setShowDescription(' ')
+      } else {
+        // Live: fetch artist details
+        const title = content.title || '—'
+        setShowTitle(title)
+        const artistId = content.artistIds?.[0] ?? null
+        const details = await getArtistDetails(artistId)
+        setArtistName(details.name)
+        setArtistImage(details.image)
+        setShowDescription(details.bio)
+      }
+    } catch (err) {
+      console.error('fetchNowPlaying failed', err)
+      // On error: fallback to offline
+      setBroadcastStatus('error')
+      setShowTitle('—')
+      setArtistName('éist · off air')
+      setArtistImage(placeholderOfflineImage)
+      setShowDescription(' ')
+    }
+  }
+
+  // Poll every 30s when screen is focused
+  useFocusEffect(
+    useCallback(() => {
+      fetchNowPlaying()
+      const interval = setInterval(fetchNowPlaying, 30000)
+      return () => clearInterval(interval)
+    }, [])
+  )
+
+  // Play/pause icon
   const iconName = isPlaying ? 'pause-circle' : 'play-circle'
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* Top half: artwork with gradient and logo */}
+      {/* Top half: artist image (or placeholder) + gradient + logo */}
       <View style={[styles.imageContainer, { height: height / 2 }]}>
-        {/* Background artwork */}
         <Image
-          source={artwork}
+          source={artistImage}
           style={{ width, height: width }}
           resizeMode="cover"
         />
-
-        {/* Gradient overlay PNG stretched over the image */}
         <Image
           source={gradientOverlay}
           style={[StyleSheet.absoluteFill, { width, height: width }]}
           resizeMode="stretch"
         />
-
-        {/* Logo on top */}
         <View style={styles.logoContainer}>
           <Image
             source={logoImage}
@@ -53,7 +148,7 @@ export default function ListenScreen() {
         </View>
       </View>
 
-      {/* Bottom half: controls and now-playing info */}
+      {/* Bottom half: controls + now-playing info */}
       <View style={styles.bottom}>
         <View style={styles.controlContainer}>
           <TouchableOpacity onPress={togglePlay} style={styles.playButton}>
@@ -63,7 +158,7 @@ export default function ListenScreen() {
             type="subtitle"
             style={[styles.artistName, { color: colors.text }]}
           >
-            DJ Artist Name
+            {artistName}
           </ThemedText>
         </View>
 
@@ -75,13 +170,13 @@ export default function ListenScreen() {
             type="subtitle"
             style={[styles.showTitle, { color: colors.text }]}
           >
-            Current Show Title
+            {showTitle}
           </ThemedText>
           <ThemedText
             type="body"
             style={[styles.showDescription, { color: colors.text }]}
           >
-            Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API.
+            {showDescription}
           </ThemedText>
         </ScrollView>
       </View>
