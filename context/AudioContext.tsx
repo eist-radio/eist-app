@@ -6,14 +6,21 @@ import React, {
   useState,
   useEffect,
   useMemo,
+  useCallback,
 } from 'react'
 import { useVideoPlayer } from 'expo-video'
 import { setAudioModeAsync } from 'expo-audio'
+import { API_KEY as apiKey } from '@env'
 
-// Live stream URL 
+// Local placeholders
+const placeholderOnlineImage = require('../assets/images/eist_online.png')
+const placeholderOfflineImage = require('../assets/images/eist_offline.png')
+
+// Live stream & API constants
 const STREAM_URL = 'https://stream-relay-geo.ntslive.net/stream'
+const stationId = 'eist-radio'
+const apiUrl = `https://api.radiocult.fm/api/station/${stationId}`
 
-// The shape of what the context provides
 export type AudioContextType = {
   isPlaying: boolean
   togglePlay: () => void
@@ -22,68 +29,122 @@ export type AudioContextType = {
 const AudioContext = createContext<AudioContextType | undefined>(undefined)
 
 export const AudioProvider = ({ children }: { children: ReactNode }) => {
-  // Enrich source with metadata for lock screen display
-  const sourceWithMetadata = useMemo(() => ({
-    uri: STREAM_URL,
-    metadata: {
-      title: "Live on éist", // TODO: Replace with API data
-      artist: "Aidan", // TODO: Replace with API data
-      artwork: "https://d4mt18vwj73wk.cloudfront.net/artistImage/2025-01-23T11:00:08Z-1024x1024.jpeg", // TODO: Replace with API data
-    },
-  }), [])
+  // Now playing metadata from API
+  const [title, setTitle] = useState<string>('Live on éist')
+  const [artist, setArtist] = useState<string>('éist')
+  const [artwork, setArtwork] = useState<string>(
+    '../assets/images/eist_online.png'
+  )
 
-  // Initialize the VideoPlayer (audio-only) with lock screen support
+  // Fetch artist details by ID
+  const getArtistDetails = useCallback(async (artistId: string | null) => {
+    if (!artistId) return { name: ' ', image: artwork }
+    try {
+      const res = await fetch(`${apiUrl}/artists/${artistId}`, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      const artistObj = json.artist || {}
+      return {
+        name: artistObj.name || ' ',
+        image:
+          artistObj.logo?.['256x256'] ||
+          artwork,
+      }
+    } catch {
+      return { name: ' ', image: artwork }
+    }
+  }, [artwork])
+
+  // fetch now-playing and update metadata
+  const fetchNowPlaying = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiUrl}/schedule/live`, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const { status, content } = (await res.json()).result
+
+      if (status !== 'schedule') {
+        // off-air fallback
+        setTitle(' ')
+        setArtist('éist · off air')
+        setArtwork(artwork)
+      } else {
+        const showTitle = content.title || ' '
+        setTitle(showTitle)
+
+        const artistId = content.artistIds?.[0] ?? null
+        const { name, image } = await getArtistDetails(artistId)
+        setArtist(name)
+        setArtwork(image)
+      }
+    } catch (err) {
+      console.warn('fetchNowPlaying failed', err)
+      setTitle(' ')
+      setArtist('éist · off air')
+      // leave artwork at last known (or placeholder)
+    }
+  }, [getArtistDetails, artwork])
+
+  // poll every 30 s
+  useEffect(() => {
+    fetchNowPlaying()
+    const iv = setInterval(fetchNowPlaying, 30000)
+    return () => clearInterval(iv)
+  }, [fetchNowPlaying])
+
+  // rebuild source whenever metadata changes:
+  const sourceWithMetadata = useMemo(
+    () => ({
+      uri: STREAM_URL,
+      metadata: {
+        title,
+        artist,
+        artwork,
+      },
+    }),
+    [title, artist, artwork]
+  )
+
+  // initialize Expo VideoPlayer with lock-screen / background audio
   const player = useVideoPlayer(sourceWithMetadata, (p) => {
     if (p) {
       p.loop = false
       p.staysActiveInBackground = true
       p.showNowPlayingNotification = true
-      p.audioMixingMode = "doNotMix"
+      p.audioMixingMode = 'doNotMix'
     }
   })
 
   const [isPlaying, setIsPlaying] = useState(false)
 
-  // Configure audio mode on initialization
+  // configure audio mode on mount
   useEffect(() => {
-    const configureAudio = async () => {
-      try {
-        await setAudioModeAsync({
-          shouldPlayInBackground: true,
-          playsInSilentMode: true,
-          interruptionMode: "doNotMix",
-          interruptionModeAndroid: "doNotMix",
-          allowsRecording: false,
-          shouldRouteThroughEarpiece: false,
-        })
-      } catch (err) {
-        console.error('Failed to configure audio mode:', err)
-      }
-    }
-    configureAudio()
+    setAudioModeAsync({
+      shouldPlayInBackground: true,
+      playsInSilentMode: true,
+      interruptionMode: 'doNotMix',
+      interruptionModeAndroid: 'doNotMix',
+      allowsRecording: false,
+      shouldRouteThroughEarpiece: false,
+    }).catch((err) => console.error('Audio mode failed', err))
   }, [])
 
-  // Play/pause helper, driven by local state
+  // play/pause toggle
   const togglePlay = async () => {
-    if (!player) {
-      console.warn('Player not available')
-      return
-    }
-    
+    if (!player) return console.warn('Player not ready')
     try {
       if (isPlaying) {
-        if (player.pause) {
-          await player.pause()
-        }
+        await player.pause?.()
         setIsPlaying(false)
       } else {
-        if (player.play) {
-          await player.play()
-        }
+        await player.play?.()
         setIsPlaying(true)
       }
     } catch (err) {
-      console.error('Playback error:', err)
+      console.error('Playback error', err)
     }
   }
 
@@ -94,11 +155,8 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
   )
 }
 
-// Custom hook for consuming the audio context — top‐level export
 export const useAudio = (): AudioContextType => {
   const ctx = useContext(AudioContext)
-  if (!ctx) {
-    throw new Error('useAudio must be used within AudioProvider')
-  }
+  if (!ctx) throw new Error('useAudio must be used within AudioProvider')
   return ctx
 }
