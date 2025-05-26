@@ -1,5 +1,5 @@
 // listen.tsx
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 import {
   View,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
+  ImageSourcePropType,
 } from 'react-native'
 import { useTheme, useFocusEffect } from '@react-navigation/native'
 import { API_KEY as apiKey } from '@env'
@@ -30,50 +31,60 @@ export default function ListenScreen() {
   const { width, height } = Dimensions.get('window')
 
   // UI state from API
-  const [showTitle, setShowTitle] = useState<string>('—')
+  const [showTitle, setShowTitle] = useState<string>(' ')
   const [showDescription, setShowDescription] = useState<string>(' ')
   const [artistName, setArtistName] = useState<string>('éist · off air')
-  const [artistImage, setArtistImage] = useState<any>(placeholderOfflineImage)
+  // Use ImageSourcePropType so we can mix require(...) & {uri: string}
+  const [artistImage, setArtistImage] = useState<ImageSourcePropType>(
+    placeholderOfflineImage
+  )
   const [broadcastStatus, setBroadcastStatus] = useState<string>('off air')
 
   // Fetch artist details by ID
-  const getArtistDetails = async (artistId: string | null) => {
-    if (!artistId) {
-      return {
-        name: '—',
-        bio: ' ',
-        image: placeholderArtistImage,
+  const getArtistDetails = useCallback(
+    async (artistId: string | null) => {
+      if (!artistId) {
+        return {
+          name: ' ',
+          bio: ' ',
+          image: placeholderArtistImage as ImageSourcePropType,
+        }
       }
-    }
-    try {
-      const res = await fetch(`${apiUrl}/artists/${artistId}`, {
-        headers: {
-          'x-api-key': apiKey,
-          'Content-Type': 'application/json',
-        },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
-      const artist = json.artist || {}
-      return {
-        name: artist.name || '—',
-        bio:
-          artist.description?.content?.[0]?.content?.[0]?.text ||
-          'No description available',
-        image: artist.logo?.['256x256'] || placeholderArtistImage,
+      try {
+        const res = await fetch(`${apiUrl}/artists/${artistId}`, {
+          headers: {
+            'x-api-key': apiKey,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        const artist = json.artist || {}
+        const imageUrl: string | undefined = artist.logo?.['256x256']
+        return {
+          name: artist.name || ' ',
+          bio:
+            artist.description?.content?.[0]?.content?.[0]?.text ||
+            'No description available',
+          // wrap remote URL in { uri }
+          image: imageUrl
+            ? ({ uri: imageUrl } as ImageSourcePropType)
+            : (placeholderArtistImage as ImageSourcePropType),
+        }
+      } catch (err) {
+        console.error('getArtistDetails failed', err)
+        return {
+          name: ' ',
+          bio: ' ',
+          image: placeholderArtistImage as ImageSourcePropType,
+        }
       }
-    } catch (err) {
-      console.error('getArtistDetails failed', err)
-      return {
-        name: '—',
-        bio: ' ',
-        image: placeholderArtistImage,
-      }
-    }
-  }
+    },
+    []
+  )
 
   // Fetch now‐playing + artist → update state
-  const fetchNowPlaying = async () => {
+  const fetchNowPlaying = useCallback(async () => {
     try {
       const res = await fetch(`${apiUrl}/schedule/live`, {
         headers: {
@@ -88,13 +99,13 @@ export default function ListenScreen() {
 
       if (status !== 'schedule') {
         // Off air: show offline placeholder
-        setShowTitle('—')
+        setShowTitle(' ')
         setArtistName('éist · off air')
         setArtistImage(placeholderOfflineImage)
         setShowDescription(' ')
       } else {
         // Live: fetch artist details
-        const title = content.title || '—'
+        const title = content.title || ' '
         setShowTitle(title)
         const artistId = content.artistIds?.[0] ?? null
         const details = await getArtistDetails(artistId)
@@ -106,12 +117,12 @@ export default function ListenScreen() {
       console.error('fetchNowPlaying failed', err)
       // On error: fallback to offline
       setBroadcastStatus('error')
-      setShowTitle('—')
+      setShowTitle(' ')
       setArtistName('éist · off air')
       setArtistImage(placeholderOfflineImage)
       setShowDescription(' ')
     }
-  }
+  }, [getArtistDetails])
 
   // Poll every 30s when screen is focused
   useFocusEffect(
@@ -119,7 +130,7 @@ export default function ListenScreen() {
       fetchNowPlaying()
       const interval = setInterval(fetchNowPlaying, 30000)
       return () => clearInterval(interval)
-    }, [])
+    }, [fetchNowPlaying])
   )
 
   // Play/pause icon
