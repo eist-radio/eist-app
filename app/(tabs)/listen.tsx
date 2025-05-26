@@ -13,8 +13,11 @@ import { ThemedText } from '@/components/ThemedText'
 import { useAudio } from '../../context/AudioContext'
 import { Ionicons } from '@expo/vector-icons'
 
-// Make sure you have a PNG here:
+// Assets
+const artwork = require('../../assets/images/artist.jpeg')
 const logoImage = require('../../assets/images/eist-logo-header.png')
+// Gradient overlay
+const gradientOverlay = require('../../assets/images/gradient.png')
 
 export default function ListenScreen() {
   const { colors } = useTheme()
@@ -24,26 +27,33 @@ export default function ListenScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      {/* Top half: artwork with gradient and logo */}
       <View style={[styles.imageContainer, { height: height / 2 }]}>
+        {/* Background artwork */}
         <Image
-          source={require('../../assets/images/artist.jpeg')}
+          source={artwork}
           style={{ width, height: width }}
           resizeMode="cover"
         />
 
-        {/* logo */}
+        {/* Gradient overlay PNG stretched over the image */}
+        <Image
+          source={gradientOverlay}
+          style={[StyleSheet.absoluteFill, { width, height: width }]}
+          resizeMode="stretch"
+        />
+
+        {/* Logo on top */}
         <View style={styles.logoContainer}>
           <Image
             source={logoImage}
-            style={{
-              width: 112,
-              height: 112,
-            }}
+            style={{ width: 112, height: 112 }}
             resizeMode="contain"
           />
         </View>
       </View>
 
+      {/* Bottom half: controls and now-playing info */}
       <View style={styles.bottom}>
         <View style={styles.controlContainer}>
           <TouchableOpacity onPress={togglePlay} style={styles.playButton}>
@@ -53,7 +63,7 @@ export default function ListenScreen() {
             type="subtitle"
             style={[styles.artistName, { color: colors.text }]}
           >
-            Dj Artist name here
+            DJ Artist Name
           </ThemedText>
         </View>
 
@@ -71,9 +81,7 @@ export default function ListenScreen() {
             type="body"
             style={[styles.showDescription, { color: colors.text }]}
           >
-            Show description goes here. This will later be pulled from the API.
-            Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.Show description goes here. This will later be pulled from the API.
-            {/* …long text… */}
+            Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API. Show description goes here. This will later be pulled from the API.
           </ThemedText>
         </ScrollView>
       </View>
@@ -97,7 +105,7 @@ const styles = StyleSheet.create({
   },
   bottom: {
     flex: 1,
-    paddingBottom: 12, // breathing room
+    paddingBottom: 12,
     alignItems: 'flex-start',
   },
   controlContainer: {
