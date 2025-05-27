@@ -1,13 +1,14 @@
 // app/(tabs)/_layout.tsx
-import React from 'react'
-import { Tabs } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
-import { useTheme } from '@react-navigation/native'
+
+import React from 'react';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@react-navigation/native';
 
 export default function TabLayout() {
-  const { colors } = useTheme()
-  const ACTIVE = colors.primary
-  const INACTIVE = 'rgba(175, 252, 65, 0.5)'
+  const { colors } = useTheme();
+  const ACTIVE = colors.primary;
+  const INACTIVE = 'rgba(175, 252, 65, 0.5)';
 
   return (
     <Tabs
@@ -59,6 +60,15 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* Artist detail route — no tab button */}
+      <Tabs.Screen
+        name="artist/[slug]"
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' } // no empty space
+        }}
+      />
     </Tabs>
-  )
+  );
 }
