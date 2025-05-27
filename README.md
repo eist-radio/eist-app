@@ -49,6 +49,14 @@ Join our community of developers creating universal apps.
 - [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
 - [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
 
+## Colours
+
+```cmd
+$eist: #4733FF !default;
+$eist-secondary: #AFFC41 !default;
+$eist-highlight: #96BFE6 !default;
+```
+
 ## Hack
 
 iOS device testing:

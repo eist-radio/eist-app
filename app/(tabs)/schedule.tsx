@@ -69,7 +69,6 @@ export default function ScheduleScreen() {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const buckets: Record<string, RawScheduleItem[]> = {};
 
-    // bucket by date (rolling back midnight UTC)
     items.forEach(item => {
       const d = new Date(item.startDateUtc);
       let dateKey = d.toISOString().split('T')[0];
@@ -83,7 +82,6 @@ export default function ScheduleScreen() {
       }
     });
 
-    // build sections
     return Object.entries(buckets)
       .map(([dateKey, dayItems]) => {
         const header = new Date(dateKey).toLocaleDateString(undefined, {
@@ -94,18 +92,14 @@ export default function ScheduleScreen() {
 
         const data = dayItems.map(it => {
           const d = new Date(it.startDateUtc);
-
-          // format without dots in AM/PM
           const raw = d.toLocaleTimeString('en-US', {
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
             timeZone: tz,
           });
-          const time = raw.toLowerCase(); // e.g. "9:00 am"
-
           return {
-            time,
+            time: raw.toLowerCase(),
             show: it.title.trim(),
           };
         });
@@ -132,7 +126,9 @@ export default function ScheduleScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Title now shares the same 8px horizontal inset */}
       <Text style={[styles.title, { color: colors.primary }]}>Schedule</Text>
+
       <SectionList
         sections={sections}
         keyExtractor={(item, idx) => item.time + idx}
@@ -169,32 +165,44 @@ export default function ScheduleScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 32, paddingHorizontal: 8, marginTop: 48 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 8 },
+  container: {
+    flex: 1,
+    paddingTop: 32,
+    paddingHorizontal: 8,  // ← add back horizontal padding
+    marginTop: 48,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
   sectionHeader: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     marginTop: 12,
     marginBottom: 4,
   },
   headerRow: {
     flexDirection: 'row',
-    paddingHorizontal: 4,
     paddingVertical: 4,
   },
   headerCell: {
     flex: 1,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'left',
   },
-  list: { paddingBottom: 16 },
+  list: {
+    paddingBottom: 16,
+    // no horizontal padding here
+  },
   row: {
     flexDirection: 'row',
-    paddingHorizontal: 4,
     paddingVertical: 6,
   },
   cell: {
     flex: 1,
+    fontSize: 18,
     textAlign: 'left',
   },
 });
