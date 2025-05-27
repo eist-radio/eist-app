@@ -17,7 +17,7 @@ const placeholderOnlineImage = require('../assets/images/eist_online.png')
 const placeholderOfflineImage = require('../assets/images/eist_offline.png')
 
 // Live stream & API constants
-const STREAM_URL = 'https://stream-relay-geo.ntslive.net/stream'
+const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
 const stationId = 'eist-radio'
 const apiUrl = `https://api.radiocult.fm/api/station/${stationId}`
 
@@ -100,12 +100,14 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
     () => ({
       uri: STREAM_URL,
       metadata: {
-        title,
-        artist,
+        // combine artist name and station label into the title
+        title: 'éist',
+        // you can clear out or repurpose the artist field
+        artist: `${artist}`,
         artwork,
       },
     }),
-    [title, artist, artwork]
+    [artist, artwork]
   )
 
   // initialize Expo VideoPlayer with lock-screen / background audio
@@ -129,6 +131,7 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
       interruptionModeAndroid: 'doNotMix',
       allowsRecording: false,
       shouldRouteThroughEarpiece: false,
+      staysActiveInBackground: true,
     }).catch((err) => console.error('Audio mode failed', err))
   }, [])
 
