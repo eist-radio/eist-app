@@ -1,5 +1,4 @@
 // app/artist/[slug].tsx
-
 import React, { useState, useEffect, ReactElement } from 'react';
 import {
   View,

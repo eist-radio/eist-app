@@ -69,6 +69,18 @@ export default function TabLayout() {
           tabBarItemStyle: { display: 'none' } // no empty space
         }}
       />
+
+      {/* Show detail route — no tab button */}
+      <Tabs.Screen
+        name="show/[slug]"
+        options={{
+          tabBarButton: () => null,
+          tabBarItemStyle: { display: 'none' } // no empty space
+        }}
+      />
+
     </Tabs>
+
+
   );
 }
