@@ -163,7 +163,7 @@ export default function ListenScreen() {
         <View style={styles.logoContainer}>
           <Image
             source={logoImage}
-            style={{ width: 112, height: 112 }}
+            style={{ width: 96, height: 96 }}
             resizeMode="contain"
           />
         </View>
@@ -215,7 +215,7 @@ export default function ListenScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   imageContainer: { width: '100%', position: 'relative', overflow: 'hidden' },
-  logoContainer: { position: 'absolute', bottom: 36, right: 24 },
+  logoContainer: { position: 'absolute', top: 48, right: 24 },
   bottom: { flex: 1, paddingBottom: 12, alignItems: 'flex-start' },
   artistNameWrapped: { fontSize: 28, fontWeight: '700', flexShrink: 1, flexWrap: 'wrap' },
   controlContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingLeft: 6 },
