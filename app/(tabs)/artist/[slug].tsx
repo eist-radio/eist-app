@@ -1,4 +1,4 @@
-// app/artist/[slug].tsx
+// app/(tabs)/artist/[slug].tsx
 import React, { useState, useEffect, ReactElement } from 'react';
 import {
   View,
@@ -14,6 +14,7 @@ import { useTheme } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { API_KEY } from '@env';
 import { ThemedText } from '@/components/ThemedText';
+import { stripFormatting } from '../../../utils/stripFormatting';
 
 // Assets
 const gradientOverlay = require('../../../assets/images/gradient.png');
@@ -23,7 +24,12 @@ const { width: screenWidth } = Dimensions.get('window');
 
 type RawArtist = {
   name?: string;
-  description?: { content?: Array<{ content?: Array<{ text?: string }> }> };
+  description?: {
+    content?: Array<{
+      type: string;
+      content?: Array<{ type: string; text?: string }>;
+    }>;
+  };
   logo?: { default?: string; '512x512'?: string; '1024x1024'?: string };
   socials?: {
     twitterHandle?: string;
@@ -38,27 +44,35 @@ type RawArtist = {
 export default function ArtistScreen(): ReactElement {
   const { colors } = useTheme();
   const router = useRouter();
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug } = useLocalSearchParams<{ slug?: string }>();
 
   const [artist, setArtist] = useState<RawArtist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
 
+  // Fetch artist data
   useEffect(() => {
     if (!slug) {
       setError('No artist specified.');
       setLoading(false);
       return;
     }
+
     (async () => {
       try {
         const res = await fetch(
-          `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${slug}`,
+          `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(
+            slug
+          )}`,
           { headers: { 'x-api-key': API_KEY } }
         );
         if (!res.ok) throw new Error(res.statusText);
         const json = await res.json();
-        setArtist(json.artist);
+        if (json?.artist) {
+          setArtist(json.artist);
+        } else {
+          throw new Error();
+        }
       } catch {
         setError('Could not load artist details.');
       } finally {
@@ -70,29 +84,6 @@ export default function ArtistScreen(): ReactElement {
   const openLink = (url: string) =>
     Linking.canOpenURL(url).then(ok => ok && Linking.openURL(url));
 
-  const renderDescription = (
-    desc?: RawArtist['description']
-  ): ReactElement[] | null => {
-    if (!desc?.content) return null;
-    return desc.content
-      .map(block =>
-        block.content
-          ?.map(node => node.text || '')
-          .join('')
-          .trim()
-      )
-      .filter(p => p.length)
-      .map((p, i) => (
-        <ThemedText
-          key={i}
-          type="body"
-          style={[styles.bodyText, { color: colors.text }]}
-        >
-          {p}
-        </ThemedText>
-      ));
-  };
-
   const renderLinks = (socials?: RawArtist['socials']): ReactElement | null => {
     if (!socials) return null;
 
@@ -101,10 +92,7 @@ export default function ArtistScreen(): ReactElement {
     if (socials.twitterHandle)
       entries.push(['Twitter', `https://twitter.com/${socials.twitterHandle}`]);
     if (socials.instagramHandle)
-      entries.push([
-        'Instagram',
-        `https://instagram.com/${socials.instagramHandle}`,
-      ]);
+      entries.push(['Instagram', `https://instagram.com/${socials.instagramHandle}`]);
     if (socials.facebook)
       entries.push(['Facebook', `https://facebook.com/${socials.facebook}`]);
     if (socials.mixcloud)
@@ -114,6 +102,8 @@ export default function ArtistScreen(): ReactElement {
         'SoundCloud',
         `https://soundcloud.com/${socials.soundcloud}`,
       ]);
+
+    if (entries.length === 0) return null;
 
     return (
       <View style={styles.linkRow}>
@@ -153,11 +143,18 @@ export default function ArtistScreen(): ReactElement {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <ThemedText type="body" style={{ color: colors.notification }}>
-          {error || 'Artist not found.'}
+          {error ?? 'Artist not found.'}
         </ThemedText>
       </View>
     );
   }
+
+  // Flatten rich-text into plain paragraphs
+  const plain = stripFormatting(artist.description?.content);
+  const paragraphs = plain
+    .split('\n')
+    .map(p => p.trim())
+    .filter(p => p.length > 0);
 
   const imageUri =
     artist.logo?.default ||
@@ -169,7 +166,7 @@ export default function ArtistScreen(): ReactElement {
       style={[styles.screen, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
     >
-      {/* Avatar + Gradient container */}
+      {/* Avatar + Gradient */}
       <View style={styles.avatarContainer}>
         <Image
           source={{ uri: imageUri }}
@@ -191,7 +188,16 @@ export default function ArtistScreen(): ReactElement {
       </ThemedText>
 
       <View style={styles.textContainer}>
-        {renderDescription(artist.description)}
+        {paragraphs.map((p, i) => (
+          <ThemedText
+            key={i}
+            type="body"
+            style={[styles.bodyText, { color: colors.text }]}
+          >
+            {p}
+          </ThemedText>
+        ))}
+
         {renderLinks(artist.socials)}
       </View>
     </ScrollView>
@@ -204,7 +210,7 @@ const styles = StyleSheet.create({
     paddingTop: 0,
   },
   content: {
-    alignItems: 'left',
+    alignItems: 'flex-start',
     paddingBottom: 24,
   },
   avatarContainer: {
@@ -239,7 +245,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 8,
-    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   linkText: {
