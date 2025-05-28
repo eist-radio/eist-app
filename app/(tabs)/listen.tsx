@@ -20,7 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 // Local assets & placeholders
 const placeholderArtistImage = require('../../assets/images/eist_online.png');
 const placeholderOfflineImage = require('../../assets/images/eist_offline.png');
-const logoImage = require('../../assets/images/eist-logo-header.png');
+const logoImage = require('../../assets/images/eist.png');
 const gradientOverlay = require('../../assets/images/gradient.png');
 
 // API constants
@@ -163,7 +163,7 @@ export default function ListenScreen() {
         <View style={styles.logoContainer}>
           <Image
             source={logoImage}
-            style={{ width: 96, height: 96 }}
+            style={{ width: 150, height: 150 }}
             resizeMode="contain"
           />
         </View>
@@ -215,7 +215,7 @@ export default function ListenScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   imageContainer: { width: '100%', position: 'relative', overflow: 'hidden' },
-  logoContainer: { position: 'absolute', top: 48, right: 24 },
+  logoContainer: { position: 'absolute', top: 64, right: 8 },
   bottom: { flex: 1, paddingBottom: 12, alignItems: 'flex-start' },
   artistNameWrapped: { fontSize: 28, fontWeight: '700', flexShrink: 1, flexWrap: 'wrap' },
   controlContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingLeft: 6 },
