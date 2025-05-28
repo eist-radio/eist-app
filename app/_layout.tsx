@@ -1,6 +1,11 @@
 // app/_layout.tsx
-import React, { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import React, {
+  useCallback,
+  useEffect,
+  useState,
+  Suspense,
+} from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider } from '@react-navigation/native';
 import { EistLightTheme, EistDarkTheme } from '../themes';
@@ -11,48 +16,71 @@ import 'react-native-reanimated';
 import { AudioProvider } from '../context/AudioContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 
-// Do NOT await here - just kick off the promise so the splash won't auto-hide
+// React Query imports
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+// Prevent the native splash from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
+const queryClient = new QueryClient();
+
 export default function RootLayout() {
-  // Hooks (always at top)
+  // --- app-ready state (fonts, splash)
   const [fontsLoaded] = useFonts({
     FunnelSans: require('../assets/fonts/FunnelSans-VariableFont_wght.ttf'),
   });
   const [isReady, setIsReady] = useState(false);
+
+  // theme
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? EistDarkTheme : EistLightTheme;
 
-  // Mark ready once fonts have loaded
+  // once fonts are in, mark app ready
   useEffect(() => {
     if (fontsLoaded) {
       setIsReady(true);
     }
   }, [fontsLoaded]);
 
-  // Hide splash in an async callback on layout
+  // hide the splash as soon as the first layout pass happens
   const onLayoutRootView = useCallback(async () => {
     if (isReady) {
-      // This is inside an async function, so await is OK
       await SplashScreen.hideAsync();
     }
   }, [isReady]);
 
-  // Don't render anything and keep the native splash until ready
+  // keep splash up
   if (!isReady) {
     return null;
   }
 
-  // Once ready, render the app and hide the splash on first layout
   return (
     <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-      <AudioProvider>
-        <ThemeProvider value={theme}>
-          {/* ← Auto-wires all nested layouts & screens */}
-          <Stack screenOptions={{ headerShown: false }} />
-          <StatusBar style="auto" />
-        </ThemeProvider>
-      </AudioProvider>
+      {/* Provide React Query client */}
+      <QueryClientProvider client={queryClient}>
+        {/* 
+          Any screen with useQuery({ suspense: true }) will
+          keep this spinner visible until its data resolves 
+        */}
+        <Suspense
+          fallback={
+            <View style={{
+              flex: 1,
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}>
+              <ActivityIndicator size="large" />
+            </View>
+          }
+        >
+          <AudioProvider>
+            <ThemeProvider value={theme}>
+              <Stack screenOptions={{ headerShown: false }} />
+              <StatusBar style="auto" />
+            </ThemeProvider>
+          </AudioProvider>
+        </Suspense>
+      </QueryClientProvider>
     </View>
   );
 }
