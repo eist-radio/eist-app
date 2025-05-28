@@ -10,6 +10,7 @@ import {
 import { useTheme } from '@react-navigation/native';
 import { useLocalSearchParams, Link } from 'expo-router';
 import { API_KEY } from '@env';
+import { stripFormatting } from '../../../utils/stripFormatting';
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
@@ -50,9 +51,12 @@ type SectionData = {
 };
 
 export default function ShowScreen() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  // Route & theme
+  const params = useLocalSearchParams<{ slug?: string }>();
+  const slug = params.slug;
   const { colors } = useTheme();
 
+  // State
   const [event, setEvent] = useState<RawScheduleItem | null>(null);
   const [host, setHost] = useState<Artist | null>(null);
   const [sections, setSections] = useState<SectionData[]>([]);
@@ -61,6 +65,12 @@ export default function ShowScreen() {
 
   // Fetch schedule & pick this event
   useEffect(() => {
+    if (!slug) {
+      setError('No show selected.');
+      setLoading(false);
+      return;
+    }
+
     (async () => {
       try {
         const today = new Date();
@@ -71,9 +81,15 @@ export default function ShowScreen() {
         const endIso = fmt(endDate, '23:59:59Z');
         const raw = await fetchSchedule(startIso, endIso);
 
-        const all = (raw.schedules || []) as RawScheduleItem[];
+        const all = Array.isArray(raw.schedules)
+          ? (raw.schedules as RawScheduleItem[])
+          : [];
+
         const matches = all.filter(e => e.id === slug);
-        if (!matches.length) throw new Error('No such show');
+        if (matches.length === 0) {
+          throw new Error('No such show');
+        }
+
         setEvent(matches[0]);
         setSections(groupByDate(matches));
       } catch {
@@ -84,24 +100,27 @@ export default function ShowScreen() {
     })();
   }, [slug]);
 
-  // Fetch host artist once event is loaded
+  // Fetch host artist
   useEffect(() => {
-    if (!event?.artistIds?.[0]) return;
+    const firstId = event?.artistIds?.[0];
+    if (!firstId) return;
+
     (async () => {
       try {
-        const artistId = event.artistIds[0];
-        const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${artistId}`;
+        const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${firstId}`;
         const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
         if (!res.ok) throw new Error();
         const json = await res.json();
-        setHost(json.artist);
+        if (json?.artist?.id) {
+          setHost(json.artist);
+        }
       } catch {
-        // ignore errors
+        // ignore
       }
     })();
   }, [event]);
 
-  // Show loading or error states first
+  // Loading / error
   if (loading) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
@@ -112,10 +131,15 @@ export default function ShowScreen() {
   if (error || !event) {
     return (
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.notification }}>{error}</Text>
+        <Text style={{ color: colors.notification }}>
+          {error ?? 'Unknown error.'}
+        </Text>
       </View>
     );
   }
+
+  // Strip formatting to plain text (handles undefined/content safely)
+  const plainDescription = stripFormatting(event.description?.content);
 
   return (
     <View style={[styles.wrapper, { backgroundColor: colors.background }]}>
@@ -131,8 +155,8 @@ export default function ShowScreen() {
               {event.title}
             </Text>
 
-            {/* Host link immediately after title */}
-            {host?.name && (
+            {/* Host link */}
+            {host?.name && host.id && (
               <Link
                 href={`/artist/${encodeURIComponent(host.id)}`}
                 style={styles.hostLinkContainer}
@@ -143,8 +167,12 @@ export default function ShowScreen() {
               </Link>
             )}
 
-            {/* Description follows host link */}
-            {renderDescription(event, colors)}
+            {/* Plain-text description */}
+            {plainDescription.length > 0 && (
+              <Text style={[styles.description, { color: colors.text }]}>
+                {plainDescription}
+              </Text>
+            )}
           </View>
         }
         renderSectionHeader={({ section: { title } }) => (
@@ -164,12 +192,12 @@ export default function ShowScreen() {
   );
 }
 
-// Format helper
+// Helpers
+
 function fmt(d: Date, suffix: string) {
   return d.toISOString().split('T')[0] + 'T' + suffix;
 }
 
-// Fetch the station schedule
 async function fetchSchedule(startDate: string, endDate: string) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const url =
@@ -177,16 +205,16 @@ async function fetchSchedule(startDate: string, endDate: string) {
     `?startDate=${startDate}&endDate=${endDate}&timeZone=${tz}`;
   const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
   if (!res.ok) throw new Error(res.statusText);
-  return res.json();
+  return res.json() as Promise<{ schedules?: RawScheduleItem[] }>;
 }
 
-// Group events by local date
 function groupByDate(items: RawScheduleItem[]): SectionData[] {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const buckets: Record<string, RawScheduleItem[]> = {};
 
   items.forEach(item => {
     const d = new Date(item.startDateUtc);
+    if (isNaN(d.getTime())) return;
     let dateKey = d.toISOString().split('T')[0];
     if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
       const prev = new Date(d);
@@ -214,26 +242,11 @@ function groupByDate(items: RawScheduleItem[]): SectionData[] {
         return { time: raw.toLowerCase() };
       }),
     }))
-    .sort((a, b) => new Date(a.title).getTime() - new Date(b.title).getTime());
-}
-
-// Render the JSONContent description
-function renderDescription(
-  event: RawScheduleItem,
-  colors: ReturnType<typeof useTheme>['colors']
-) {
-  if (!event.description?.content) return null;
-  return event.description.content.map((node, i) => {
-    if (node.type === 'paragraph' && Array.isArray(node.content)) {
-      const text = node.content.map(c => c.text || '').join('');
-      return (
-        <Text key={i} style={[styles.description, { color: colors.text }]}>
-          {text}
-        </Text>
-      );
-    }
-    return null;
-  });
+    .sort((a, b) => {
+      const da = Date.parse(a.title);
+      const db = Date.parse(b.title);
+      return isNaN(da) || isNaN(db) ? 0 : da - db;
+    });
 }
 
 const styles = StyleSheet.create({
@@ -261,7 +274,6 @@ const styles = StyleSheet.create({
   hostLink: {
     fontSize: 16,
     fontWeight: '600',
-    fontStyle: 'bold',
   },
   description: {
     fontSize: 16,

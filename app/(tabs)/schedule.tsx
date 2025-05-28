@@ -36,7 +36,7 @@ type RawScheduleItem = {
 type SectionData = {
   title: string;
   data: Array<{
-    time: string;
+    time: string;   // now a range like "8:00 - 11:00 pm"
     title: string;
     id: string;
   }>;
@@ -79,7 +79,7 @@ export default function ScheduleScreen() {
       `?startDate=${startDate}&endDate=${endDate}&timeZone=${tz}`;
     const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
     if (!res.ok) throw new Error(res.statusText);
-    return res.json();
+    return res.json() as Promise<{ schedules?: RawScheduleItem[] }>;
   }
 
   function groupByDate(items: RawScheduleItem[]): SectionData[] {
@@ -109,8 +109,10 @@ export default function ScheduleScreen() {
           month: 'long',
         }),
         data: dayItems.map(it => {
-          const d = new Date(it.startDateUtc);
-          const time = d
+          const startDate = new Date(it.startDateUtc);
+          const endDate = new Date(it.endDateUtc);
+
+          const startStr = startDate
             .toLocaleTimeString('en-US', {
               hour: 'numeric',
               minute: '2-digit',
@@ -118,6 +120,27 @@ export default function ScheduleScreen() {
               timeZone: tz,
             })
             .toLowerCase();
+
+          const endStr = endDate
+            .toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+              timeZone: tz,
+            })
+            .toLowerCase();
+
+          // If both times share the same " am"/" pm" suffix, omit it on the start time
+          const suffixMatch = endStr.match(/\s(am|pm)$/);
+          const endSuffix = suffixMatch ? suffixMatch[0] : '';
+          const startSuffixMatch = startStr.match(/\s(am|pm)$/);
+          const startSuffix = startSuffixMatch ? startSuffixMatch[0] : '';
+
+          const time =
+            endSuffix && startSuffix === endSuffix
+              ? `${startStr.replace(endSuffix, '')} - ${endStr}`
+              : `${startStr} - ${endStr}`;
+
           return {
             time,
             title: it.title.trim(),
@@ -162,7 +185,7 @@ export default function ScheduleScreen() {
             </Text>
             <View style={styles.headerRow}>
               <Text style={[styles.headerCell, { color: colors.primary }]}>
-                Start
+                Time
               </Text>
               <Text style={[styles.headerCell, { color: colors.primary }]}>
                 Show
