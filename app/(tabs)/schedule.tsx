@@ -7,22 +7,38 @@ import {
   SectionList,
   ActivityIndicator,
 } from 'react-native';
+import { Link } from 'expo-router';
 import { useTheme } from '@react-navigation/native';
 import { API_KEY } from '@env';
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
 
+// matches the Radiocult API “event” object
 type RawScheduleItem = {
-  startDateUtc: string;
+  id: string;
+  stationId: string;
   title: string;
+  startDateUtc: string;
+  endDateUtc: string;
+  description?: any;       // JSONContent
+  duration: number;
+  timezone: string;
+  color?: string;
+  artistIds?: string[];
+  isRecurring: boolean;
+  media:
+    | { type: 'mix'; trackId?: string }
+    | { type: 'playlist'; playlistId: string }
+    | { type: 'live' };
 };
 
 type SectionData = {
   title: string;
   data: Array<{
     time: string;
-    show: string;
+    title: string;
+    id: string;
   }>;
 };
 
@@ -42,6 +58,7 @@ export default function ScheduleScreen() {
         const startIso = fmt(today, '00:00:00Z');
         const endIso = fmt(endDate, '23:59:59Z');
         const raw = await fetchSchedule(startIso, endIso);
+
         setSections(groupByDate(raw.schedules || []));
       } catch {
         setError('Could not load schedule.');
@@ -57,8 +74,9 @@ export default function ScheduleScreen() {
 
   async function fetchSchedule(startDate: string, endDate: string) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const url = `https://api.radiocult.fm/api/station/${STATION_ID}/schedule`
-      + `?startDate=${startDate}&endDate=${endDate}&timeZone=${tz}`;
+    const url =
+      `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
+      `?startDate=${startDate}&endDate=${endDate}&timeZone=${tz}`;
     const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
     if (!res.ok) throw new Error(res.statusText);
     return res.json();
@@ -72,6 +90,7 @@ export default function ScheduleScreen() {
     items.forEach(item => {
       const d = new Date(item.startDateUtc);
       let dateKey = d.toISOString().split('T')[0];
+      // midnights belong to the previous day
       if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
         const prev = new Date(d);
         prev.setUTCDate(prev.getUTCDate() - 1);
@@ -83,30 +102,33 @@ export default function ScheduleScreen() {
     });
 
     return Object.entries(buckets)
-      .map(([dateKey, dayItems]) => {
-        const header = new Date(dateKey).toLocaleDateString(undefined, {
+      .map(([dateKey, dayItems]) => ({
+        title: new Date(dateKey).toLocaleDateString(undefined, {
           weekday: 'long',
           day: 'numeric',
           month: 'long',
-        });
-
-        const data = dayItems.map(it => {
+        }),
+        data: dayItems.map(it => {
           const d = new Date(it.startDateUtc);
-          const raw = d.toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-            timeZone: tz,
-          });
+          const time = d
+            .toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+              timeZone: tz,
+            })
+            .toLowerCase();
           return {
-            time: raw.toLowerCase(),
-            show: it.title.trim(),
+            time,
+            title: it.title.trim(),
+            id: it.id,
           };
-        });
-
-        return { title: header, data };
-      })
-      .sort((a, b) => new Date(a.title).getTime() - new Date(b.title).getTime());
+        }),
+      }))
+      .sort(
+        (a, b) =>
+          new Date(a.title).getTime() - new Date(b.title).getTime()
+      );
   }
 
   if (loading) {
@@ -116,6 +138,7 @@ export default function ScheduleScreen() {
       </View>
     );
   }
+
   if (error) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -126,12 +149,11 @@ export default function ScheduleScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Title now shares the same 8px horizontal inset */}
       <Text style={[styles.title, { color: colors.primary }]}>Schedule</Text>
 
       <SectionList
         sections={sections}
-        keyExtractor={(item, idx) => item.time + idx}
+        keyExtractor={(item, idx) => item.id + idx}
         stickySectionHeadersEnabled={false}
         renderSectionHeader={({ section: { title } }) => (
           <>
@@ -153,9 +175,14 @@ export default function ScheduleScreen() {
             <Text style={[styles.cell, { color: colors.text }]}>
               {item.time}
             </Text>
-            <Text style={[styles.cell, { color: colors.text }]}>
-              {item.show}
-            </Text>
+            <Link
+              href={`/show/${encodeURIComponent(item.id)}`}
+              style={styles.cell}
+            >
+              <Text style={[styles.cell, { color: colors.primary }]}>
+                {item.title}
+              </Text>
+            </Link>
           </View>
         )}
         contentContainerStyle={styles.list}
@@ -168,7 +195,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 32,
-    paddingHorizontal: 8,  // ← add back horizontal padding
+    paddingHorizontal: 8,
     marginTop: 48,
   },
   title: {
@@ -194,7 +221,6 @@ const styles = StyleSheet.create({
   },
   list: {
     paddingBottom: 16,
-    // no horizontal padding here
   },
   row: {
     flexDirection: 'row',
