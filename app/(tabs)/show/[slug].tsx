@@ -9,7 +9,7 @@ import {
 import { useTheme } from '@react-navigation/native';
 import { useLocalSearchParams, Link } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { API_KEY } from '@env';
+import { apiKey } from '../../../config';
 import { stripFormatting } from '../../../utils/stripFormatting';
 
 const STATION_ID = 'eist-radio';
@@ -47,7 +47,7 @@ async function fetchSchedule(
 ): Promise<RawScheduleItem[]> {
   const url = `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
               `?startDate=${startDate}&endDate=${endDate}`;
-  const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
+  const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
   if (!res.ok) throw new Error(`Schedule fetch failed: ${res.statusText}`);
   const json = (await res.json()) as { schedules?: RawScheduleItem[] };
   if (!json.schedules) throw new Error('No schedules returned');
@@ -72,7 +72,7 @@ async function fetchEventById(id: string): Promise<RawScheduleItem> {
 // 3. Fetch the host artist by its ID
 async function fetchHostArtist(artistId: string): Promise<Artist> {
   const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${artistId}`;
-  const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
+  const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
   if (!res.ok) throw new Error(`Artist fetch failed: ${res.statusText}`);
   const json = (await res.json()) as { artist?: Artist };
   if (!json.artist) throw new Error('Artist not found');
@@ -206,14 +206,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerContainer: {
-    marginTop: 64,
+    marginTop: 72,
     paddingTop: 32,
     paddingHorizontal: 8,
     paddingBottom: 16,
   },
   list: { paddingBottom: 16 },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '700',
     marginBottom: 8,
   },
@@ -221,16 +221,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   hostLink: {
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '600',
   },
   description: {
-    fontSize: 16,
+    fontSize: 18,
     marginBottom: 6,
     lineHeight: 22,
   },
   sectionHeader: {
-    fontSize: 15,
+    fontSize: 17,
     fontStyle: 'italic',
     marginTop: 12,
     marginBottom: 4,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   cell: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 17,
     fontStyle: 'italic',
     textAlign: 'left',
   },
