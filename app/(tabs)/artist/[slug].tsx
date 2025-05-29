@@ -13,7 +13,7 @@ import {
 import { useTheme } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { API_KEY } from '@env';
+import { apiKey } from '../../../config';
 import { ThemedText } from '@/components/ThemedText';
 import { stripFormatting } from '../../../utils/stripFormatting';
 
@@ -46,7 +46,7 @@ async function fetchArtistBySlug(slug: string): Promise<RawArtist> {
     `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(
       slug
     )}`;
-  const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
+  const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
   if (!res.ok) throw new Error(`Artist fetch failed: ${res.statusText}`);
   const json = (await res.json()) as { artist?: RawArtist };
   if (!json.artist) throw new Error('Artist not found');

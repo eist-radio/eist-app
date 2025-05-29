@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "eist-app",
+    "name": "éist",
     "slug": "eist-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,7 +13,9 @@
       "bundleIdentifier": "com.oootini.eistapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["audio"]
+        "UIBackgroundModes": [
+          "audio"
+        ]
       }
     },
     "android": {
@@ -48,15 +50,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/eist-logo.png",
+          "image": "./assets/images/eist.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#4733FF"
         }
       ],
       "expo-audio",
-      "expo-video",
-      "react-native-google-cast"
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": false

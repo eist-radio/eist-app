@@ -12,15 +12,15 @@ import {
 } from 'react-native';
 import { useTheme, useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { API_KEY as apiKey } from '@env';
 import { ThemedText } from '@/components/ThemedText';
 import { useAudio } from '../../context/AudioContext';
 import { Ionicons } from '@expo/vector-icons';
+import { apiKey } from '../../config';
 
 // Local assets & placeholders
 const placeholderArtistImage = require('../../assets/images/eist_online.png');
 const placeholderOfflineImage = require('../../assets/images/eist_offline.png');
-const logoImage = require('../../assets/images/eist.png');
+const logoImage = require('../../assets/images/eist-logo-header.png');
 const gradientOverlay = require('../../assets/images/gradient.png');
 
 // API constants
@@ -163,7 +163,7 @@ export default function ListenScreen() {
         <View style={styles.logoContainer}>
           <Image
             source={logoImage}
-            style={{ width: 150, height: 150 }}
+            style={{ width: 74, height: 74 }}
             resizeMode="contain"
           />
         </View>
@@ -215,7 +215,7 @@ export default function ListenScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   imageContainer: { width: '100%', position: 'relative', overflow: 'hidden' },
-  logoContainer: { position: 'absolute', top: 64, right: 8 },
+  logoContainer: { position: 'absolute', top: 36, right: 18 },
   bottom: { flex: 1, paddingBottom: 12, alignItems: 'flex-start' },
   artistNameWrapped: { fontSize: 28, fontWeight: '700', flexShrink: 1, flexWrap: 'wrap' },
   controlContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingLeft: 6 },

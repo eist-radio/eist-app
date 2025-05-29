@@ -11,7 +11,10 @@
       }
     },
     "production": {
-      "distribution": "store"
+      "distribution": "store",
+      "env": {
+        "API_KEY": "@API_KEY"
+      }
     }
   }
 }

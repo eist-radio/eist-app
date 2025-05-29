@@ -101,7 +101,10 @@ export default function TabLayout() {
           tabBarShowLabel:      false,
           tabBarActiveTintColor:   ACTIVE,
           tabBarInactiveTintColor: INACTIVE,
-          tabBarStyle:          { backgroundColor: colors.card },
+          tabBarStyle: { 
+            backgroundColor: colors.card,
+            marginTop: 12,
+          },
         }}
       >
         {/* Live tab */}
@@ -109,7 +112,7 @@ export default function TabLayout() {
           name="listen"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="radio-outline" size={size ?? 24} color={color} />
+              <Ionicons name="radio-outline" size={(size ?? 24) * 1.2} color={color} />
             ),
           }}
         />
@@ -119,7 +122,7 @@ export default function TabLayout() {
           name="schedule"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calendar-outline" size={size ?? 24} color={color} />
+              <Ionicons name="calendar-outline" size={(size ?? 24) * 1.2} color={color} />
             ),
           }}
         />
@@ -129,7 +132,7 @@ export default function TabLayout() {
           name="share"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="share-outline" size={size ?? 24} color={color} />
+              <Ionicons name="share-outline" size={(size ?? 24) * 1.2} color={color} />
             ),
             tabBarButton: ({ children, ...props }) => (
               <TouchableOpacity {...props} onPress={onShare}>
@@ -144,7 +147,7 @@ export default function TabLayout() {
           name="website"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="globe-outline" size={size ?? 24} color={color} />
+              <Ionicons name="globe-outline" size={(size ?? 24) * 1.2} color={color} />
             ),
           }}
         />
@@ -154,7 +157,7 @@ export default function TabLayout() {
           name="discord"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="logo-discord" size={size ?? 24} color={color} />
+              <Ionicons name="logo-discord" size={(size ?? 24) * 1.2} color={color} />
             ),
           }}
         />
