@@ -45,16 +45,34 @@ npx expo start --tunnel
 
 Press `s` to switch to expo go, and open in app. `r` reloads the app.
 
-## Deploy to App store
+## Build and deploy to App stores
 
 Make changes and uprev the `app.json` version.
+
+### iOS
+
+**Note:** You must have an Apple developer licence
+
+```cmd
+eas credentials --platform ios
+```
 
 ```cmd
 eas build --platform ios
 ```
 
 ```cmd
-eas submit --platform ios --latest
+eas submit --platform ios --profile production
+```
+
+```cmd
+eas build --platform ios --auto-submit
+```
+
+## Android build
+
+```cmd
+eas build --platform android
 ```
 
 **TODO**
