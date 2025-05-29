@@ -2,7 +2,7 @@
   "expo": {
     "name": "éist",
     "slug": "eist-app",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "eistapp",
@@ -20,7 +20,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#4733FF"
       },
       "edgeToEdgeEnabled": true,
@@ -37,11 +37,11 @@
       "favicon": "./assets/images/favicon.png"
     },
     "splash": {
-      "image": "./assets/images/eist-logo.png",
+      "image": "./assets/images/eist.png",
       "resizeMode": "contain",
       "backgroundColor": "#4733FF",
       "dark": {
-        "image": "./assets/images/eist-logo.png",
+        "image": "./assets/images/eist.png",
         "backgroundColor": "#4733FF"
       }
     },
