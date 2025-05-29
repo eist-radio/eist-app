@@ -25,14 +25,14 @@ export default function TabLayout() {
   const ACTIVE   = colors.primary;
   const INACTIVE = 'rgba(175, 252, 65, 0.5)';
 
-  // 1) Ref + layout for the full wrapper
+  // Ref + layout for the full wrapper
   const wrapperRef = useRef<View>(null);
   const [layout, setLayout] = useState<LayoutRectangle | null>(null);
 
-  // 2) Figure out safe-area bottom inset
+  // Figure out safe-area bottom inset
   const insets = useSafeAreaInsets();
 
-  // 3) Share logic: capture → crop off tab bar → share
+  // Share logic: capture → crop off tab bar → share
   const onShare = async () => {
     try {
       if (!wrapperRef.current || !layout) {
@@ -70,7 +70,7 @@ export default function TabLayout() {
         { format: SaveFormat.PNG }
       );
 
-      // e) share
+      // Share
       if (Platform.OS === 'ios') {
         await RNShare.share({ url: croppedUri });
       } else {

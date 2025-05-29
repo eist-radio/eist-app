@@ -1,11 +1,11 @@
 // app/_layout.tsx
-import React, {
-  useCallback,
-  useEffect,
-  useState,
-  Suspense,
-} from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import React, { Suspense, useEffect, useState, useRef } from 'react';
+import {
+  Animated,
+  View,
+  ActivityIndicator,
+  StyleSheet,
+} from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider } from '@react-navigation/native';
 import { EistLightTheme, EistDarkTheme } from '../themes';
@@ -25,50 +25,44 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
-  // --- app-ready state (fonts, splash)
+  // load custom font
   const [fontsLoaded] = useFonts({
     FunnelSans: require('../assets/fonts/FunnelSans-VariableFont_wght.ttf'),
   });
   const [isReady, setIsReady] = useState(false);
 
-  // theme
+  // Animated opacity value for fade
+  const rootOpacity = useRef(new Animated.Value(0)).current;
+
+  // Pick theme
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? EistDarkTheme : EistLightTheme;
 
-  // once fonts are in, mark app ready
+  // Once fonts are loaded, mark ready, fade in, then hide splash
   useEffect(() => {
     if (fontsLoaded) {
       setIsReady(true);
+      Animated.timing(rootOpacity, {
+        toValue: 1,
+        duration: 500, // fade duration in ms
+        useNativeDriver: true,
+      }).start(async () => {
+        await SplashScreen.hideAsync();
+      });
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, rootOpacity]);
 
-  // hide the splash as soon as the first layout pass happens
-  const onLayoutRootView = useCallback(async () => {
-    if (isReady) {
-      await SplashScreen.hideAsync();
-    }
-  }, [isReady]);
-
-  // keep splash up
+  // keep splash visible until ready
   if (!isReady) {
     return null;
   }
 
   return (
-    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-      {/* Provide React Query client */}
+    <Animated.View style={[styles.container, { opacity: rootOpacity }]}>
       <QueryClientProvider client={queryClient}>
-        {/* 
-          Any screen with useQuery({ suspense: true }) will
-          keep this spinner visible until its data resolves 
-        */}
         <Suspense
           fallback={
-            <View style={{
-              flex: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}>
+            <View style={styles.loader}>
               <ActivityIndicator size="large" />
             </View>
           }
@@ -81,6 +75,17 @@ export default function RootLayout() {
           </AudioProvider>
         </Suspense>
       </QueryClientProvider>
-    </View>
+    </Animated.View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});
