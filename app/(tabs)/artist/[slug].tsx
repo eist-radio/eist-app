@@ -1,4 +1,5 @@
 // app/(tabs)/artist/[slug].tsx
+
 import React from 'react';
 import {
   View,
@@ -16,8 +17,8 @@ import { useQuery } from '@tanstack/react-query';
 import { apiKey } from '../../../config';
 import { ThemedText } from '@/components/ThemedText';
 import { stripFormatting } from '../../../utils/stripFormatting';
+import { LinearGradient } from 'expo-linear-gradient';
 
-const gradientOverlay = require('../../../assets/images/gradient.png');
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -40,7 +41,6 @@ type RawArtist = {
   };
 };
 
-// Fetch artist by slug
 async function fetchArtistBySlug(slug: string): Promise<RawArtist> {
   const url =
     `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(
@@ -73,14 +73,14 @@ export default function ArtistScreen() {
     suspense: true,
   });
 
-  // Flatten rich-text and split into paragraphs
+  // Flatten rich-text → plain paragraphs
   const plain = stripFormatting(artist.description?.content);
   const paragraphs = plain
     .split('\n')
     .map(p => p.trim())
     .filter(p => p);
 
-  // Build social links array
+  // Social links
   const socials = artist.socials ?? {};
   const entries: Array<[string, string]> = [];
   if (socials.site) entries.push(['Website', socials.site]);
@@ -111,17 +111,19 @@ export default function ArtistScreen() {
       style={[styles.screen, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
     >
-      {/* Avatar + gradient overlay */}
+      {/* Avatar + gradient overlay via LinearGradient */}
       <View style={styles.avatarContainer}>
         <Image
           source={{ uri: imageUri }}
           style={styles.fullWidthAvatar}
           resizeMode="cover"
         />
-        <Image
-          source={gradientOverlay}
-          style={[StyleSheet.absoluteFill, styles.fullWidthAvatar]}
-          resizeMode="stretch"
+        <LinearGradient
+          // adjust these colors to match your PNG
+          colors={['transparent', 'rgba(0,0,0,0.4)']}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={StyleSheet.absoluteFill}
         />
       </View>
 
