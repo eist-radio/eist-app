@@ -1,4 +1,4 @@
-# Welcome to your Expo app 👋
+# éist Apple iOS and Google Android app
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
@@ -25,30 +25,6 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
-
 ## Colours
 
 ```cmd
@@ -57,19 +33,30 @@ $eist-secondary: #AFFC41 !default;
 $eist-highlight: #96BFE6 !default;
 ```
 
-## Hack
+## A hacking we will go 🪓
 
-iOS device testing:
+Download the expo go app in the App store on your device.
 
-Clear previous instance in expo go app, then:
+Clear previous build instances in Expo go app, then:
 
 ```cmd
-$ npx expo start --tunnel
+npx expo start --tunnel
 ```
 
-Press s to switch to expo go, and open in app
+Press `s` to switch to expo go, and open in app. `r` reloads the app.
+
+## Deploy to App store
+
+Make changes and uprev the `app.json` version.
+
+```cmd
+eas build --platform ios
+```
+
+```cmd
+eas submit --platform ios --latest
+```
 
 **TODO**
 * Chromecast https://github.com/react-native-google-cast/react-native-google-cast
-* Lockscreen player https://medium.com/@gionata.brunel/implementing-react-native-track-player-with-expo-including-lock-screen-part-1-ios-9552fea5178c
-* Carkit (?)
+* Carkit
