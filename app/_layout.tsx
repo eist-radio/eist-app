@@ -15,7 +15,6 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { AudioProvider } from '../context/AudioContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
-
 // React Query imports
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -25,57 +24,110 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 export default function RootLayout() {
-  // load custom font
+  // Load custom font
   const [fontsLoaded] = useFonts({
     FunnelSans: require('../assets/fonts/FunnelSans-VariableFont_wght.ttf'),
   });
-  const [isReady, setIsReady] = useState(false);
 
-  // Animated opacity value for fade
-  const rootOpacity = useRef(new Animated.Value(0)).current;
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [isSplashHidden, setIsSplashHidden] = useState(false);
+  
+  // Animated opacity values
+  const appOpacity = useRef(new Animated.Value(0)).current;
+  const splashOpacity = useRef(new Animated.Value(1)).current;
 
   // Pick theme
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? EistDarkTheme : EistLightTheme;
 
-  // Once fonts are loaded, mark ready, fade in, then hide splash
+  // Handle app initialization and splash transition
   useEffect(() => {
-    if (fontsLoaded) {
-      setIsReady(true);
-      Animated.timing(rootOpacity, {
-        toValue: 1,
-        duration: 500, // fade duration in ms
-        useNativeDriver: true,
-      }).start(async () => {
-        await SplashScreen.hideAsync();
-      });
-    }
-  }, [fontsLoaded, rootOpacity]);
+    const prepareApp = async () => {
+      if (fontsLoaded) {
+        // Small delay to ensure everything is loaded
+        await new Promise(resolve => setTimeout(resolve, 500));
+        setIsAppReady(true);
+        
+        // Start the fade transition
+        Animated.parallel([
+          // Fade in the app content
+          Animated.timing(appOpacity, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          // Fade out the splash screen
+          Animated.timing(splashOpacity, {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]).start(async () => {
+          // Hide the native splash screen after animation completes
+          await SplashScreen.hideAsync();
+          setIsSplashHidden(true);
+        });
+      }
+    };
 
-  // keep splash visible until ready
-  if (!isReady) {
+    prepareApp();
+  }, [fontsLoaded, appOpacity, splashOpacity]);
+
+  // Show nothing until fonts are loaded
+  if (!fontsLoaded) {
     return null;
   }
 
   return (
-    <Animated.View style={[styles.container, { opacity: rootOpacity }]}>
-      <QueryClientProvider client={queryClient}>
-        <Suspense
-          fallback={
-            <View style={styles.loader}>
-              <ActivityIndicator size="large" />
-            </View>
+    <View style={styles.container}>
+      {/* App Content */}
+      <Animated.View 
+        style={[
+          styles.container, 
+          { 
+            opacity: appOpacity,
+            // Ensure app content is behind splash initially
+            zIndex: isAppReady ? 1 : 0
           }
+        ]}
+      >
+        <QueryClientProvider client={queryClient}>
+          <Suspense
+            fallback={
+              <View style={styles.loader}>
+                <ActivityIndicator size="large" />
+              </View>
+            }
+          >
+            <AudioProvider>
+              <ThemeProvider value={theme}>
+                <Stack screenOptions={{ headerShown: false }} />
+                <StatusBar style="auto" />
+              </ThemeProvider>
+            </AudioProvider>
+          </Suspense>
+        </QueryClientProvider>
+      </Animated.View>
+
+      {/* Custom Splash Overlay - only show until fully hidden */}
+      {!isSplashHidden && (
+        <Animated.View 
+          style={[
+            styles.splashContainer,
+            { 
+              opacity: splashOpacity,
+              zIndex: 2 // Ensure splash is on top
+            }
+          ]}
         >
-          <AudioProvider>
-            <ThemeProvider value={theme}>
-              <Stack screenOptions={{ headerShown: false }} />
-              <StatusBar style="auto" />
-            </ThemeProvider>
-          </AudioProvider>
-        </Suspense>
-      </QueryClientProvider>
-    </Animated.View>
+          {/* You can customize this splash content */}
+          <View style={styles.splashContent}>
+            {/* Add your logo or splash content here */}
+            <ActivityIndicator size="large" color="#AFFC41" />
+          </View>
+        </Animated.View>
+      )}
+    </View>
   );
 }
 
@@ -85,6 +137,16 @@ const styles = StyleSheet.create({
   },
   loader: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashContainer: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#4733FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  splashContent: {
     justifyContent: 'center',
     alignItems: 'center',
   },
