@@ -1,4 +1,5 @@
 // app/(tabs)/schedule.tsx
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -21,7 +22,7 @@ type RawScheduleItem = {
   title: string;
   startDateUtc: string;
   endDateUtc: string;
-  description?: any;       // JSONContent
+  description?: any; // JSONContent
   duration: number;
   timezone: string;
   color?: string;
@@ -36,9 +37,10 @@ type RawScheduleItem = {
 type SectionData = {
   title: string;
   data: Array<{
-    time: string;   // now a range like "8:00 - 11:00 pm"
+    time: string; // e.g. "8:00 - 11:00 pm"
     title: string;
     id: string;
+    artistIds?: string[];
   }>;
 };
 
@@ -87,7 +89,7 @@ export default function ScheduleScreen() {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const buckets: Record<string, RawScheduleItem[]> = {};
 
-    items.forEach(item => {
+    items.forEach((item) => {
       const d = new Date(item.startDateUtc);
       let dateKey = d.toISOString().split('T')[0];
       // midnights belong to the previous day
@@ -108,7 +110,7 @@ export default function ScheduleScreen() {
           day: 'numeric',
           month: 'long',
         }),
-        data: dayItems.map(it => {
+        data: dayItems.map((it) => {
           const startDate = new Date(it.startDateUtc);
           const endDate = new Date(it.endDateUtc);
 
@@ -145,12 +147,12 @@ export default function ScheduleScreen() {
             time,
             title: it.title.trim(),
             id: it.id,
+            artistIds: it.artistIds, // carry through artistIds
           };
         }),
       }))
       .sort(
-        (a, b) =>
-          new Date(a.title).getTime() - new Date(b.title).getTime()
+        (a, b) => new Date(a.title).getTime() - new Date(b.title).getTime()
       );
   }
 
@@ -198,6 +200,8 @@ export default function ScheduleScreen() {
             <Text style={[styles.cell, { color: colors.text }]}>
               {item.time}
             </Text>
+
+            {/* Link points to the show page, not the artist page */}
             <Link
               href={`/show/${encodeURIComponent(item.id)}`}
               style={styles.cell}

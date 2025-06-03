@@ -42,6 +42,10 @@ export default function ListenScreen() {
   );
   const [broadcastStatus, setBroadcastStatus] = useState<string>('off air');
 
+  // State for next show when off air
+  const [nextShowTitle, setNextShowTitle] = useState<string>(' ');
+  const [nextShowTime, setNextShowTime] = useState<string>(' ');
+
   // Keep current artist ID for navigation
   const [artistId, setArtistId] = useState<string | null>(null);
 
@@ -60,6 +64,13 @@ export default function ListenScreen() {
       })
       .filter(Boolean)
       .join('\n\n') || ' ';
+
+  // Helper: format an ISO timestamp into "HH:MM" (24-hour) format
+  const formatTime = (isoString: string): string => {
+    const date = new Date(isoString);
+    // Format as "HH:MM" in the user's locale, 24-hour clock
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   // Fetch artist details by ID
   const getArtistDetails = useCallback(async (id: string | null) => {
@@ -92,9 +103,10 @@ export default function ListenScreen() {
     }
   }, []);
 
-  // Fetch now-playing + artist → update state
+  // Fetch now-playing + artist → update state (and next show if off air)
   const fetchNowPlaying = useCallback(async () => {
     try {
+      // Fetch live schedule
       const res = await fetch(`${apiUrl}/schedule/live`, {
         headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
       });
@@ -105,12 +117,41 @@ export default function ListenScreen() {
       setBroadcastStatus(status);
 
       if (status !== 'schedule') {
+        // When off air: clear current show info
         setShowTitle(' ');
         setArtistName('éist · off air');
         setArtistImage(placeholderOfflineImage);
         setShowDescription(' ');
         setArtistId(null);
+
+        // Fetch next scheduled show within the next 24 hours
+        try {
+          const now = new Date().toISOString();
+          const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          const nextRes = await fetch(
+            `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(tomorrow)}`,
+            {
+              headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+            }
+          );
+          if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`);
+          const nextJson = await nextRes.json();
+          const events: Array<any> = nextJson.schedules || [];
+          if (events.length > 0) {
+            const nextEvent = events[0];
+            setNextShowTitle(nextEvent.title || ' ');
+            setNextShowTime(formatTime(nextEvent.startDateUtc));
+          } else {
+            setNextShowTitle(' ');
+            setNextShowTime(' ');
+          }
+        } catch (nextErr) {
+          console.error('fetchNextShow failed', nextErr);
+          setNextShowTitle(' ');
+          setNextShowTime(' ');
+        }
       } else {
+        // When on air: display current show info
         setShowTitle(content.title || ' ');
         const id = content.artistIds?.[0] ?? null;
         setArtistId(id);
@@ -123,6 +164,10 @@ export default function ListenScreen() {
           desc += `\n\nNow playing: ${metadata.title}`;
         }
         setShowDescription(desc);
+
+        // Clear next show info while on air
+        setNextShowTitle(' ');
+        setNextShowTime(' ');
       }
     } catch (err) {
       console.error('fetchNowPlaying failed', err);
@@ -132,6 +177,8 @@ export default function ListenScreen() {
       setArtistImage(placeholderOfflineImage);
       setShowDescription(' ');
       setArtistId(null);
+      setNextShowTitle(' ');
+      setNextShowTime(' ');
     }
   }, [getArtistDetails]);
 
@@ -183,12 +230,11 @@ export default function ListenScreen() {
           <TouchableOpacity
             onPress={() => artistId && router.push(`/artist/${artistId}`)}
             disabled={!artistId}
-            style={styles.artistContainer} // ◀── Added style here
+            style={styles.artistContainer}
           >
             <ThemedText
               type="subtitle"
               style={[styles.artistNameWrapped, { color: colors.text }]}
-              // Optional: limit to 2 lines, ellipsize if too long
               numberOfLines={2}
               ellipsizeMode="tail"
             >
@@ -201,6 +247,17 @@ export default function ListenScreen() {
           style={styles.nowPlayingContainer}
           contentContainerStyle={styles.nowPlayingContent}
         >
+          {/* Show "Next up" when off air */}
+          {broadcastStatus !== 'schedule' && nextShowTitle.trim() !== '' && (
+            <ThemedText
+              type="subtitle"
+              style={[styles.nextUp, { color: colors.text }]}
+            >
+              <i>Next up: {nextShowTitle}, {nextShowTime}</i>
+            </ThemedText>
+          )}
+
+          {/* Current show title (visible when on air) */}
           <ThemedText
             type="subtitle"
             style={[styles.showTitle, { color: colors.text }]}
@@ -247,6 +304,9 @@ const styles = StyleSheet.create({
 
   nowPlayingContainer: { flex: 1, width: '100%' },
   nowPlayingContent: { paddingHorizontal: 12 },
+
+  nextUp: { fontSize: 20, fontWeight: '500', marginBottom: 6 },
+
   showTitle: { fontSize: 24, fontWeight: '500', marginBottom: 6 },
   showDescription: { fontSize: 18, lineHeight: 22 },
 });
