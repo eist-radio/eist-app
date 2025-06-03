@@ -31,7 +31,7 @@ export default function ListenScreen() {
   const { colors } = useTheme();
   const { isPlaying, togglePlay } = useAudio();
   const { width, height } = Dimensions.get('window');
-  const router = useRouter();              // ← useRouter, not useNavigation
+  const router = useRouter(); // ← useRouter, not useNavigation
 
   // UI state from API
   const [showTitle, setShowTitle] = useState<string>(' ');
@@ -92,7 +92,7 @@ export default function ListenScreen() {
     }
   }, []);
 
-  // Fetch now‐playing + artist → update state
+  // Fetch now-playing + artist → update state
   const fetchNowPlaying = useCallback(async () => {
     try {
       const res = await fetch(`${apiUrl}/schedule/live`, {
@@ -176,14 +176,21 @@ export default function ListenScreen() {
             <Ionicons name={iconName} size={64} color={colors.primary} />
           </TouchableOpacity>
 
-          {/* use router.push, not navigation.navigate */}
+          {/* 
+            Give this touchable a flex: 1 so the text is constrained to the remaining width.
+            ThemedText inside will wrap instead of overflowing.
+          */}
           <TouchableOpacity
             onPress={() => artistId && router.push(`/artist/${artistId}`)}
             disabled={!artistId}
+            style={styles.artistContainer} // ◀── Added style here
           >
             <ThemedText
               type="subtitle"
               style={[styles.artistNameWrapped, { color: colors.text }]}
+              // Optional: limit to 2 lines, ellipsize if too long
+              numberOfLines={2}
+              ellipsizeMode="tail"
             >
               {artistName}
             </ThemedText>
@@ -217,9 +224,27 @@ const styles = StyleSheet.create({
   imageContainer: { width: '100%', position: 'relative', overflow: 'hidden' },
   logoContainer: { position: 'absolute', top: 36, right: 18 },
   bottom: { flex: 1, paddingBottom: 12, alignItems: 'flex-start' },
-  artistNameWrapped: { fontSize: 28, fontWeight: '700', flexShrink: 1, flexWrap: 'wrap' },
-  controlContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, paddingLeft: 6 },
+
+  controlContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingLeft: 4,
+    paddingRight: 4,
+  },
   playButton: { marginRight: 16 },
+
+  artistContainer: {
+    flex: 1,
+  },
+
+  artistNameWrapped: {
+    fontSize: 28,
+    fontWeight: '700',
+    flexShrink: 1,
+    flexWrap: 'wrap',
+  },
+
   nowPlayingContainer: { flex: 1, width: '100%' },
   nowPlayingContent: { paddingHorizontal: 12 },
   showTitle: { fontSize: 24, fontWeight: '500', marginBottom: 6 },
