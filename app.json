@@ -2,7 +2,7 @@
   "expo": {
     "name": "éist",
     "slug": "eist-app",
-    "version": "1.0.7",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "eistapp",
@@ -16,7 +16,7 @@
         "UIBackgroundModes": [
           "audio"
         ],
-      "NSPhotoLibraryUsageDescription": "We save app screenshots to your photo library so that you can access them later."
+        "NSPhotoLibraryUsageDescription": "We save app screenshots to your photo library so that you can access them later."
       }
     },
     "android": {
@@ -52,13 +52,16 @@
         "expo-splash-screen",
         {
           "image": "./assets/images/eist.png",
-          "imageWidth": 200,
+          "imageWidth": 350,
           "resizeMode": "contain",
-          "backgroundColor": "#4733FF"
+          "backgroundColor": "#4733FF",
+          "dark": {
+            "image": "./assets/images/eist.png",
+            "backgroundColor": "#4733FF"
+          }
         }
       ],
-      "expo-audio",
-      "expo-video"
+      "expo-dev-client"
     ],
     "experiments": {
       "typedRoutes": false

@@ -101,10 +101,18 @@ export default function ArtistScreen() {
   const openLink = (url: string) =>
     Linking.canOpenURL(url).then(ok => ok && Linking.openURL(url));
 
-  const imageUri =
-    artist.logo?.default ||
-    artist.logo?.['512x512'] ||
-    'https://via.placeholder.com/512';
+  // Pick the best available artist image; if none, fall back to local asset
+  let imageSource;
+  if (artist.logo?.['1024x1024']) {
+    imageSource = { uri: artist.logo['1024x1024'] };
+  } else if (artist.logo?.['512x512']) {
+    imageSource = { uri: artist.logo['512x512'] };
+  } else if (artist.logo?.default) {
+    imageSource = { uri: artist.logo.default };
+  } else {
+    // Fallback to bundled image when no artist image is provided
+    imageSource = require('../../../assets/images/eist_online.png');
+  }
 
   return (
     <ScrollView
@@ -114,7 +122,7 @@ export default function ArtistScreen() {
       {/* Avatar + gradient overlay via LinearGradient */}
       <View style={styles.avatarContainer}>
         <Image
-          source={{ uri: imageUri }}
+          source={imageSource}
           style={styles.fullWidthAvatar}
           resizeMode="cover"
         />

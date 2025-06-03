@@ -1,4 +1,5 @@
 // app/(tabs)/show/[slug].tsx
+
 import React, { useMemo } from 'react';
 import {
   View,
@@ -40,13 +41,14 @@ type SectionData = {
   data: Array<{ time: string }>;
 };
 
-// 1. Fetch the full week’s schedule (range endpoint returns { schedules: Event[], success: true })
+// 1. Fetch a full week’s schedule
 async function fetchSchedule(
   startDate: string,
   endDate: string
 ): Promise<RawScheduleItem[]> {
-  const url = `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
-              `?startDate=${startDate}&endDate=${endDate}`;
+  const url =
+    `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
+    `?startDate=${startDate}&endDate=${endDate}`;
   const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
   if (!res.ok) throw new Error(`Schedule fetch failed: ${res.statusText}`);
   const json = (await res.json()) as { schedules?: RawScheduleItem[] };
@@ -61,17 +63,18 @@ async function fetchEventById(id: string): Promise<RawScheduleItem> {
   end.setDate(end.getDate() + NUM_DAYS);
 
   const startIso = `${today.toISOString().split('T')[0]}T00:00:00Z`;
-  const endIso   = `${end.toISOString().split('T')[0]}T23:59:59Z`;
+  const endIso = `${end.toISOString().split('T')[0]}T23:59:59Z`;
   const schedules = await fetchSchedule(startIso, endIso);
 
-  const ev = schedules.find(e => e.id === id);
+  const ev = schedules.find((e) => e.id === id);
   if (!ev) throw new Error('Show not found');
   return ev;
 }
 
-// 3. Fetch the host artist by its ID
+// 3. Fetch the host artist by its ID (only if we have one)
 async function fetchHostArtist(artistId: string): Promise<Artist> {
-  const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${artistId}`;
+  const url =
+    `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${artistId}`;
   const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
   if (!res.ok) throw new Error(`Artist fetch failed: ${res.statusText}`);
   const json = (await res.json()) as { artist?: Artist };
@@ -84,11 +87,11 @@ function groupByDate(items: RawScheduleItem[]): SectionData[] {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const buckets: Record<string, RawScheduleItem[]> = {};
 
-  items.forEach(item => {
+  items.forEach((item) => {
     const d = new Date(item.startDateUtc);
     if (isNaN(d.getTime())) return;
     let key = d.toISOString().split('T')[0];
-    // handle midnight UTC rolling back into previous local day
+    // Handle midnight UTC rolling back into previous local day
     if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
       const p = new Date(d);
       p.setUTCDate(p.getUTCDate() - 1);
@@ -104,15 +107,17 @@ function groupByDate(items: RawScheduleItem[]): SectionData[] {
         day: 'numeric',
         month: 'long',
       }),
-      data: dayItems.map(it => {
+      data: dayItems.map((it) => {
         const t = new Date(it.startDateUtc);
-        const time = t.toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-          timeZone: tz,
-        });
-        return { time: time.toLowerCase() };
+        const time = t
+          .toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZone: tz,
+          })
+          .toLowerCase();
+        return { time };
       }),
     }))
     .sort((a, b) => {
@@ -134,23 +139,24 @@ export default function ShowScreen() {
     );
   }
 
-  // — Suspense will hold our root spinner until this resolves —
+  // 5. Always suspend on the “show/event” fetch
   const { data: event } = useQuery({
     queryKey: ['show', slug],
     queryFn: () => fetchEventById(slug),
     suspense: true,
   });
 
+  // 6. Only fetch host artist if artistIds[0] exists; no suspense here
   const hostId = event.artistIds?.[0];
   const { data: host } = useQuery({
     queryKey: ['artist', hostId],
     queryFn: () => fetchHostArtist(hostId!),
     enabled: Boolean(hostId),
-    suspense: true,
+    // remove suspense on this one
   });
 
   const sections = useMemo(() => groupByDate([event]), [event]);
-  const plainDesc = stripFormatting(event.description?.content);
+  const plainDesc = stripFormatting(event.description?.content || []);
 
   return (
     <View style={[styles.wrapper, { backgroundColor: colors.background }]}>
@@ -164,6 +170,8 @@ export default function ShowScreen() {
             <Text style={[styles.title, { color: colors.primary }]}>
               {event.title}
             </Text>
+
+            {/* Only render host link if we actually got host.name */}
             {host?.name && (
               <Link
                 href={`/artist/${encodeURIComponent(host.id)}`}
@@ -174,6 +182,7 @@ export default function ShowScreen() {
                 </Text>
               </Link>
             )}
+
             {plainDesc.length > 0 && (
               <Text style={[styles.description, { color: colors.text }]}>
                 {plainDesc}
@@ -199,7 +208,9 @@ export default function ShowScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrapper: { flex: 1 },
+  wrapper: {
+    flex: 1,
+  },
   centered: {
     flex: 1,
     justifyContent: 'center',
@@ -211,7 +222,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 16,
   },
-  list: { paddingBottom: 16 },
+  list: {
+    paddingBottom: 16,
+  },
   title: {
     fontSize: 30,
     fontWeight: '700',
