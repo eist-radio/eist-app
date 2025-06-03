@@ -29,7 +29,7 @@ export type AudioContextType = {
 const AudioContext = createContext<AudioContextType | undefined>(undefined)
 
 export const AudioProvider = ({ children }: { children: ReactNode }) => {
-  // ——— Metadata polling (unchanged) ——————————————
+  // Metadata polling (unchanged)
   const [title, setTitle] = useState('Live on éist')
   const [artist, setArtist] = useState('éist')
   const [artwork, setArtwork] = useState<string>(
@@ -87,7 +87,7 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
     return () => clearInterval(iv)
   }, [fetchNowPlaying])
 
-  // ——— Build the source including dynamic metadata ——————————————
+  // Build the source including dynamic metadata with live stream indicators
   const sourceWithMetadata = useMemo(
     () => ({
       uri: STREAM_URL,
@@ -95,22 +95,27 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
         title,   // now-playing title
         artist,  // now-playing artist
         artwork, // now-playing artwork
+        // Duration set to indicate live content
+        duration: null,
       },
     }),
     [title, artist, artwork]
   )
 
-  // ——— Initialize the player for background & lock-screen ———————————
+  // Initialize the player for background & lock-screen with live stream config
   const player = useVideoPlayer(sourceWithMetadata, (p) => {
     if (p) {
       p.loop = false
       p.staysActiveInBackground = true
       p.showNowPlayingNotification = true
       p.audioMixingMode = 'doNotMix'
+      
+      // Configure for live streaming
+      p.allowsExternalPlayback = true
     }
   })
 
-  // ——— Playback state & audio mode ——————————————
+  // Playback state & audio mode
   const [isPlaying, setIsPlaying] = useState(false)
 
   useEffect(() => {
@@ -119,10 +124,12 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
       playsInSilentMode: true,
       interruptionMode: 'doNotMix',
       interruptionModeAndroid: 'doNotMix',
+      // Add category for live audio
+      category: 'playback',
     }).catch((err) => console.error('Audio mode failed', err))
   }, [])
 
-  // ——— Play/pause toggle ——————————————
+  // Play/pause toggle
   const togglePlay = async () => {
     if (!player) {
       console.warn('Player not ready')
@@ -141,15 +148,15 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  // ——— Robustness: auto-reconnect on stream errors ————————
+  // Auto-reconnect on stream errors
   useEffect(() => {
     if (!player) return
     const sub = player.addListener('statusChange', (status) => {
       if ((status as any).error || status.status === 'error') {
         console.warn('Stream error detected:', (status as any).error)
-        // quick pause to reset
+        // Quick pause to reset
         player.pause?.().catch(() => {})
-        // after 3s try to play again
+        // After 3s try to play again
         setTimeout(() => {
           player
             .play?.()
@@ -161,6 +168,21 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
         }, 3000)
       }
     })
+    return () => sub.remove()
+  }, [player])
+
+  // Listen for playback state changes to keep UI in sync
+  useEffect(() => {
+    if (!player) return
+    
+    const sub = player.addListener('statusChange', (status) => {
+      if (status.status === 'readyToPlay' || status.status === 'loading') {
+        // Player is ready or loading
+      } else if (status.status === 'idle') {
+        setIsPlaying(false)
+      }
+    })
+    
     return () => sub.remove()
   }, [player])
 
@@ -179,11 +201,7 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
           left: -1000,
         }}
         player={player}
-        allowsFullscreen={false}
-        allowsPictureInPicture={false}
-        showsTimecodes={false}
         nativeControls={false}
-        pointerEvents="none"
       />
     </AudioContext.Provider>
   )
