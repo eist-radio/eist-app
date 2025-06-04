@@ -29,9 +29,9 @@ type RawScheduleItem = {
   artistIds?: string[];
   isRecurring: boolean;
   media:
-    | { type: 'mix'; trackId?: string }
-    | { type: 'playlist'; playlistId: string }
-    | { type: 'live' };
+  | { type: 'mix'; trackId?: string }
+  | { type: 'playlist'; playlistId: string }
+  | { type: 'live' };
 };
 
 type SectionData = {
@@ -77,144 +77,140 @@ export default function ScheduleScreen() {
   async function fetchSchedule(startDate: string, endDate: string) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const url =
-      `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
-      `?startDate=${startDate}&endDate=${endDate}&timeZone=${tz}`;
-    const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
-    if (!res.ok) throw new Error(res.statusText);
-    return res.json() as Promise<{ schedules?: RawScheduleItem[] }>;
-  }
+  `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
+`?startDate=${startDate}&endDate=${endDate}&timeZone=${tz}`;
+const res = await fetch(url, { headers: { 'x-api-key': API_KEY } });
+if (!res.ok) throw new Error(res.statusText);
+return res.json() as Promise<{ schedules?: RawScheduleItem[] }>;
+}
 
-  function groupByDate(items: RawScheduleItem[]): SectionData[] {
-    const todayKey = new Date().toISOString().split('T')[0];
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const buckets: Record<string, RawScheduleItem[]> = {};
+function groupByDate(items: RawScheduleItem[]): SectionData[] {
+  const todayKey = new Date().toISOString().split('T')[0];
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const buckets: Record<string, RawScheduleItem[]> = {};
 
-    items.forEach((item) => {
-      const d = new Date(item.startDateUtc);
-      let dateKey = d.toISOString().split('T')[0];
+  items.forEach((item) => {
+    const d = new Date(item.startDateUtc);
+    let dateKey = d.toISOString().split('T')[0];
       // midnights belong to the previous day
-      if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
-        const prev = new Date(d);
-        prev.setUTCDate(prev.getUTCDate() - 1);
-        dateKey = prev.toISOString().split('T')[0];
-      }
-      if (dateKey >= todayKey) {
-        (buckets[dateKey] ||= []).push(item);
-      }
-    });
+    if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
+      const prev = new Date(d);
+      prev.setUTCDate(prev.getUTCDate() - 1);
+      dateKey = prev.toISOString().split('T')[0];
+    }
+    if (dateKey >= todayKey) {
+      (buckets[dateKey] ||= []).push(item);
+    }
+  });
 
-    return Object.entries(buckets)
-      .map(([dateKey, dayItems]) => ({
-        title: new Date(dateKey).toLocaleDateString(undefined, {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        }),
-        data: dayItems.map((it) => {
-          const startDate = new Date(it.startDateUtc);
-          const endDate = new Date(it.endDateUtc);
+  return Object.entries(buckets)
+  .map(([dateKey, dayItems]) => ({
+    title: new Date(dateKey).toLocaleDateString(undefined, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    }),
+    data: dayItems.map((it) => {
+      const startDate = new Date(it.startDateUtc);
+      const endDate = new Date(it.endDateUtc);
 
-          const startStr = startDate
-            .toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-              timeZone: tz,
-            })
-            .toLowerCase();
+      const startStr = startDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: tz,
+      });
 
-          const endStr = endDate
-            .toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-              timeZone: tz,
-            })
-            .toLowerCase();
+      const endStr = endDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: tz,
+      });
 
           // If both times share the same " am"/" pm" suffix, omit it on the start time
-          const suffixMatch = endStr.match(/\s(am|pm)$/);
-          const endSuffix = suffixMatch ? suffixMatch[0] : '';
-          const startSuffixMatch = startStr.match(/\s(am|pm)$/);
-          const startSuffix = startSuffixMatch ? startSuffixMatch[0] : '';
+      const suffixMatch = endStr.match(/\s(am|pm)$/);
+      const endSuffix = suffixMatch ? suffixMatch[0] : '';
+      const startSuffixMatch = startStr.match(/\s(am|pm)$/);
+      const startSuffix = startSuffixMatch ? startSuffixMatch[0] : '';
 
-          const time =
-            endSuffix && startSuffix === endSuffix
-              ? `${startStr.replace(endSuffix, '')} - ${endStr}`
-              : `${startStr} - ${endStr}`;
+      const time =
+      endSuffix && startSuffix === endSuffix
+      ? `${startStr.replace(endSuffix, '')} - ${endStr}`
+      : `${startStr} - ${endStr}`;
 
-          return {
-            time,
-            title: it.title.trim(),
-            id: it.id,
+      return {
+        time,
+        title: it.title.trim(),
+        id: it.id,
             artistIds: it.artistIds, // carry through artistIds
           };
         }),
-      }))
-      .sort(
-        (a, b) => new Date(a.title).getTime() - new Date(b.title).getTime()
-      );
-  }
-
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+  }))
+  .sort(
+    (a, b) => new Date(a.title).getTime() - new Date(b.title).getTime()
     );
-  }
+}
 
-  if (error) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.notification }}>{error}</Text>
-      </View>
-    );
-  }
-
+if (loading) {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.primary }]}>Schedule</Text>
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+    );
+}
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item, idx) => item.id + idx}
-        stickySectionHeadersEnabled={false}
-        renderSectionHeader={({ section: { title } }) => (
-          <>
-            <Text style={[styles.sectionHeader, { color: colors.primary }]}>
-              {title}
-            </Text>
-            <View style={styles.headerRow}>
-              <Text style={[styles.headerCell, { color: colors.primary }]}>
-                Time
-              </Text>
-              <Text style={[styles.headerCell, { color: colors.primary }]}>
-                Show
-              </Text>
-            </View>
-          </>
+if (error) {
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={{ color: colors.notification }}>{error}</Text>
+    </View>
+    );
+}
+
+return (
+  <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <Text style={[styles.title, { color: colors.primary }]}>Schedule</Text>
+
+    <SectionList
+      sections={sections}
+      keyExtractor={(item, idx) => item.id + idx}
+      stickySectionHeadersEnabled={false}
+      renderSectionHeader={({ section: { title } }) => (
+        <>
+        <Text style={[styles.sectionHeader, { color: colors.primary }]}>
+          {title}
+        </Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.headerCell, { color: colors.primary }]}>
+            Time
+          </Text>
+          <Text style={[styles.headerCell, { color: colors.primary }]}>
+            Show
+          </Text>
+        </View>
+        </>
         )}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={[styles.cell, { color: colors.text }]}>
-              {item.time}
-            </Text>
+      renderItem={({ item }) => (
+        <View style={styles.row}>
+          <Text style={[styles.cell, { color: colors.text }]}>
+            {item.time}
+          </Text>
 
             {/* Link points to the show page, not the artist page */}
-            <Link
-              href={`/show/${encodeURIComponent(item.id)}`}
-              style={styles.cell}
-            >
-              <Text style={[styles.cell, { color: colors.primary }]}>
-                {item.title}
-              </Text>
-            </Link>
-          </View>
+          <Link
+            href={`/show/${encodeURIComponent(item.id)}`}
+            style={styles.cell}
+          >
+            <Text style={[styles.cell, { color: colors.primary }]}>
+              {item.title}
+            </Text>
+          </Link>
+        </View>
         )}
-        contentContainerStyle={styles.list}
-      />
-    </View>
+      contentContainerStyle={styles.list}
+    />
+  </View>
   );
 }
 

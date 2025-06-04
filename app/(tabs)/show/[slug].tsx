@@ -10,6 +10,7 @@ import {
 import { useTheme } from '@react-navigation/native';
 import { useLocalSearchParams, Link } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { Ionicons } from '@expo/vector-icons';
 import { apiKey } from '../../../config';
 import { stripFormatting } from '../../../utils/stripFormatting';
 
@@ -29,9 +30,9 @@ type RawScheduleItem = {
   artistIds?: string[];
   isRecurring: boolean;
   media:
-    | { type: 'mix'; trackId?: string }
-    | { type: 'playlist'; playlistId: string }
-    | { type: 'live' };
+  | { type: 'mix'; trackId?: string }
+  | { type: 'playlist'; playlistId: string }
+  | { type: 'live' };
 };
 
 type Artist = { id: string; name?: string };
@@ -41,22 +42,22 @@ type SectionData = {
   data: Array<{ time: string }>;
 };
 
-// 1. Fetch a full week’s schedule
+// Fetch a full week’s schedule
 async function fetchSchedule(
   startDate: string,
   endDate: string
-): Promise<RawScheduleItem[]> {
+  ): Promise<RawScheduleItem[]> {
   const url =
-    `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
-    `?startDate=${startDate}&endDate=${endDate}`;
-  const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
-  if (!res.ok) throw new Error(`Schedule fetch failed: ${res.statusText}`);
-  const json = (await res.json()) as { schedules?: RawScheduleItem[] };
-  if (!json.schedules) throw new Error('No schedules returned');
-  return json.schedules;
+`https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
+`?startDate=${startDate}&endDate=${endDate}`;
+const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
+if (!res.ok) throw new Error(`Schedule fetch failed: ${res.statusText}`);
+const json = (await res.json()) as { schedules?: RawScheduleItem[] };
+if (!json.schedules) throw new Error('No schedules returned');
+return json.schedules;
 }
 
-// 2. Pick out the one event matching our slug
+// Pick out the one event matching our slug
 async function fetchEventById(id: string): Promise<RawScheduleItem> {
   const today = new Date();
   const end = new Date(today);
@@ -71,18 +72,18 @@ async function fetchEventById(id: string): Promise<RawScheduleItem> {
   return ev;
 }
 
-// 3. Fetch the host artist by its ID (only if we have one)
+// Fetch the host artist by its ID (only if we have one)
 async function fetchHostArtist(artistId: string): Promise<Artist> {
   const url =
-    `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${artistId}`;
-  const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
-  if (!res.ok) throw new Error(`Artist fetch failed: ${res.statusText}`);
-  const json = (await res.json()) as { artist?: Artist };
-  if (!json.artist) throw new Error('Artist not found');
-  return json.artist;
+`https://api.radiocult.fm/api/station/${STATION_ID}/artists/${artistId}`;
+const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
+if (!res.ok) throw new Error(`Artist fetch failed: ${res.statusText}`);
+const json = (await res.json()) as { artist?: Artist };
+if (!json.artist) throw new Error('Artist not found');
+return json.artist;
 }
 
-// 4. Group into sections by local date
+// Group into sections by local date
 function groupByDate(items: RawScheduleItem[]): SectionData[] {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const buckets: Record<string, RawScheduleItem[]> = {};
@@ -101,30 +102,28 @@ function groupByDate(items: RawScheduleItem[]): SectionData[] {
   });
 
   return Object.entries(buckets)
-    .map(([dateKey, dayItems]) => ({
-      title: new Date(dateKey).toLocaleDateString(undefined, {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-      }),
-      data: dayItems.map((it) => {
-        const t = new Date(it.startDateUtc);
-        const time = t
-          .toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-            timeZone: tz,
-          })
-          .toLowerCase();
-        return { time };
-      }),
-    }))
-    .sort((a, b) => {
-      const da = Date.parse(a.title);
-      const db = Date.parse(b.title);
-      return isNaN(da) || isNaN(db) ? 0 : da - db;
-    });
+  .map(([dateKey, dayItems]) => ({
+    title: new Date(dateKey).toLocaleDateString(undefined, {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    }),
+    data: dayItems.map((it) => {
+      const t = new Date(it.startDateUtc);
+      const time = t.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: tz,
+      });
+      return { time };
+    }),
+  }))
+  .sort((a, b) => {
+    const da = Date.parse(a.title);
+    const db = Date.parse(b.title);
+    return isNaN(da) || isNaN(db) ? 0 : da - db;
+  });
 }
 
 export default function ShowScreen() {
@@ -136,23 +135,22 @@ export default function ShowScreen() {
       <View style={[styles.centered, { backgroundColor: colors.background }]}>
         <Text style={{ color: colors.notification }}>No show selected.</Text>
       </View>
-    );
+      );
   }
 
-  // 5. Always suspend on the “show/event” fetch
+  // Always suspend on the “show/event” fetch
   const { data: event } = useQuery({
     queryKey: ['show', slug],
     queryFn: () => fetchEventById(slug),
     suspense: true,
   });
 
-  // 6. Only fetch host artist if artistIds[0] exists; no suspense here
+  // Only fetch host artist if artistIds[0] exists; no suspense here
   const hostId = event.artistIds?.[0];
   const { data: host } = useQuery({
     queryKey: ['artist', hostId],
     queryFn: () => fetchHostArtist(hostId!),
     enabled: Boolean(hostId),
-    // remove suspense on this one
   });
 
   const sections = useMemo(() => groupByDate([event]), [event]);
@@ -167,44 +165,60 @@ export default function ShowScreen() {
         contentContainerStyle={styles.list}
         ListHeaderComponent={
           <View style={styles.headerContainer}>
-            <Text style={[styles.title, { color: colors.primary }]}>
-              {event.title}
-            </Text>
+            {/* Title row with icon aligned to top */}
+            <View style={styles.titleRow}>
+              <Ionicons
+                name="calendar-clear-outline"
+                size={36}
+                color={colors.primary}
+                style={styles.icon}
+              />
+              <Text style={[styles.title, { color: colors.primary }]}>
+                {event.title}
+              </Text>
+            </View>
 
-            {/* Only render host link if we actually got host.name */}
+            {/* Host link with title wrapping */}
             {host?.name && (
               <Link
                 href={`/artist/${encodeURIComponent(host.id)}`}
                 style={styles.hostLinkContainer}
               >
-                <Text style={[styles.hostLink, { color: colors.primary }]}>
-                  {host.name}
-                </Text>
-              </Link>
-            )}
+                <Text
+                  style={[
+                    styles.hostLink,
+                    { color: colors.primary },
+                    ]}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                  >
+                    {host.name}
+                  </Text>
+                </Link>
+                )}
 
             {plainDesc.length > 0 && (
               <Text style={[styles.description, { color: colors.text }]}>
                 {plainDesc}
               </Text>
-            )}
+              )}
           </View>
         }
         renderSectionHeader={({ section: { title } }) => (
           <Text style={[styles.sectionHeader, { color: colors.primary }]}>
             {title}
           </Text>
-        )}
+          )}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <Text style={[styles.cell, { color: colors.text }]}>
               {item.time}
             </Text>
           </View>
-        )}
+          )}
       />
     </View>
-  );
+    );
 }
 
 const styles = StyleSheet.create({
@@ -222,13 +236,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingBottom: 16,
   },
-  list: {
-    paddingBottom: 16,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start', // icon aligned to top of text
+    marginBottom: 8,
+  },
+  icon: {
+    marginRight: 8,
   },
   title: {
     fontSize: 30,
     fontWeight: '700',
-    marginBottom: 8,
+    flexShrink: 1,
+    flexWrap: 'wrap', // allow wrapping if too long
+    lineHeight: 36,
   },
   hostLinkContainer: {
     marginBottom: 12,
@@ -236,6 +257,9 @@ const styles = StyleSheet.create({
   hostLink: {
     fontSize: 19,
     fontWeight: '600',
+    flexShrink: 1,
+    flexWrap: 'wrap', // wrap long names
+    lineHeight: 22,
   },
   description: {
     fontSize: 18,
@@ -259,5 +283,8 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontStyle: 'italic',
     textAlign: 'left',
+  },
+  list: {
+    paddingBottom: 16,
   },
 });
