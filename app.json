@@ -2,7 +2,7 @@
   "expo": {
     "name": "éist",
     "slug": "eist-app",
-    "version": "1.1.0",
+    "version": "1.4.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "eistapp",
@@ -16,7 +16,8 @@
         "UIBackgroundModes": [
           "audio"
         ],
-        "NSPhotoLibraryUsageDescription": "We save app screenshots to your photo library so that you can access them later."
+        "NSPhotoLibraryUsageDescription": "We save app screenshots to your photo library so that you can access them later.",
+        "NSMicrophoneUsageDescription": "This app streams audio and does not record you, but a library we use requires an infoPlist entry to work."
       }
     },
     "android": {

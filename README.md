@@ -62,19 +62,16 @@ eas build --platform ios
 ```
 
 ```cmd
-eas submit --platform ios --profile production
+eas submit --platform ios
 ```
 
-```cmd
-eas build --platform ios --auto-submit
-```
-
-## Android build
+## Android
 
 ```cmd
 eas build --platform android
 ```
 
-**TODO**
-* Chromecast https://github.com/react-native-google-cast/react-native-google-cast
-* Carkit
+## TODO
+
+* Google Cast https://github.com/react-native-google-cast/react-native-google-cast
+* Android Auto + CarPlay https://github.com/g4rb4g3/react-native-carplay

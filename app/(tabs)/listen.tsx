@@ -31,7 +31,7 @@ export default function ListenScreen() {
   const { colors } = useTheme();
   const { isPlaying, togglePlay } = useAudio();
   const { width, height } = Dimensions.get('window');
-  const router = useRouter(); // ← useRouter, not useNavigation
+  const router = useRouter();
 
   // UI state from API
   const [showTitle, setShowTitle] = useState<string>(' ');
@@ -43,6 +43,7 @@ export default function ListenScreen() {
   const [broadcastStatus, setBroadcastStatus] = useState<string>('off air');
 
   // State for next show when off air
+  const [nextShowId, setNextShowId] = useState<string | null>(null);
   const [nextShowTitle, setNextShowTitle] = useState<string>(' ');
   const [nextShowTime, setNextShowTime] = useState<string>(' ');
 
@@ -65,11 +66,14 @@ export default function ListenScreen() {
       .filter(Boolean)
       .join('\n\n') || ' ';
 
-  // Helper: format an ISO timestamp into "HH:MM" (24-hour) format
+  // Helper: format an ISO timestamp into "h:mm AM/PM" format
   const formatTime = (isoString: string): string => {
     const date = new Date(isoString);
-    // Format as "HH:MM" in the user's locale, 24-hour clock
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
   // Fetch artist details by ID
@@ -124,12 +128,22 @@ export default function ListenScreen() {
         setShowDescription(' ');
         setArtistId(null);
 
-        // Fetch next scheduled show within the next 24 hours
+        // Clear previous next-show info
+        setNextShowId(null);
+        setNextShowTitle(' ');
+        setNextShowTime(' ');
+
+        // Fetch next scheduled show within the next 7 days
         try {
           const now = new Date().toISOString();
-          const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+          const weekAhead = new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+          ).toISOString();
+
           const nextRes = await fetch(
-            `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(tomorrow)}`,
+            `${apiUrl}/schedule?startDate=${encodeURIComponent(
+              now
+            )}&endDate=${encodeURIComponent(weekAhead)}`,
             {
               headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
             }
@@ -137,18 +151,21 @@ export default function ListenScreen() {
           if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`);
           const nextJson = await nextRes.json();
           const events: Array<any> = nextJson.schedules || [];
+
           if (events.length > 0) {
+            // Ensure events are sorted by startDateUtc
+            events.sort(
+              (a, b) =>
+                new Date(a.startDateUtc).getTime() -
+                new Date(b.startDateUtc).getTime()
+            );
             const nextEvent = events[0];
+            setNextShowId(nextEvent.id);
             setNextShowTitle(nextEvent.title || ' ');
             setNextShowTime(formatTime(nextEvent.startDateUtc));
-          } else {
-            setNextShowTitle(' ');
-            setNextShowTime(' ');
           }
         } catch (nextErr) {
           console.error('fetchNextShow failed', nextErr);
-          setNextShowTitle(' ');
-          setNextShowTime(' ');
         }
       } else {
         // When on air: display current show info
@@ -166,6 +183,7 @@ export default function ListenScreen() {
         setShowDescription(desc);
 
         // Clear next show info while on air
+        setNextShowId(null);
         setNextShowTitle(' ');
         setNextShowTime(' ');
       }
@@ -177,6 +195,7 @@ export default function ListenScreen() {
       setArtistImage(placeholderOfflineImage);
       setShowDescription(' ');
       setArtistId(null);
+      setNextShowId(null);
       setNextShowTitle(' ');
       setNextShowTime(' ');
     }
@@ -248,13 +267,24 @@ export default function ListenScreen() {
           contentContainerStyle={styles.nowPlayingContent}
         >
           {/* Show "Next up" when off air */}
-          {broadcastStatus !== 'schedule' && nextShowTitle.trim() !== '' && (
-            <ThemedText
-              type="subtitle"
-              style={[styles.nextUp, { color: colors.text }]}
+          {broadcastStatus !== 'schedule' && nextShowId && (
+            <TouchableOpacity
+              onPress={() => router.push(`/show/${nextShowId}`)}
+              style={styles.nextRow}
             >
-              <i>Next up: {nextShowTitle}, {nextShowTime}</i>
-            </ThemedText>
+              <Ionicons
+                name="calendar-clear-outline"
+                size={20}
+                color={colors.text}
+                style={styles.nextIcon}
+              />
+              <ThemedText
+                type="subtitle"
+                style={[styles.nextUp, { color: colors.text }]}
+              >
+                Next up: {nextShowTitle} at {nextShowTime}
+              </ThemedText>
+            </TouchableOpacity>
           )}
 
           {/* Current show title (visible when on air) */}
@@ -305,7 +335,20 @@ const styles = StyleSheet.create({
   nowPlayingContainer: { flex: 1, width: '100%' },
   nowPlayingContent: { paddingHorizontal: 12 },
 
-  nextUp: { fontSize: 20, fontWeight: '500', marginBottom: 6 },
+  nextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  nextIcon: {
+    marginRight: 6,
+  },
+  nextUp: {
+    fontSize: 20,
+    fontWeight: '400',
+    fontStyle: 'italic',
+  },
 
   showTitle: { fontSize: 24, fontWeight: '500', marginBottom: 6 },
   showDescription: { fontSize: 18, lineHeight: 22 },

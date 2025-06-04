@@ -1,10 +1,12 @@
 // app/_layout.tsx
+
 import React, { Suspense, useEffect, useState, useRef } from 'react';
 import {
   Animated,
   View,
   ActivityIndicator,
   StyleSheet,
+  Image,
 } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider } from '@react-navigation/native';
@@ -15,13 +17,15 @@ import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
 import { AudioProvider } from '../context/AudioContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
-// React Query imports
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Prevent the native splash from auto-hiding
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+// Replace with your actual splash image asset
+const splashImage = require('../assets/images/eist.png');
 
 export default function RootLayout() {
   // Load custom font
@@ -45,7 +49,7 @@ export default function RootLayout() {
     const prepareApp = async () => {
       if (fontsLoaded) {
         // Small delay to ensure everything is loaded
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 700));
         setIsAppReady(true);
         
         // Start the fade transition
@@ -53,13 +57,13 @@ export default function RootLayout() {
           // Fade in the app content
           Animated.timing(appOpacity, {
             toValue: 1,
-            duration: 800,
+            duration: 1100,
             useNativeDriver: true,
           }),
           // Fade out the splash screen
           Animated.timing(splashOpacity, {
             toValue: 0,
-            duration: 800,
+            duration: 1100,
             useNativeDriver: true,
           }),
         ]).start(async () => {
@@ -86,8 +90,7 @@ export default function RootLayout() {
           styles.container, 
           { 
             opacity: appOpacity,
-            // Ensure app content is behind splash initially
-            zIndex: isAppReady ? 1 : 0
+            zIndex: isAppReady ? 1 : 0, // Ensure app content is behind splash initially
           }
         ]}
       >
@@ -116,14 +119,16 @@ export default function RootLayout() {
             styles.splashContainer,
             { 
               opacity: splashOpacity,
-              zIndex: 2 // Ensure splash is on top
+              zIndex: 2, // Ensure splash is on top
             }
           ]}
         >
-          {/* You can customize this splash content */}
           <View style={styles.splashContent}>
-            {/* Add your logo or splash content here */}
-            <ActivityIndicator size="large" color="#AFFC41" />
+            <Image
+              source={splashImage}
+              style={styles.splashImage}
+              resizeMode="contain"
+            />
           </View>
         </Animated.View>
       )}
@@ -147,7 +152,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   splashContent: {
+    flex: 1, // Fill entire container
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  splashImage: {
+    ...StyleSheet.absoluteFillObject, // Stretch to fill parent
   },
 });

@@ -15,6 +15,7 @@ import { useTheme } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { apiKey } from '../../../config';
+import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '@/components/ThemedText';
 import { stripFormatting } from '../../../utils/stripFormatting';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -77,8 +78,8 @@ export default function ArtistScreen() {
   const plain = stripFormatting(artist.description?.content);
   const paragraphs = plain
     .split('\n')
-    .map(p => p.trim())
-    .filter(p => p);
+    .map((p) => p.trim())
+    .filter((p) => p);
 
   // Social links
   const socials = artist.socials ?? {};
@@ -87,7 +88,10 @@ export default function ArtistScreen() {
   if (socials.twitterHandle)
     entries.push(['Twitter', `https://twitter.com/${socials.twitterHandle}`]);
   if (socials.instagramHandle)
-    entries.push(['Instagram', `https://instagram.com/${socials.instagramHandle}`]);
+    entries.push([
+      'Instagram',
+      `https://instagram.com/${socials.instagramHandle}`,
+    ]);
   if (socials.facebook)
     entries.push(['Facebook', `https://facebook.com/${socials.facebook}`]);
   if (socials.mixcloud)
@@ -99,7 +103,7 @@ export default function ArtistScreen() {
     ]);
 
   const openLink = (url: string) =>
-    Linking.canOpenURL(url).then(ok => ok && Linking.openURL(url));
+    Linking.canOpenURL(url).then((ok) => ok && Linking.openURL(url));
 
   // Pick the best available artist image; if none, fall back to local asset
   let imageSource;
@@ -135,12 +139,23 @@ export default function ArtistScreen() {
         />
       </View>
 
-      <ThemedText
-        type="subtitle"
-        style={[styles.header, { color: colors.primary }]}
-      >
-        {artist.name || 'Unnamed Artist'}
-      </ThemedText>
+      {/* Title row: icon + artist name */}
+      <View style={styles.titleRow}>
+        <Ionicons
+          name="headset-outline"
+          size={36}
+          color={colors.primary}
+          style={styles.icon}
+        />
+        <ThemedText
+          type="subtitle"
+          style={[styles.header, { color: colors.primary }]}
+          numberOfLines={2}           // limit to two lines
+          ellipsizeMode="tail"
+        >
+          {artist.name || 'Unnamed Artist'}
+        </ThemedText>
+      </View>
 
       <View style={styles.textContainer}>
         {paragraphs.map((p, i) => (
@@ -200,12 +215,21 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',   // align icon to top of text
+    marginHorizontal: 16,
+    marginVertical: 16,
+  },
+  icon: {
+    marginRight: 8,
+  },
   header: {
     fontSize: 28,
     fontWeight: '700',
-    marginVertical: 16,
-    paddingHorizontal: 16,
-    textAlign: 'left',
+    flexShrink: 1,               // allow shrinking
+    flexWrap: 'wrap',            // allow wrapping
+    lineHeight: 32,              // ensure proper line spacing
   },
   textContainer: {
     width: '100%',
