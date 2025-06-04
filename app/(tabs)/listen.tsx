@@ -337,9 +337,10 @@ const styles = StyleSheet.create({
 
   nextRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginTop: 8,
     marginBottom: 6,
+    width: '100%',
   },
   nextIcon: {
     marginRight: 6,
@@ -348,6 +349,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '400',
     fontStyle: 'italic',
+    flex: 1,
+    flexWrap: 'wrap',
   },
 
   showTitle: { fontSize: 24, fontWeight: '500', marginBottom: 6 },
