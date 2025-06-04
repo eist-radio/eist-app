@@ -57,13 +57,13 @@ export default function RootLayout() {
           // Fade in the app content
           Animated.timing(appOpacity, {
             toValue: 1,
-            duration: 1100,
+            duration: 1200,
             useNativeDriver: true,
           }),
           // Fade out the splash screen
           Animated.timing(splashOpacity, {
             toValue: 0,
-            duration: 1100,
+            duration: 1200,
             useNativeDriver: true,
           }),
         ]).start(async () => {
