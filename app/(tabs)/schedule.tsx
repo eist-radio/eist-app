@@ -16,7 +16,7 @@ import { API_KEY } from '@env';
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
 
-// matches the Radiocult API “event” object
+// matches the Radiocult API "event" object
 type RawScheduleItem = {
   id: string;
   stationId: string;
@@ -68,7 +68,7 @@ export default function ScheduleScreen() {
         const raw = await fetchSchedule(startIso, endIso);
         setSections(groupByDate(raw.schedules || []));
 
-        // 3) Fetch “live” schedule to see if there’s a show on-air right now
+        // 3) Fetch "live" schedule to see if there’s a show on-air right now
         const liveRes = await fetch(
           `https://api.radiocult.fm/api/station/${STATION_ID}/schedule/live`,
           {
@@ -82,7 +82,7 @@ export default function ScheduleScreen() {
           result: { status: string; content: any };
         };
 
-        // Radiocult’s “live” endpoint returns:
+        // Radiocult’s "live" endpoint returns:
         //   • result.status === 'schedule' when on‐air, and content has .id
         //   • result.status !== 'schedule' when off‐air
         if (liveJson.result.status === 'schedule') {
@@ -126,7 +126,7 @@ export default function ScheduleScreen() {
       const d = new Date(item.startDateUtc);
       let dateKey = d.toISOString().split('T')[0];
 
-      // If the show starts exactly at midnight UTC, count it as “previous day” in local
+      // If the show starts exactly at midnight UTC, count it as "previous day" in local
       if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
         const prev = new Date(d);
         prev.setUTCDate(prev.getUTCDate() - 1);

@@ -76,6 +76,21 @@ eas build --platform android
 eas submit --platform android
 ```
 
+## Native dev build
+
+```cmd
+eas build --profile development --platform ios
+```
+**Note**: Ignore `setSleepTimer` warnings, not using this in the app.
+
+Install app using the QR code, and then:
+
+```cmd
+npx expo start --tunnel
+```
+
+Use the dev build, not expo.
+
 ## TODO
 
 * Get set up in the Android store: https://docs.expo.dev/submit/android/

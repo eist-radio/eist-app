@@ -2,7 +2,7 @@
   "expo": {
     "name": "éist",
     "slug": "eist-app",
-    "version": "1.6.0",
+    "version": "1.6.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "eistapp",
@@ -39,25 +39,25 @@
       "favicon": "./assets/images/favicon.png"
     },
     "splash": {
-      "image": "./assets/images/eist.png",
-      "resizeMode": "contain",
       "backgroundColor": "#4733FF",
       "dark": {
-        "image": "./assets/images/eist.png",
         "backgroundColor": "#4733FF"
       }
     },
     "plugins": [
-      "expo-router",
+    "expo-audio",
+    "expo-video",
+    "expo-router",
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/eist.png",
-          "imageWidth": 350,
+          "imageWidth": 275,
           "resizeMode": "contain",
           "backgroundColor": "#4733FF",
           "dark": {
             "image": "./assets/images/eist.png",
+            "imageWidth": 275,
             "backgroundColor": "#4733FF"
           }
         }

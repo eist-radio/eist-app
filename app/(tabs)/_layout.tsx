@@ -32,7 +32,7 @@ export default function TabLayout() {
   // Figure out safe-area bottom inset
   const insets = useSafeAreaInsets();
 
-  // Share logic: capture → crop off tab bar → share
+  // Share logic
   const onShare = async () => {
     try {
       if (!wrapperRef.current || !layout) {
@@ -53,7 +53,7 @@ export default function TabLayout() {
       const TAB_BAR_HEIGHT_PT = 48;
       const tabBarHeightPx    = (TAB_BAR_HEIGHT_PT + insets.bottom) * density;
 
-      // d) crop off that bottom strip
+      // d) crop off bottom strip
       const cropHeight = pxH - tabBarHeightPx;
       const { uri: croppedUri } = await manipulateAsync(
         rawUri,
@@ -127,7 +127,7 @@ export default function TabLayout() {
           }}
         />
 
-        {/* Share screenshot “button” */}
+        {/* Share screenshot "button" */}
         <Tabs.Screen
           name="share"
           options={{
