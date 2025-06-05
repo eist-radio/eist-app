@@ -260,7 +260,7 @@ export default function ScheduleScreen() {
                 <View style={styles.showCellContent}>
                   {isCurrent && (
                     <Ionicons
-                      name="headset-outline"
+                      name="arrow-forward-outline"
                       size={18}
                       color={colors.primary}
                       style={styles.playIcon}
