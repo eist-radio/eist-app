@@ -1,4 +1,13 @@
 {
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "react-native-track-player"
+        ]
+      }
+    }
+  },
   "name": "eist-app",
   "main": "index.js",
   "version": "1.0.0",

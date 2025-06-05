@@ -2,7 +2,7 @@
   "expo": {
     "name": "éist",
     "slug": "eist-app",
-    "version": "1.6.2",
+    "version": "1.6.8",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "eistapp",
@@ -45,9 +45,9 @@
       }
     },
     "plugins": [
-    "expo-audio",
-    "expo-video",
-    "expo-router",
+      "expo-audio",
+      "expo-video",
+      "expo-router",
       [
         "expo-splash-screen",
         {
@@ -58,6 +58,7 @@
           "dark": {
             "image": "./assets/images/eist.png",
             "imageWidth": 275,
+            "resizeMode": "contain",
             "backgroundColor": "#4733FF"
           }
         }

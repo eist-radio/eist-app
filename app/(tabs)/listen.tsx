@@ -185,7 +185,7 @@ export default function ListenScreen() {
 
         // Update lock‐screen/notification metadata for this "On Air" show
         const artworkUri = (image as any).uri ?? undefined;
-        await updateMetadata(content.title || 'éist Radio', name, artworkUri);
+        await updateMetadata(content.title || 'éist', name, artworkUri);
       }
     } catch (err) {
       console.error('fetchNowPlaying failed', err);

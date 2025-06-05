@@ -35,15 +35,25 @@ $eist-highlight: #96BFE6 !default;
 
 ## A hacking we will go 🪓
 
-Download the expo go app in the App store on your device.
+Download the expo dev app on your device.
 
-Clear previous build instances in Expo go app, then:
+Clear previous build instances:
 
 ```cmd
 npx expo start --tunnel
 ```
+Use the development build, we are using native components so we can't use expo go. 
 
-Press `s` to switch to expo go, and open in app. `r` reloads the app.
+`r` reloads the app.
+
+## Native dev build
+
+```cmd
+eas build --profile development --platform ios
+```
+**Note**: Ignore `setSleepTimer` warnings, not using this in the app.
+
+**NB**: Use the dev build, not expo.
 
 ## Build and deploy to App stores
 
@@ -51,7 +61,7 @@ Make changes and uprev the `app.json` version.
 
 ### iOS
 
-**Note:** You must have an Apple developer licence
+**Note:** You must have an Apple developer licence.
 
 ```cmd
 eas credentials --platform ios
@@ -71,29 +81,13 @@ eas submit --platform ios
 eas build --platform android
 ```
 
-
 ```cmd
 eas submit --platform android
 ```
 
-## Native dev build
-
-```cmd
-eas build --profile development --platform ios
-```
-**Note**: Ignore `setSleepTimer` warnings, not using this in the app.
-
-Install app using the QR code, and then:
-
-```cmd
-npx expo start --tunnel
-```
-
-Use the dev build, not expo.
-
 ## TODO
 
-* Get set up in the Android store: https://docs.expo.dev/submit/android/
+* Get set up in the Android store: https://docs.expo.dev/submit/android/, Needs an Android v10 or later device.
 * Set up a Git CI
 * Google Cast https://github.com/react-native-google-cast/react-native-google-cast
 * Android Auto + CarPlay https://github.com/g4rb4g3/react-native-carplay

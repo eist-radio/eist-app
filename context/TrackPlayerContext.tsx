@@ -19,7 +19,8 @@ type TrackPlayerContextType = {
   togglePlayStop: () => Promise<void>;
   setupPlayer: () => Promise<void>;
   /**
-   * Update metadata on the native player (lock/notification). 
+   * Update metadata on the native player (lock/notification).
+   * If a real track (non-placeholder) is playing, append " – éist" to the artist.
    */
   updateMetadata: (title: string, artist: string, artworkUrl?: string) => Promise<void>;
 };
@@ -116,7 +117,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
 
-    const metadataArtist = artist;
+    const isDeadAir = title.trim().length === 0;
+
+    // If there's a valid artist/title, append éist to the artist field
+    const metadataArtist = isDeadAir
+      ? artist: `${artist} · éist`;
 
     try {
       if (artworkUrl && typeof artworkUrl === 'string') {
@@ -138,7 +143,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Listen for playback‐state changes and initialize player on mount
+  // Listen for playback-state changes and initialize player on mount
   useEffect(() => {
     setupPlayer();
 
