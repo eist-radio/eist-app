@@ -71,7 +71,14 @@ eas submit --platform ios
 eas build --platform android
 ```
 
+
+```cmd
+eas submit --platform android
+```
+
 ## TODO
 
+* Get set up in the Android store: https://docs.expo.dev/submit/android/
+* Set up a Git CI
 * Google Cast https://github.com/react-native-google-cast/react-native-google-cast
 * Android Auto + CarPlay https://github.com/g4rb4g3/react-native-carplay
