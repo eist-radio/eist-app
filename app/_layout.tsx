@@ -63,13 +63,13 @@ export default function RootLayout() {
         // Fade in the actual app content
         Animated.timing(appOpacity, {
           toValue: 1,
-          duration: 3600,
+          duration: 3200,
           useNativeDriver: true,
         }),
         // Fade out the custom splash overlay
         Animated.timing(splashOpacity, {
           toValue: 0,
-          duration: 3200,
+          duration: 2800,
           useNativeDriver: true,
         }),
       ]).start(() => {
@@ -160,6 +160,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   splashImage: {
-    width: 250,
+    width: 350,
   },
 });
