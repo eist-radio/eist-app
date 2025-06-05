@@ -1,6 +1,6 @@
 // app/(tabs)/schedule.tsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { API_KEY } from '@env';
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
+const LIVE_POLL_INTERVAL = 60_000; // 60 seconds
 
 // matches the Radiocult API "event" object
 type RawScheduleItem = {
@@ -53,6 +54,12 @@ export default function ScheduleScreen() {
   const [error, setError] = useState<string>();
   const [currentShowId, setCurrentShowId] = useState<string | null>(null);
 
+  // Helper to format a Date to "YYYY-MM-DDT" + suffix
+  function fmt(d: Date, suffix: string) {
+    return d.toISOString().split('T')[0] + 'T' + suffix;
+  }
+
+  // Fetch the 7-day schedule once on mount
   useEffect(() => {
     (async () => {
       try {
@@ -67,8 +74,22 @@ export default function ScheduleScreen() {
         // 2) Fetch the 7-day schedule
         const raw = await fetchSchedule(startIso, endIso);
         setSections(groupByDate(raw.schedules || []));
+      } catch (err) {
+        console.warn('ScheduleScreen fetch error:', err);
+        setError('Could not load schedule.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
-        // 3) Fetch "live" schedule to see if there’s a show on-air right now
+  // Poll "/schedule/live" every minute to update currentShowId
+  useEffect(() => {
+    let isMounted = true;
+
+    // Define a reusable function to fetch live‐show info
+    const fetchLiveShow = async () => {
+      try {
         const liveRes = await fetch(
           `https://api.radiocult.fm/api/station/${STATION_ID}/schedule/live`,
           {
@@ -82,27 +103,38 @@ export default function ScheduleScreen() {
           result: { status: string; content: any };
         };
 
-        // Radiocult’s "live" endpoint returns:
-        //   • result.status === 'schedule' when on‐air, and content has .id
-        //   • result.status !== 'schedule' when off‐air
+        // If on‐air, Radiocult returns result.status === 'schedule' with content.id
         if (liveJson.result.status === 'schedule') {
-          setCurrentShowId(liveJson.result.content.id);
+          if (isMounted) {
+            setCurrentShowId(liveJson.result.content.id);
+          }
         } else {
-          setCurrentShowId(null);
+          if (isMounted) {
+            setCurrentShowId(null);
+          }
         }
       } catch (err) {
-        console.warn('ScheduleScreen fetch error:', err);
-        setError('Could not load schedule.');
-      } finally {
-        setLoading(false);
+        console.warn('Live‐show fetch error:', err);
+        if (isMounted) {
+          // Optionally, you could setCurrentShowId(null) here if you want to clear indicator on error
+        }
       }
-    })();
+    };
+
+    // Immediately fetch live‐show once
+    fetchLiveShow();
+
+    // Then set up polling every LIVE_POLL_INTERVAL ms
+    const interval = setInterval(fetchLiveShow, LIVE_POLL_INTERVAL);
+
+    // Cleanup on unmount
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, []);
 
-  function fmt(d: Date, suffix: string) {
-    return d.toISOString().split('T')[0] + 'T' + suffix;
-  }
-
+  // Helper to call Radiocult's schedule endpoint
   async function fetchSchedule(startDate: string, endDate: string) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const url =
@@ -117,6 +149,7 @@ export default function ScheduleScreen() {
     return (await res.json()) as { schedules?: RawScheduleItem[] };
   }
 
+  // Group raw schedule items into sections by local date
   function groupByDate(items: RawScheduleItem[]): SectionData[] {
     const todayKey = new Date().toISOString().split('T')[0];
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -126,7 +159,7 @@ export default function ScheduleScreen() {
       const d = new Date(item.startDateUtc);
       let dateKey = d.toISOString().split('T')[0];
 
-      // If the show starts exactly at midnight UTC, count it as "previous day" in local
+      // If the show starts exactly at midnight UTC, count it as "previous day" locally
       if (d.getUTCHours() === 0 && d.getUTCMinutes() === 0) {
         const prev = new Date(d);
         prev.setUTCDate(prev.getUTCDate() - 1);
@@ -150,7 +183,7 @@ export default function ScheduleScreen() {
           const startDate = new Date(it.startDateUtc);
           const endDate = new Date(it.endDateUtc);
 
-          // Format with hour/minute + meridiem, e.g. "7:00 PM", "9:00 PM"
+          // Format times in local timezone
           const startStr = startDate.toLocaleTimeString('en-US', {
             hour: 'numeric',
             minute: '2-digit',
@@ -164,9 +197,8 @@ export default function ScheduleScreen() {
             timeZone: tz,
           });
 
-          // Split each into [time, meridiem], e.g. ["7:00", "PM"]
-          const startParts = startStr.split(/\s+/);
-          const endParts = endStr.split(/\s+/);
+          const startParts = startStr.split(/\s+/); // e.g. ["7:00", "PM"]
+          const endParts = endStr.split(/\s+/);     // e.g. ["9:00", "PM"]
 
           let timeLabel: string;
           if (
@@ -177,7 +209,7 @@ export default function ScheduleScreen() {
             // Same meridiem ⇒ "7:00 – 9:00 PM"
             timeLabel = `${startParts[0]} – ${endParts[0]} ${endParts[1]}`;
           } else {
-            // Different meridiems (or unexpected format) ⇒ "7:00 PM – 9:00 AM", etc.
+            // Different meridiems ⇒ "7:00 PM – 9:00 AM"
             timeLabel = `${startStr} – ${endStr}`;
           }
 
@@ -190,8 +222,10 @@ export default function ScheduleScreen() {
         }),
       }))
       .sort((a, b) => {
-        // Sort by the actual date, not by string
-        return new Date(a.title).getTime() - new Date(b.title).getTime();
+        // Sort sections by actual date
+        return new Date(
+          a.title.replace(/,?\s?[A-Za-z]+\s\d+,\s\d{4}$/, '') // strip away locale info if needed
+        ).getTime() - new Date(b.title).getTime();
       });
   }
 
@@ -244,7 +278,6 @@ export default function ScheduleScreen() {
                   styles.cell,
                   {
                     color: colors.text,
-                    // Bold + italic if this is the current live show
                     fontWeight: isCurrent ? '700' : '400',
                     fontStyle: isCurrent ? 'italic' : 'normal',
                   },
