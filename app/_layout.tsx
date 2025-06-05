@@ -15,7 +15,7 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import 'react-native-reanimated';
-import { AudioProvider } from '../context/AudioContext';
+import { TrackPlayerProvider } from '../context/TrackPlayerContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -31,13 +31,9 @@ export default function RootLayout() {
     FunnelSans: require('../assets/fonts/FunnelSans-VariableFont_wght.ttf'),
   });
 
-  // Track whether we have triggered ready state
   const [isAppReady, setIsAppReady] = useState(false);
-
-  // Remove the overlay
   const [isSplashHidden, setIsSplashHidden] = useState(false);
 
-  // Animated values for the fade
   const appOpacity = useRef(new Animated.Value(0)).current;
   const splashOpacity = useRef(new Animated.Value(1)).current;
 
@@ -45,7 +41,6 @@ export default function RootLayout() {
   const theme = scheme === 'dark' ? EistDarkTheme : EistLightTheme;
 
   useEffect(() => {
-    // Runs whenever fontsLoaded changes
     const prepareApp = async () => {
       if (!fontsLoaded) {
         return;
@@ -54,26 +49,20 @@ export default function RootLayout() {
       await new Promise((resolve) => setTimeout(resolve, 900));
 
       setIsAppReady(true);
-
-      // Hide the **native** splash _before_ we start animating our custom overlay.
       await SplashScreen.hideAsync();
 
-      // Now that the native splash is gone, start the fade animations
       Animated.parallel([
-        // Fade in the actual app content
         Animated.timing(appOpacity, {
           toValue: 1,
           duration: 3200,
           useNativeDriver: true,
         }),
-        // Fade out the custom splash overlay
         Animated.timing(splashOpacity, {
           toValue: 0,
           duration: 2800,
           useNativeDriver: true,
         }),
       ]).start(() => {
-        // Once the fade is complete, remove the overlay
         setIsSplashHidden(true);
       });
     };
@@ -81,20 +70,18 @@ export default function RootLayout() {
     prepareApp();
   }, [fontsLoaded, appOpacity, splashOpacity]);
 
-  // Don't render anything until fonts are loaded (native splash still shows)
   if (!fontsLoaded) {
     return null;
   }
 
   return (
     <View style={styles.container}>
-      {/* Main App Content */}
       <Animated.View
         style={[
           styles.container,
           {
             opacity: appOpacity,
-            zIndex: isAppReady ? 1 : 0, // Ensure this sits under the splash until ready
+            zIndex: isAppReady ? 1 : 0,
           },
         ]}
       >
@@ -106,31 +93,30 @@ export default function RootLayout() {
               </View>
             }
           >
-            <AudioProvider>
+            <TrackPlayerProvider>
               <ThemeProvider value={theme}>
                 <Stack screenOptions={{ headerShown: false }} />
                 <StatusBar style="auto" />
               </ThemeProvider>
-            </AudioProvider>
+            </TrackPlayerProvider>
           </Suspense>
         </QueryClientProvider>
       </Animated.View>
 
-      {/* Custom Splash Overlay: only show it until our fade‐out finishes. */}
       {!isSplashHidden && (
         <Animated.View
           style={[
             styles.splashContainer,
             {
               opacity: splashOpacity,
-              zIndex: 2, // Keep splash on top until fully faded
+              zIndex: 2,
             },
           ]}
         >
           <View style={styles.splashContent}>
             <Image
               source={splashImage}
-              style={styles.splashImage} // Give it a fixed size, not absoluteFill
+              style={styles.splashImage}
               resizeMode="contain"
             />
           </View>
@@ -160,6 +146,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   splashImage: {
-    width: 350,
+    width: 275,
   },
 });

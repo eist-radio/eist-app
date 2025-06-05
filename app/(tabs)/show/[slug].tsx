@@ -138,7 +138,7 @@ export default function ShowScreen() {
       );
   }
 
-  // Always suspend on the “show/event” fetch
+  // Always suspend on the "show/event" fetch
   const { data: event } = useQuery({
     queryKey: ['show', slug],
     queryFn: () => fetchEventById(slug),
