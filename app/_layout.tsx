@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Image,
+  Platform,
 } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider } from '@react-navigation/native';
@@ -18,10 +19,11 @@ import { TrackPlayerProvider } from '../context/TrackPlayerContext';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-// Keep the native splash visible until we hide it explicitly
+// Tell the native splash to stay visible until we explicitly hide it
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
 const splashImage = require('../assets/images/eist.png');
 
 export default function RootLayout() {
@@ -44,11 +46,10 @@ export default function RootLayout() {
         return;
       }
 
-      // Simulate a short loading period—adjust as needed
       await new Promise((resolve) => setTimeout(resolve, 900));
 
       setIsAppReady(true);
-      await SplashScreen.hideAsync(); 
+      await SplashScreen.hideAsync();
 
       Animated.parallel([
         Animated.timing(appOpacity, {
@@ -58,7 +59,7 @@ export default function RootLayout() {
         }),
         Animated.timing(splashOpacity, {
           toValue: 0,
-          duration: 2600,
+          duration: 2800,
           useNativeDriver: true,
         }),
       ]).start(() => {
@@ -75,7 +76,6 @@ export default function RootLayout() {
 
   return (
     <View style={styles.container}>
-      {/* Main app content (fades in once ready) */}
       <Animated.View
         style={[
           styles.container,
@@ -103,7 +103,6 @@ export default function RootLayout() {
         </QueryClientProvider>
       </Animated.View>
 
-      {/* Custom splash (fades out) */}
       {!isSplashHidden && (
         <Animated.View
           style={[
@@ -147,7 +146,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   splashImage: {
-    width: '100%',
-    height: '100%',
+    width: 275,
   },
 });
