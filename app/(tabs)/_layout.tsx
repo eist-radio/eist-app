@@ -11,9 +11,12 @@ import {
   LayoutRectangle,
   StyleSheet,
   Share as RNShare,
+  Linking,
 } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faMixcloud } from '@fortawesome/free-brands-svg-icons';
 import { useTheme } from '@react-navigation/native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -25,58 +28,34 @@ export default function TabLayout() {
   const ACTIVE   = colors.primary;
   const INACTIVE = 'rgba(175, 252, 65, 0.5)';
 
-  // Ref + layout for the full wrapper
   const wrapperRef = useRef<View>(null);
   const [layout, setLayout] = useState<LayoutRectangle | null>(null);
-
-  // Figure out safe-area bottom inset
   const insets = useSafeAreaInsets();
 
-  // Share logic
   const onShare = async () => {
     try {
-      if (!wrapperRef.current || !layout) {
-        throw new Error('View not ready yet');
-      }
-
-      // a) snapshot the entire wrapper
+      if (!wrapperRef.current || !layout) throw new Error('View not ready yet');
       const tag = findNodeHandle(wrapperRef.current);
       if (!tag) throw new Error('Could not find native view handle');
       const rawUri = await captureRef(tag, { format: 'png', quality: 0.8 });
 
-      // b) compute pixel dims
-      const density  = PixelRatio.get();
-      const pxW      = layout.width  * density;
-      const pxH      = layout.height * density;
+      const density       = PixelRatio.get();
+      const pxW           = layout.width  * density;
+      const pxH           = layout.height * density;
+      const TAB_BAR_PT    = 48;
+      const tabBarPx      = (TAB_BAR_PT + insets.bottom) * density;
+      const cropHeightPx  = pxH - tabBarPx;
 
-      // c) compute tab-bar height in points (default ~48pt) + safe-area
-      const TAB_BAR_HEIGHT_PT = 48;
-      const tabBarHeightPx    = (TAB_BAR_HEIGHT_PT + insets.bottom) * density;
-
-      // d) crop off bottom strip
-      const cropHeight = pxH - tabBarHeightPx;
       const { uri: croppedUri } = await manipulateAsync(
         rawUri,
-        [
-          {
-            crop: {
-              originX: 0,
-              originY: 0,
-              width:   pxW,
-              height:  cropHeight,
-            },
-          },
-        ],
+        [{ crop: { originX: 0, originY: 0, width: pxW, height: cropHeightPx } }],
         { format: SaveFormat.PNG }
       );
 
-      // Share
       if (Platform.OS === 'ios') {
         await RNShare.share({ url: croppedUri });
       } else {
-        if (!(await Sharing.isAvailableAsync())) {
-          throw new Error('No share targets available');
-        }
+        if (!(await Sharing.isAvailableAsync())) throw new Error('No share targets available');
         await Sharing.shareAsync(croppedUri, {
           mimeType: 'image/png',
           dialogTitle: 'Share Screenshot',
@@ -97,42 +76,48 @@ export default function TabLayout() {
       <Tabs
         initialRouteName="listen"
         screenOptions={{
-          headerShown:          false,
-          tabBarShowLabel:      false,
+          headerShown:           false,
+          tabBarShowLabel:       false,
           tabBarActiveTintColor:   ACTIVE,
           tabBarInactiveTintColor: INACTIVE,
-          tabBarStyle: { 
+          tabBarStyle: {
             backgroundColor: colors.card,
             marginTop: 12,
           },
         }}
       >
-        {/* Live tab */}
         <Tabs.Screen
           name="listen"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="radio-outline" size={(size ?? 24) * 1.2} color={color} />
+              <Ionicons name="radio-outline" size={size ?? 24} color={color} />
             ),
           }}
         />
 
-        {/* Schedule tab */}
         <Tabs.Screen
           name="schedule"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calendar-outline" size={(size ?? 24) * 1.2} color={color} />
+              <Ionicons name="calendar-outline" size={size ?? 24} color={color} />
             ),
           }}
         />
 
-        {/* Share screenshot "button" */}
+        <Tabs.Screen
+          name="discord"
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="logo-discord" size={size ?? 24} color={color} />
+            ),
+          }}
+        />
+
         <Tabs.Screen
           name="share"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="share-outline" size={(size ?? 24) * 1.2} color={color} />
+              <Ionicons name="share-outline" size={size ?? 24} color={color} />
             ),
             tabBarButton: ({ children, ...props }) => (
               <TouchableOpacity {...props} onPress={onShare}>
@@ -142,39 +127,65 @@ export default function TabLayout() {
           }}
         />
 
-        {/* Website external link tab */}
         <Tabs.Screen
           name="website"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="globe-outline" size={(size ?? 24) * 1.2} color={color} />
+              <Ionicons name="globe-outline" size={size ?? 24} color={color} />
             ),
           }}
         />
 
-        {/* Discord external link tab */}
         <Tabs.Screen
-          name="discord"
+          name="instagram"
           options={{
             tabBarIcon: ({ color, size }) => (
-              <Ionicons name="logo-discord" size={(size ?? 24) * 1.2} color={color} />
+              <Ionicons name="logo-instagram" size={size ?? 24} color={color} />
+            ),
+            tabBarButton: ({ children, ...props }) => (
+              <TouchableOpacity
+                {...props}
+                onPress={() => Linking.openURL('https://instagram.com/eistcork')}
+              >
+                {children}
+              </TouchableOpacity>
             ),
           }}
         />
 
-        {/* Hidden detail routes */}
+        <Tabs.Screen
+          name="mixcloud"
+          options={{
+            tabBarIcon: ({ color, size }) => (
+              <FontAwesomeIcon
+                icon={faMixcloud}
+                size={(size ?? 24) * 1.2}
+                color={color}
+              />
+            ),
+            tabBarButton: ({ children, ...props }) => (
+              <TouchableOpacity
+                {...props}
+                onPress={() => Linking.openURL('https://www.mixcloud.com/eistcork/')}
+              >
+                {children}
+              </TouchableOpacity>
+            ),
+          }}
+        />
+
         <Tabs.Screen
           name="artist/[slug]"
           options={{
-            tabBarButton:   () => null,
-            tabBarItemStyle:{ display: 'none' },
+            tabBarButton:    () => null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
         <Tabs.Screen
           name="show/[slug]"
           options={{
-            tabBarButton:   () => null,
-            tabBarItemStyle:{ display: 'none' },
+            tabBarButton:    () => null,
+            tabBarItemStyle: { display: 'none' },
           }}
         />
       </Tabs>
