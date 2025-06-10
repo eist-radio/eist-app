@@ -173,7 +173,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <FontAwesomeIcon
                 icon={faMixcloud}
-                size={(size ?? 24) * 1.3}
+                size={(size ?? 24) * 1.4}
                 color={color}
               />
             ),
