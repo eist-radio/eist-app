@@ -1,4 +1,5 @@
 // app/_layout.tsx
+
 import React, { Suspense, useEffect, useState, useRef } from 'react';
 import {
   Animated,
