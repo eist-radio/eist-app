@@ -115,7 +115,7 @@ export default function ArtistScreen() {
     imageSource = { uri: artist.logo.default };
   } else {
     // Fallback to bundled image when no artist image is provided
-    imageSource = require('../../../assets/images/eist_online.png');
+    imageSource = require('../../../assets/images/artist.png');
   }
 
   return (
@@ -217,7 +217,7 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',   // align icon to top of text
+    alignItems: 'center',
     marginHorizontal: 16,
     marginVertical: 16,
   },
