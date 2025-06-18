@@ -3,7 +3,9 @@
     "doctor": {
       "reactNativeDirectoryCheck": {
         "exclude": [
-          "react-native-track-player"
+          "react-native-track-player",
+          "@fortawesome/fontawesome-svg-core",
+          "@fortawesome/free-brands-svg-icons"
         ]
       }
     }
@@ -35,17 +37,17 @@
     "expo-dev-client": "~5.2.0",
     "expo-font": "~13.3.1",
     "expo-haptics": "~14.1.4",
-    "expo-image": "~2.2.0",
+    "expo-image": "~2.3.0",
     "expo-image-manipulator": "^13.1.7",
     "expo-linear-gradient": "~14.1.5",
     "expo-linking": "~7.1.5",
-    "expo-router": "^5.0.7",
+    "expo-router": "~5.1.0",
     "expo-sharing": "^13.1.5",
     "expo-splash-screen": "~0.30.9",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
     "expo-system-ui": "~5.0.8",
-    "expo-video": "~2.2.0",
+    "expo-video": "~2.2.1",
     "expo-web-browser": "~14.1.6",
     "react": "19.0.0",
     "react-dom": "19.0.0",
@@ -60,8 +62,7 @@
     "react-native-track-player": "^4.1.1",
     "react-native-view-shot": "^4.0.3",
     "react-native-web": "~0.20.0",
-    "react-native-webview": "13.13.5",
-    "shaka-player": "^4.15.1"
+    "react-native-webview": "13.13.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

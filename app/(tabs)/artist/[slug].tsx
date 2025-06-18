@@ -1,6 +1,4 @@
-// app/(tabs)/artist/[slug].tsx
-
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -14,8 +12,8 @@ import {
 import { useTheme } from '@react-navigation/native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { apiKey } from '../../../config';
 import { Ionicons } from '@expo/vector-icons';
+import { apiKey } from '../../../config';
 import { ThemedText } from '@/components/ThemedText';
 import { stripFormatting } from '../../../utils/stripFormatting';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -40,13 +38,17 @@ type RawArtist = {
     soundcloud?: string;
     site?: string;
   };
+  tags?: string[];
 };
 
+function extractTagValue(tags: string[] | undefined, prefix: string): string | undefined {
+  if (!tags) return undefined;
+  const found = tags.find((t) => t.startsWith(prefix));
+  return found ? found.replace(prefix, '').toLowerCase() : undefined;
+}
+
 async function fetchArtistBySlug(slug: string): Promise<RawArtist> {
-  const url =
-    `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(
-      slug
-    )}`;
+  const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(slug)}`;
   const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
   if (!res.ok) throw new Error(`Artist fetch failed: ${res.statusText}`);
   const json = (await res.json()) as { artist?: RawArtist };
@@ -74,64 +76,87 @@ export default function ArtistScreen() {
     suspense: true,
   });
 
-  // Flatten rich-text → plain paragraphs
+  const fallbackImage = require('../../../assets/images/artist.png');
+  const [imageFailed, setImageFailed] = useState(false);
+
+  const remoteImage =
+    artist.logo?.['1024x1024'] ||
+    artist.logo?.['512x512'] ||
+    artist.logo?.default;
+
+  const imageSource =
+    imageFailed || !remoteImage
+      ? fallbackImage
+      : { uri: remoteImage };
+
   const plain = stripFormatting(artist.description?.content);
   const paragraphs = plain
     .split('\n')
     .map((p) => p.trim())
     .filter((p) => p);
 
-  // Social links
   const socials = artist.socials ?? {};
+  const tags = artist.tags ?? [];
+
   const entries: Array<[string, string]> = [];
+
+  // Standard social links
   if (socials.site) entries.push(['Website', socials.site]);
   if (socials.twitterHandle)
     entries.push(['Twitter', `https://twitter.com/${socials.twitterHandle}`]);
   if (socials.instagramHandle)
-    entries.push([
-      'Instagram',
-      `https://instagram.com/${socials.instagramHandle}`,
-    ]);
+    entries.push(['Instagram', `https://instagram.com/${socials.instagramHandle}`]);
   if (socials.facebook)
     entries.push(['Facebook', `https://facebook.com/${socials.facebook}`]);
   if (socials.mixcloud)
     entries.push(['Mixcloud', `https://mixcloud.com/${socials.mixcloud}`]);
   if (socials.soundcloud)
+    entries.push(['SoundCloud', `https://soundcloud.com/${socials.soundcloud}`]);
+
+  // Archive links from tags
+  const mcUsername = extractTagValue(tags, 'MC-USERNAME_');
+  const scUsername = extractTagValue(tags, 'SC-USERNAME_');
+  const hostScPlaylist = extractTagValue(tags, 'HOST-SC-PLAYLIST_');
+  const hostMcPlaylist = extractTagValue(tags, 'HOST-MC-PLAYLIST_');
+  const eistMcPlaylist = extractTagValue(tags, 'EIST-MC-PLAYLIST_');
+
+  if (scUsername && hostScPlaylist) {
     entries.push([
-      'SoundCloud',
-      `https://soundcloud.com/${socials.soundcloud}`,
+      'SoundCloud archive',
+      `https://soundcloud.com/${scUsername}/sets/${hostScPlaylist}`,
     ]);
+  }
+
+  if (eistMcPlaylist) {
+    entries.push([
+      'éist archive',
+      `https://www.mixcloud.com/eistcork/playlists/${eistMcPlaylist}`,
+    ]);
+  }
+
+  if (mcUsername && hostMcPlaylist) {
+    entries.push([
+      'Mixcloud archive',
+      `https://mixcloud.com/${mcUsername}/playlists/${hostMcPlaylist}`,
+    ]);
+  }
 
   const openLink = (url: string) =>
     Linking.canOpenURL(url).then((ok) => ok && Linking.openURL(url));
-
-  // Pick the best available artist image; if none, fall back to local asset
-  let imageSource;
-  if (artist.logo?.['1024x1024']) {
-    imageSource = { uri: artist.logo['1024x1024'] };
-  } else if (artist.logo?.['512x512']) {
-    imageSource = { uri: artist.logo['512x512'] };
-  } else if (artist.logo?.default) {
-    imageSource = { uri: artist.logo.default };
-  } else {
-    // Fallback to bundled image when no artist image is provided
-    imageSource = require('../../../assets/images/artist.png');
-  }
 
   return (
     <ScrollView
       style={[styles.screen, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.content}
     >
-      {/* Avatar + gradient overlay via LinearGradient */}
       <View style={styles.avatarContainer}>
         <Image
           source={imageSource}
           style={styles.fullWidthAvatar}
           resizeMode="cover"
+          onError={() => setImageFailed(true)}
         />
         <LinearGradient
-          // adjust these colors to match your PNG
           colors={['transparent', 'rgba(0,0,0,0.4)']}
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
@@ -139,7 +164,6 @@ export default function ArtistScreen() {
         />
       </View>
 
-      {/* Title row: icon + artist name */}
       <View style={styles.titleRow}>
         <Ionicons
           name="headset-outline"
@@ -150,7 +174,7 @@ export default function ArtistScreen() {
         <ThemedText
           type="subtitle"
           style={[styles.header, { color: colors.primary }]}
-          numberOfLines={2}           // limit to two lines
+          numberOfLines={2}
           ellipsizeMode="tail"
         >
           {artist.name || 'Unnamed Artist'}
@@ -173,20 +197,14 @@ export default function ArtistScreen() {
             {entries.map(([label, url], idx) => (
               <React.Fragment key={label}>
                 <TouchableOpacity onPress={() => openLink(url)}>
-                  <ThemedText
-                    type="body"
-                    style={[styles.linkText, { color: colors.primary }]}
-                  >
+                  <Text style={[styles.linkText, { color: colors.primary }]}>
                     {label}
-                  </ThemedText>
+                  </Text>
                 </TouchableOpacity>
                 {idx < entries.length - 1 && (
-                  <ThemedText
-                    type="body"
-                    style={[styles.separator, { color: colors.text }]}
-                  >
-                    {' '} /{' '}
-                  </ThemedText>
+                  <Text style={[styles.separator, { color: colors.text }]}>
+                    {' / '}
+                  </Text>
                 )}
               </React.Fragment>
             ))}
@@ -227,9 +245,9 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 28,
     fontWeight: '700',
-    flexShrink: 1,               // allow shrinking
-    flexWrap: 'wrap',            // allow wrapping
-    lineHeight: 32,              // ensure proper line spacing
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    lineHeight: 32,
   },
   textContainer: {
     width: '100%',

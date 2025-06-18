@@ -226,7 +226,7 @@ export default function ListenScreen() {
         <TouchableOpacity
           style={styles.logoContainer}
           activeOpacity={0.7}
-          onPress={() => Linking.openURL('https://eist.radio')}
+          onPress={() => Linking.openURL('https://eist.radio/support')}
           accessibilityRole="link"
         >
           <Image
