@@ -1,3 +1,5 @@
+// app/(tabs)/schedule.tsx
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -289,7 +291,7 @@ export default function ScheduleScreen() {
                         styles.cellText,
                         {
                           color: colors.primary,
-                          fontWeight: isCurrent ? '700' : '400',
+                          fontWeight: '600',
                           fontStyle: isCurrent ? 'italic' : 'normal',
                         },
                       ]}
@@ -317,12 +319,12 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: 8,
   },
   sectionHeader: {
     fontSize: 20,
-    fontWeight: '700',
+    fontWeight: '400',
     marginTop: 12,
     marginBottom: 4,
   },
@@ -333,7 +335,7 @@ const styles = StyleSheet.create({
   headerCell: {
     flex: 1,
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '500',
     textAlign: 'left',
   },
   list: {

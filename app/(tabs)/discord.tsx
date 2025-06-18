@@ -1,4 +1,5 @@
 // app/(tabs)/discord.tsx
+
 import React from 'react'
 import { View, Text, StyleSheet, Linking } from 'react-native'
 import { useTheme, useFocusEffect } from '@react-navigation/native'

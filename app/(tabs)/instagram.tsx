@@ -1,4 +1,5 @@
 // app/(tabs)/instagram.tsx
+
 import React from 'react'
 import { View, Text, StyleSheet, Linking } from 'react-native'
 import { useTheme } from '@react-navigation/native'

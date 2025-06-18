@@ -19,16 +19,16 @@ export default function ShareNow() {
       if (!viewRef.current) {
         throw new Error('View not ready');
       }
-      // get the native tag
+      // Get the native tag
       const tag = findNodeHandle(viewRef.current);
       if (!tag) {
         throw new Error('Could not find view handle');
       }
 
-      // capture the entire view as PNG
+      // Capture the entire view as PNG
       const uri = await captureRef(tag, { format: 'png', quality: 0.8 });
 
-      // fire the native share sheet with that image
+      // Fire the native share sheet with that image
       if (!(await Sharing.isAvailableAsync())) {
         throw new Error('No share targets available');
       }
@@ -43,7 +43,6 @@ export default function ShareNow() {
 
   return (
     <View style={styles.container} ref={viewRef} collapsable={false}>
-      {/* Whatever is rendered here (or in children) will end up in your screenshot */}
       <Button title="Share Screenshot" onPress={onShareScreenshot} />
     </View>
   );

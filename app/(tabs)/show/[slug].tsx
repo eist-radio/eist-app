@@ -1,3 +1,5 @@
+// app/(tabs)/show/[slug].tsx
+
 import React from 'react';
 import {
   View,

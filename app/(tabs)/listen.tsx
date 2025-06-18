@@ -9,6 +9,7 @@ import {
   Dimensions,
   ScrollView,
   Linking,
+  Text,
 } from 'react-native'
 import { useTheme, useFocusEffect } from '@react-navigation/native'
 import { useRouter } from 'expo-router'
@@ -47,23 +48,21 @@ export default function ListenScreen() {
   const [nextShowTime, setNextShowTime] = useState<string>(' ')
   const [artistId, setArtistId] = useState<string | null>(null)
 
-  // turn rich text blocks into plain text
   const parseDescription = (blocks: any[]): string =>
-    blocks
-      .map(block => {
-        if (!Array.isArray(block.content)) return ''
-        return block.content
-          .map(child => {
-            if (child.type === 'text') return child.text
-            if (child.type === 'hardBreak') return '\n'
-            return ''
-          })
-          .join('')
+  blocks
+  .map(block => {
+    if (!Array.isArray(block.content)) return ''
+      return block.content
+    .map(child => {
+      if (child.type === 'text') return child.text
+        if (child.type === 'hardBreak') return '\n'
+          return ''
       })
-      .filter(Boolean)
-      .join('\n\n') || ' '
+    .join('')
+  })
+  .filter(Boolean)
+  .join('\n\n') || ' '
 
-  // format ISO timestamp to "h:mm AM/PM"
   const formatTime = (isoString: string): string => {
     const date = new Date(isoString)
     return date.toLocaleTimeString('en-US', {
@@ -73,7 +72,6 @@ export default function ListenScreen() {
     })
   }
 
-  // fetch artist name and image by ID
   const getArtistDetails = useCallback(async (id: string | null) => {
     if (!id) {
       return { name: ' ', image: placeholderArtistImage as any }
@@ -83,14 +81,14 @@ export default function ListenScreen() {
         headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const json = await res.json()
+        const json = await res.json()
       const artist = json.artist || {}
       const imageUrl: string | undefined = artist.logo?.['256x256']
       return {
         name: artist.name || ' ',
         image: imageUrl
-          ? ({ uri: imageUrl } as any)
-          : (placeholderArtistImage as any),
+        ? ({ uri: imageUrl } as any)
+        : (placeholderArtistImage as any),
       }
     } catch (err) {
       console.error('getArtistDetails failed', err)
@@ -98,22 +96,80 @@ export default function ListenScreen() {
     }
   }, [])
 
-  // poll API for now-playing and next show
   const fetchNowPlaying = useCallback(async () => {
     if (!isPlayerReady) return
 
-    try {
-      const res = await fetch(`${apiUrl}/schedule/live`, {
-        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-      })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      const data = await res.json()
-      const { status, content, metadata } = data.result
+      try {
+        const res = await fetch(`${apiUrl}/schedule/live`, {
+          headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const data = await res.json()
+        const { status, content, metadata } = data.result
 
-      setBroadcastStatus(status)
+        setBroadcastStatus(status)
 
-      if (status !== 'schedule') {
-        // off air: reset display and fetch next
+        if (status !== 'schedule') {
+          setShowTitle(' ')
+          setArtistName('éist · off air')
+          setArtistImage(placeholderOfflineImage)
+          setShowDescription(' ')
+          setArtistId(null)
+          setNextShowId(null)
+          setNextShowTitle(' ')
+          setNextShowTime(' ')
+          await updateMetadata('éist · off air', '', undefined)
+
+          try {
+            const now = new Date().toISOString()
+            const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString()
+            const nextRes = await fetch(
+          `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(weekAhead)}`,
+          {
+            headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+          }
+          )
+            if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`)
+              const nextJson = await nextRes.json()
+            const events: any[] = nextJson.schedules || []
+            if (events.length > 0) {
+              events.sort(
+                (a, b) =>
+                new Date(a.startDateUtc).getTime() -
+                new Date(b.startDateUtc).getTime()
+                )
+              const nextEvent = events[0]
+              setNextShowId(nextEvent.id)
+              setNextShowTitle(nextEvent.title || ' ')
+              setNextShowTime(formatTime(nextEvent.startDateUtc))
+            }
+          } catch (nextErr) {
+            console.error('fetchNextShow failed', nextErr)
+          }
+        } else {
+          setShowTitle(content.title || ' ')
+          const id = content.artistIds?.[0] ?? null
+          setArtistId(id)
+          const { name, image } = await getArtistDetails(id)
+          setArtistName(name)
+          setArtistImage(image)
+
+          let desc = parseDescription(content.description?.content || [])
+          if (content.media?.type === 'playlist' && metadata?.title) {
+            desc += `\n\nNow playing: ${metadata.title}`
+          }
+          setShowDescription(desc)
+
+          setNextShowId(null)
+          setNextShowTitle(' ')
+          setNextShowTime(' ')
+
+          const artworkUri = (image as any).uri
+          await updateMetadata(content.title || 'éist', name, artworkUri)
+        }
+      } catch (err) {
+        console.error('fetchNowPlaying failed', err)
+        setBroadcastStatus('error')
         setShowTitle(' ')
         setArtistName('éist · off air')
         setArtistImage(placeholderOfflineImage)
@@ -123,94 +179,28 @@ export default function ListenScreen() {
         setNextShowTitle(' ')
         setNextShowTime(' ')
         await updateMetadata('éist · off air', '', undefined)
-
-        try {
-          const now = new Date().toISOString()
-          const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString()
-          const nextRes = await fetch(
-            `${apiUrl}/schedule?startDate=${encodeURIComponent(
-              now
-            )}&endDate=${encodeURIComponent(weekAhead)}`,
-            {
-              headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-            }
-          )
-          if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`)
-          const nextJson = await nextRes.json()
-          const events: any[] = nextJson.schedules || []
-          if (events.length > 0) {
-            events.sort(
-              (a, b) =>
-                new Date(a.startDateUtc).getTime() -
-                new Date(b.startDateUtc).getTime()
-            )
-            const nextEvent = events[0]
-            setNextShowId(nextEvent.id)
-            setNextShowTitle(nextEvent.title || ' ')
-            setNextShowTime(formatTime(nextEvent.startDateUtc))
-          }
-        } catch (nextErr) {
-          console.error('fetchNextShow failed', nextErr)
-        }
-      } else {
-        // on air: update display and metadata
-        setShowTitle(content.title || ' ')
-        const id = content.artistIds?.[0] ?? null
-        setArtistId(id)
-        const { name, image } = await getArtistDetails(id)
-        setArtistName(name)
-        setArtistImage(image)
-
-        let desc = parseDescription(content.description?.content || [])
-        if (content.media?.type === 'playlist' && metadata?.title) {
-          desc += `\n\nNow playing: ${metadata.title}`
-        }
-        setShowDescription(desc)
-
-        setNextShowId(null)
-        setNextShowTitle(' ')
-        setNextShowTime(' ')
-
-        const artworkUri = (image as any).uri
-        await updateMetadata(content.title || 'éist', name, artworkUri)
       }
-    } catch (err) {
-      console.error('fetchNowPlaying failed', err)
-      setBroadcastStatus('error')
-      setShowTitle(' ')
-      setArtistName('éist · off air')
-      setArtistImage(placeholderOfflineImage)
-      setShowDescription(' ')
-      setArtistId(null)
-      setNextShowId(null)
-      setNextShowTitle(' ')
-      setNextShowTime(' ')
-      await updateMetadata('éist · off air', '', undefined)
-    }
-  }, [getArtistDetails, isPlayerReady, updateMetadata])
+    }, [getArtistDetails, isPlayerReady, updateMetadata])
 
-  // start polling when screen focused and player is ready
   useFocusEffect(
     useCallback(() => {
       if (!isPlayerReady) return
-      fetchNowPlaying()
+        fetchNowPlaying()
       const interval = setInterval(fetchNowPlaying, 30000)
       return () => clearInterval(interval)
     }, [isPlayerReady, fetchNowPlaying])
-  )
+    )
 
-  // initialize TrackPlayer on mount
   useEffect(() => {
     setupPlayer()
   }, [setupPlayer])
 
   const iconName = isPlaying
-    ? 'stop-circle-outline'
-    : 'play-circle-outline'
+  ? 'stop-circle-outline'
+  : 'play-circle-outline'
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* top half: live image and logo link */}
       <View style={[styles.imageContainer, { height: height / 2 }]}>
         <Image
           source={artistImage}
@@ -222,7 +212,6 @@ export default function ListenScreen() {
           style={[StyleSheet.absoluteFill, { width, height: width }]}
           resizeMode="stretch"
         />
-
         <TouchableOpacity
           style={styles.logoContainer}
           activeOpacity={0.7}
@@ -237,18 +226,10 @@ export default function ListenScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* bottom half: controls and metadata */}
       <View style={styles.bottom}>
         <View style={styles.controlContainer}>
-          <TouchableOpacity
-            onPress={togglePlayStop}
-            style={styles.playButton}
-          >
-            <Ionicons
-              name={iconName}
-              size={56}
-              color={colors.primary}
-            />
+          <TouchableOpacity onPress={togglePlayStop} style={styles.playButton}>
+            <Ionicons name={iconName} size={56} color={colors.primary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -282,14 +263,13 @@ export default function ListenScreen() {
                 color={colors.text}
                 style={styles.nextIcon}
               />
-              <ThemedText
-                type="subtitle"
-                style={[styles.nextUp, { color: colors.text }]}
-              >
-                Next up: {nextShowTitle} at {nextShowTime}
-              </ThemedText>
+              <Text style={[styles.nextUp, { color: colors.text }]}>
+                <Text style={{ fontWeight: '500' }}>Next up: </Text>
+                <Text style={{ fontWeight: '700' }}>{nextShowTitle}</Text>
+                <Text style={{ fontWeight: '500' }}> at {nextShowTime}</Text>
+              </Text>
             </TouchableOpacity>
-          )}
+            )}
 
           <ThemedText
             type="subtitle"
@@ -306,7 +286,7 @@ export default function ListenScreen() {
         </ScrollView>
       </View>
     </View>
-  )
+    )
 }
 
 const styles = StyleSheet.create({
@@ -366,8 +346,7 @@ const styles = StyleSheet.create({
   },
   nextUp: {
     fontSize: 20,
-    fontWeight: '400',
-    fontStyle: 'italic',
+    fontWeight: '500',
     flex: 1,
     flexWrap: 'wrap',
   },
