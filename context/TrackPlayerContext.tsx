@@ -129,7 +129,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         await TrackPlayer.updateMetadataForTrack('radio-stream', {
           title,
           artist: metadataArtist,
-          artwork: require('../assets/images/eist_offline.png'),
+          artwork: require('../assets/images/artist.png'),
         });
       }
     } catch (err) {

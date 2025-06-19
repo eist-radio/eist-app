@@ -1,6 +1,6 @@
 // app/(tabs)/schedule.tsx
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Animated,
 } from 'react-native';
+import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { Link } from 'expo-router';
 import { useTheme } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -98,7 +99,10 @@ export default function ScheduleScreen() {
         if (!res.ok) throw new Error(`Live fetch error: ${res.statusText}`);
         const json = await res.json();
 
-        const newId = json?.result?.status === 'schedule' ? json?.result?.content?.id : null;
+        const newId =
+          json?.result?.status === 'schedule'
+            ? json?.result?.content?.id
+            : null;
 
         if (isMounted) {
           if (newId !== currentShowId) {
@@ -215,98 +219,103 @@ export default function ScheduleScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <SwipeNavigator>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SwipeNavigator>
     );
   }
 
   if (error) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.notification }}>{error}</Text>
-      </View>
+      <SwipeNavigator>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
+          <Text style={{ color: colors.notification }}>{error}</Text>
+        </View>
+      </SwipeNavigator>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.primary }]}>Schedule</Text>
+    <SwipeNavigator>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.primary }]}>Schedule</Text>
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item, idx) => item.id + idx}
-        stickySectionHeadersEnabled={false}
-        renderSectionHeader={({ section: { title } }) => (
-          <>
-            <Text style={[styles.sectionHeader, { color: colors.primary }]}>
-              {title}
-            </Text>
-            <View style={styles.headerRow}>
-              <Text style={[styles.headerCell, { color: colors.primary }]}>
-                Time
+        <SectionList
+          sections={sections}
+          keyExtractor={(item, idx) => item.id + idx}
+          stickySectionHeadersEnabled={false}
+          renderSectionHeader={({ section: { title } }) => (
+            <>
+              <Text style={[styles.sectionHeader, { color: colors.primary }]}>
+                {title}
               </Text>
-              <Text style={[styles.headerCell, { color: colors.primary }]}>
-                Show
-              </Text>
-            </View>
-          </>
-        )}
-        renderItem={({ item }) => {
-          const isCurrent = item.id === currentShowId;
-
-          const CellWrapper = isCurrent ? Animated.View : View;
-
-          return (
-            <CellWrapper style={isCurrent ? { opacity: fadeAnim } : undefined}>
-              <View style={styles.row}>
-                <Text
-                  style={[
-                    styles.cell,
-                    {
-                      color: colors.text,
-                      fontWeight: isCurrent ? '700' : '400',
-                      fontStyle: isCurrent ? 'italic' : 'normal',
-                    },
-                  ]}
-                >
-                  {item.time}
+              <View style={styles.headerRow}>
+                <Text style={[styles.headerCell, { color: colors.primary }]}>
+                  Time
                 </Text>
-
-                <Link
-                  href={`/show/${encodeURIComponent(item.id)}`}
-                  style={{ flex: 1 }}
-                >
-                  <View style={styles.showCellContent}>
-                    {isCurrent && (
-                      <Ionicons
-                        name="arrow-forward-outline"
-                        size={18}
-                        color={colors.primary}
-                        style={styles.playIcon}
-                      />
-                    )}
-                    <Text
-                      style={[
-                        styles.cellText,
-                        {
-                          color: colors.primary,
-                          fontWeight: '600',
-                          fontStyle: isCurrent ? 'italic' : 'normal',
-                        },
-                      ]}
-                    >
-                      {item.title}
-                    </Text>
-                  </View>
-                </Link>
+                <Text style={[styles.headerCell, { color: colors.primary }]}>
+                  Show
+                </Text>
               </View>
-            </CellWrapper>
-          );
-        }}
-        contentContainerStyle={styles.list}
-      />
-    </View>
+            </>
+          )}
+          renderItem={({ item }) => {
+            const isCurrent = item.id === currentShowId;
+            const CellWrapper = isCurrent ? Animated.View : View;
+
+            return (
+              <CellWrapper style={isCurrent ? { opacity: fadeAnim } : undefined}>
+                <View style={styles.row}>
+                  <Text
+                    style={[
+                      styles.cell,
+                      {
+                        color: colors.text,
+                        fontWeight: isCurrent ? '700' : '400',
+                        fontStyle: isCurrent ? 'italic' : 'normal',
+                      },
+                    ]}
+                  >
+                    {item.time}
+                  </Text>
+
+                  <Link
+                    href={`/show/${encodeURIComponent(item.id)}`}
+                    style={{ flex: 1 }}
+                  >
+                    <View style={styles.showCellContent}>
+                      {isCurrent && (
+                        <Ionicons
+                          name="arrow-forward-outline"
+                          size={18}
+                          color={colors.primary}
+                          style={styles.playIcon}
+                        />
+                      )}
+                      <Text
+                        style={[
+                          styles.cellText,
+                          {
+                            color: colors.primary,
+                            fontWeight: '600',
+                            fontStyle: isCurrent ? 'italic' : 'normal',
+                          },
+                        ]}
+                      >
+                        {item.title}
+                      </Text>
+                    </View>
+                  </Link>
+                </View>
+              </CellWrapper>
+            );
+          }}
+          contentContainerStyle={styles.list}
+        />
+      </View>
+    </SwipeNavigator>
   );
 }
 
