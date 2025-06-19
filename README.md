@@ -51,15 +51,24 @@ Use the development build, we are using native components so we can't use expo g
 First delete previous App store installed éist app.
 
 ```cmd
-eas build --profile development --platform ios
+eas build --platform ios --profile development
 ```
+
+Once complete, install the Dev build via QR code.
+
 **Note**: Ignore `setSleepTimer` warnings, not using this in the app.
 
 **NB**: Use the dev build, not expo.
 
+**NB**: New dev build only needed when new components are added. JS/CSS changes do not need a new build.
+
 ```cmd
-npx expo start --clear --tunnel
+npx expo start --tunnel
 ```
+
+Scan the start QR code to build and serve in the dev server
+
+**NB**: be careful with `--clear` it will remove the old build. Duh. 
 
 ## Build and deploy to App stores
 

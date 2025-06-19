@@ -8,14 +8,20 @@ import React, {
   useRef,
   ReactNode,
 } from 'react';
-import TrackPlayer, { Capability, State, Event } from 'react-native-track-player';
+import TrackPlayer, {
+  Capability,
+  State,
+  Event,
+  AppKilledPlaybackBehavior,
+} from 'react-native-track-player';
+import { AppState } from 'react-native';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
-const TOGGLE_DEBOUNCE_MS = 500;
 
 type TrackPlayerContextType = {
   isPlaying: boolean;
   isPlayerReady: boolean;
+  isBusy: boolean;
   play: () => Promise<void>;
   stop: () => Promise<void>;
   togglePlayStop: () => Promise<void>;
@@ -28,8 +34,8 @@ const TrackPlayerContext = createContext<TrackPlayerContextType | undefined>(und
 export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
+  const [isBusy, setIsBusy] = useState(false);
   const hasInitialized = useRef(false);
-  const isTogglingRef = useRef(false);
 
   const setupPlayer = async () => {
     if (hasInitialized.current) return;
@@ -41,6 +47,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await TrackPlayer.updateOptions({
         stopWithApp: false,
         alwaysPauseOnInterruption: true,
+        android: {
+          appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+        },
         capabilities: [Capability.Play, Capability.Stop],
         compactCapabilities: [Capability.Play, Capability.Stop],
         notificationCapabilities: [Capability.Play, Capability.Stop],
@@ -65,29 +74,29 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   const play = async () => {
     if (!isPlayerReady) return;
+    setIsBusy(true);
     try {
       await TrackPlayer.play();
-      setIsPlaying(true);
     } catch (err) {
       console.error('TrackPlayer.play() failed:', err);
-      setIsPlaying(false);
+      setIsBusy(false);
     }
   };
 
   const stop = async () => {
     if (!isPlayerReady) return;
+    setIsBusy(true);
     try {
       await TrackPlayer.stop();
-      setIsPlaying(false);
     } catch (err) {
       console.error('TrackPlayer.stop() failed:', err);
+      setIsBusy(false);
     }
   };
 
   const togglePlayStop = async () => {
-    if (!isPlayerReady || isTogglingRef.current) return;
-
-    isTogglingRef.current = true;
+    if (!isPlayerReady || isBusy) return;
+    setIsBusy(true);
 
     try {
       const currentState = await TrackPlayer.getState();
@@ -98,10 +107,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       console.error('TrackPlayer.togglePlayStop() failed:', err);
-    } finally {
-      setTimeout(() => {
-        isTogglingRef.current = false;
-      }, TOGGLE_DEBOUNCE_MS);
+      setIsBusy(false);
     }
   };
 
@@ -116,10 +122,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const isDeadAir = title.trim().length === 0;
-    const metadataArtist = isDeadAir ? '' : `${artist} · éist`;
+    const metadataArtist = (!artist || isDeadAir) ? '': `${artist} · éist`;
 
     try {
-      if (artworkUrl && typeof artworkUrl === 'string') {
+      if (isDeadAir) {
+        await TrackPlayer.updateMetadataForTrack('radio-stream', {
+          title,
+          artist: '',
+          artwork: require('../assets/images/eist_offline.png'),
+        });
+      } else if (artworkUrl && typeof artworkUrl === 'string') {
         await TrackPlayer.updateMetadataForTrack('radio-stream', {
           title,
           artist: metadataArtist,
@@ -129,7 +141,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         await TrackPlayer.updateMetadataForTrack('radio-stream', {
           title,
           artist: metadataArtist,
-          artwork: require('../assets/images/artist.png'),
+          artwork: require('../assets/images/eist_online.png'),
         });
       }
     } catch (err) {
@@ -142,8 +154,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     const playbackStateListener = TrackPlayer.addEventListener(
       Event.PlaybackState,
-      (data) => {
-        setIsPlaying(data.state === State.Playing);
+      ({ state }) => {
+        const playing = state === State.Playing;
+        setIsPlaying(playing);
+        if (state === State.Playing || state === State.Stopped || state === State.Paused) {
+          setIsBusy(false);
+        }
       }
     );
 
@@ -152,12 +168,32 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       (error) => {
         console.warn('Playback error:', error);
         setIsPlaying(false);
+        setIsBusy(false);
       }
     );
+
+    const appStateListener = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        try {
+          const currentState = await TrackPlayer.getState();
+          setIsPlaying(currentState === State.Playing);
+          if (
+            currentState === State.Playing ||
+            currentState === State.Stopped ||
+            currentState === State.Paused
+          ) {
+            setIsBusy(false);
+          }
+        } catch (err) {
+          console.error('Failed to get state on app resume:', err);
+        }
+      }
+    });
 
     return () => {
       playbackStateListener.remove();
       playbackErrorListener.remove();
+      appStateListener.remove();
     };
   }, []);
 
@@ -166,6 +202,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       value={{
         isPlaying,
         isPlayerReady,
+        isBusy,
         play,
         stop,
         togglePlayStop,

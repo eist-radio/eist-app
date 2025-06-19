@@ -81,7 +81,7 @@ export default function ArtistScreen() {
     suspense: true,
   });
 
-  const fallbackImage = require('../../../assets/images/artist.png');
+  const fallbackImage = require('../../../assets/images/eist_online.png');
   const [imageFailed, setImageFailed] = useState(false);
 
   const remoteImage =
@@ -161,7 +161,7 @@ export default function ArtistScreen() {
             onError={() => setImageFailed(true)}
           />
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.4)']}
+            colors={['transparent', 'rgba(0,0,0,0.2)']}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFill}
