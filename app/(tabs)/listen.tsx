@@ -1,3 +1,5 @@
+// app/(tabs)/listen.tsx
+
 import React, { useCallback, useState, useEffect } from 'react'
 import {
   View,
@@ -16,6 +18,7 @@ import { useTrackPlayer } from '../../context/TrackPlayerContext'
 import { Ionicons } from '@expo/vector-icons'
 import { apiKey } from '../../config'
 import { SwipeNavigator } from '@/components/SwipeNavigator'
+import { LinearGradient } from 'expo-linear-gradient'
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
@@ -25,11 +28,10 @@ const styles = StyleSheet.create({
   controlContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    paddingLeft: 4,
-    paddingRight: 4,
+    marginHorizontal: 8,
+    marginVertical: 16,
   },
-  playButton: { marginRight: 16 },
+  playButton: { marginRight: 8 },
   artistContainer: { flex: 1 },
   artistNameWrapped: {
     fontSize: 28,
@@ -38,24 +40,22 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   nowPlayingContainer: { flex: 1, width: '100%' },
-  nowPlayingContent: { paddingHorizontal: 12 },
+  nowPlayingContent: { paddingHorizontal: 16 },
   nextRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: 8,
-    marginBottom: 6,
-    width: '100%',
+    alignItems: 'center',
+    marginHorizontal: 8,
+    marginVertical: 4,
   },
   nextIcon: { marginRight: 6 },
   nextUp: { fontSize: 20, fontWeight: '500', flex: 1, flexWrap: 'wrap' },
-  showTitle: { fontSize: 24, fontWeight: '500', marginBottom: 6 },
-  showDescription: { fontSize: 18, lineHeight: 22 },
+  showTitle: { fontSize: 24, fontWeight: '500', marginHorizontal: 2, marginVertical: 2 },
+  showDescription: { fontSize: 18, lineHeight: 22, marginHorizontal: 2, marginVertical: 2 },
 })
 
 const placeholderArtistImage = require('../../assets/images/eist_online.png')
 const placeholderOfflineImage = require('../../assets/images/eist_offline.png')
 const logoImage = require('../../assets/images/eist-logo-header.png')
-const gradientOverlay = require('../../assets/images/gradient.png')
 
 const stationId = 'eist-radio'
 const apiUrl = `https://api.radiocult.fm/api/station/${stationId}`
@@ -69,17 +69,17 @@ export default function ListenScreen() {
     setupPlayer,
     updateMetadata,
   } = useTrackPlayer()
-  const { width, height } = Dimensions.get('window')
+  const { width } = Dimensions.get('window')
   const router = useRouter()
 
-  const [showTitle, setShowTitle] = useState(' ')
-  const [showDescription, setShowDescription] = useState(' ')
+  const [showTitle, setShowTitle] = useState('')
+  const [showDescription, setShowDescription] = useState('')
   const [artistName, setArtistName] = useState('éist · off air')
   const [artistImage, setArtistImage] = useState<any>(placeholderArtistImage)
   const [broadcastStatus, setBroadcastStatus] = useState('off air')
   const [nextShowId, setNextShowId] = useState<string | null>(null)
-  const [nextShowTitle, setNextShowTitle] = useState(' ')
-  const [nextShowTime, setNextShowTime] = useState(' ')
+  const [nextShowTitle, setNextShowTitle] = useState('')
+  const [nextShowTime, setNextShowTime] = useState('')
   const [artistId, setArtistId] = useState<string | null>(null)
 
   const parseDescription = (blocks: any[]): string =>
@@ -95,7 +95,7 @@ export default function ListenScreen() {
           .join('')
       })
       .filter(Boolean)
-      .join('\n\n') || ' '
+      .join('\n\n') || ''
 
   const formatTime = (isoString: string): string => {
     const date = new Date(isoString)
@@ -107,7 +107,7 @@ export default function ListenScreen() {
   }
 
   const getArtistDetails = useCallback(async (id: string | null) => {
-    if (!id) return { name: ' ', image: null }
+    if (!id) return { name: '', image: null }
     try {
       const res = await fetch(`${apiUrl}/artists/${id}`, {
         headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
@@ -117,14 +117,26 @@ export default function ListenScreen() {
       const artist = json.artist || {}
       const imageUrl = artist.logo?.['256x256']
       return {
-        name: artist.name || ' ',
+        name: artist.name || '',
         image: imageUrl ? { uri: imageUrl } : null,
       }
     } catch (err) {
       console.error('getArtistDetails failed', err)
-      return { name: ' ', image: null }
+      return { name: '', image: null }
     }
   }, [])
+
+  const clearNowPlayingState = useCallback(async () => {
+    setShowTitle('')
+    setArtistName('éist · off air')
+    setArtistImage(placeholderOfflineImage)
+    setShowDescription('')
+    setArtistId(null)
+    setNextShowId(null)
+    setNextShowTitle('')
+    setNextShowTime('')
+    await updateMetadata('éist · off air', '', undefined)
+  }, [updateMetadata])
 
   const fetchNowPlaying = useCallback(async () => {
     if (!isPlayerReady) return
@@ -140,18 +152,8 @@ export default function ListenScreen() {
       setBroadcastStatus(status)
 
       if (status !== 'schedule') {
-        // stream is off air
-        setShowTitle(' ')
-        setArtistName('éist · off air')
-        setArtistImage(placeholderOfflineImage)
-        setShowDescription(' ')
-        setArtistId(null)
-        setNextShowId(null)
-        setNextShowTitle(' ')
-        setNextShowTime(' ')
-        await updateMetadata('éist · off air', '', undefined)
+        await clearNowPlayingState()
 
-        // attempt to show upcoming show info
         try {
           const now = new Date().toISOString()
           const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString()
@@ -165,22 +167,17 @@ export default function ListenScreen() {
           const nextJson = await nextRes.json()
           const events: any[] = nextJson.schedules || []
           if (events.length > 0) {
-            events.sort(
-              (a, b) =>
-                new Date(a.startDateUtc).getTime() -
-                new Date(b.startDateUtc).getTime()
-            )
+            events.sort((a, b) => new Date(a.startDateUtc).getTime() - new Date(b.startDateUtc).getTime())
             const nextEvent = events[0]
             setNextShowId(nextEvent.id)
-            setNextShowTitle(nextEvent.title || ' ')
+            setNextShowTitle(nextEvent.title || '')
             setNextShowTime(formatTime(nextEvent.startDateUtc))
           }
         } catch (nextErr) {
           console.error('fetchNextShow failed', nextErr)
         }
       } else {
-        // stream is live
-        setShowTitle(content.title || ' ')
+        setShowTitle(content.title || '')
         const id = content.artistIds?.[0] ?? null
         setArtistId(id)
         const { name, image } = await getArtistDetails(id)
@@ -194,8 +191,8 @@ export default function ListenScreen() {
         setShowDescription(desc)
 
         setNextShowId(null)
-        setNextShowTitle(' ')
-        setNextShowTime(' ')
+        setNextShowTitle('')
+        setNextShowTime('')
 
         const artworkUri = (image || placeholderArtistImage).uri
         await updateMetadata(content.title || 'éist', name, artworkUri)
@@ -203,17 +200,9 @@ export default function ListenScreen() {
     } catch (err) {
       console.error('fetchNowPlaying failed', err)
       setBroadcastStatus('error')
-      setShowTitle(' ')
-      setArtistName('éist · off air')
-      setArtistImage(placeholderOfflineImage)
-      setShowDescription(' ')
-      setArtistId(null)
-      setNextShowId(null)
-      setNextShowTitle(' ')
-      setNextShowTime(' ')
-      await updateMetadata('éist · off air', '', undefined)
+      await clearNowPlayingState()
     }
-  }, [getArtistDetails, isPlayerReady, updateMetadata])
+  }, [isPlayerReady, getArtistDetails, updateMetadata, clearNowPlayingState])
 
   useFocusEffect(
     useCallback(() => {
@@ -235,16 +224,17 @@ export default function ListenScreen() {
   return (
     <SwipeNavigator>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <View style={[styles.imageContainer, { height: height / 2 }]}>
+        <View style={[styles.imageContainer, { height: width }]}>
           <Image
             source={artistImage}
             style={{ width, height: width }}
             resizeMode="cover"
           />
-          <Image
-            source={gradientOverlay}
-            style={[StyleSheet.absoluteFill, { width, height: width }]}
-            resizeMode="stretch"
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.2)']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
           />
           <TouchableOpacity
             style={styles.logoContainer}
@@ -298,9 +288,9 @@ export default function ListenScreen() {
                   style={styles.nextIcon}
                 />
                 <Text style={[styles.nextUp, { color: colors.text }]}>
-                  <Text style={{ fontWeight: '500' }}>Next up: </Text>
+                  <Text style={{ fontWeight: '400' }}>Next up: </Text>
                   <Text style={{ fontWeight: '700' }}>{nextShowTitle}</Text>
-                  <Text style={{ fontWeight: '500' }}> at {nextShowTime}</Text>
+                  <Text style={{ fontWeight: '400' }}> at {nextShowTime}</Text>
                 </Text>
               </TouchableOpacity>
             )}

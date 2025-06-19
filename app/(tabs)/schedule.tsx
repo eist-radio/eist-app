@@ -104,22 +104,26 @@ export default function ScheduleScreen() {
             ? json?.result?.content?.id
             : null;
 
-        if (isMounted) {
-          if (newId !== currentShowId) {
+        if (!isMounted) return;
+
+        // Use a functional update to access the latest value
+        setCurrentShowId((prevId) => {
+          if (prevId !== newId) {
             Animated.timing(fadeAnim, {
               toValue: 0,
               duration: 300,
               useNativeDriver: true,
             }).start(() => {
-              setCurrentShowId(newId || null);
               Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 300,
                 useNativeDriver: true,
               }).start();
             });
+            return newId || null;
           }
-        }
+          return prevId;
+        });
       } catch (err) {
         console.warn('Live-show fetch error:', err);
       }
@@ -132,7 +136,7 @@ export default function ScheduleScreen() {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [currentShowId]);
+  }, []);
 
   async function fetchSchedule(startDate: string, endDate: string) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -333,7 +337,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: 20,
-    fontWeight: '400',
+    fontWeight: '600',
     marginTop: 12,
     marginBottom: 4,
   },
