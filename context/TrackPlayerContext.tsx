@@ -1,4 +1,5 @@
 // context/TrackPlayerContext.tsx
+
 import React, {
   createContext,
   useContext,
@@ -10,6 +11,7 @@ import React, {
 import TrackPlayer, { Capability, State, Event } from 'react-native-track-player';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
+const TOGGLE_DEBOUNCE_MS = 500;
 
 type TrackPlayerContextType = {
   isPlaying: boolean;
@@ -18,10 +20,6 @@ type TrackPlayerContextType = {
   stop: () => Promise<void>;
   togglePlayStop: () => Promise<void>;
   setupPlayer: () => Promise<void>;
-  /**
-   * Update metadata on the native player (lock/notification).
-   * If a real track (non-placeholder) is playing, append " – éist" to the artist.
-   */
   updateMetadata: (title: string, artist: string, artworkUrl?: string) => Promise<void>;
 };
 
@@ -30,20 +28,16 @@ const TrackPlayerContext = createContext<TrackPlayerContextType | undefined>(und
 export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
-
-  // Ensure setupPlayer() only runs once
   const hasInitialized = useRef(false);
+  const isTogglingRef = useRef(false);
 
-  // Initialize TrackPlayer (only once)
   const setupPlayer = async () => {
     if (hasInitialized.current) return;
     hasInitialized.current = true;
 
     try {
-      // Create the native player instance
       await TrackPlayer.setupPlayer();
 
-      // Configure lock-screen / notification controls to include just Play + Stop
       await TrackPlayer.updateOptions({
         stopWithApp: false,
         alwaysPauseOnInterruption: true,
@@ -52,7 +46,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         notificationCapabilities: [Capability.Play, Capability.Stop],
       });
 
-      // Add radio-stream with a placeholder title/artist
       await TrackPlayer.add({
         id: 'radio-stream',
         url: STREAM_URL,
@@ -61,7 +54,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         isLiveStream: true,
       });
 
-      // Prime the player to enable controls
       await TrackPlayer.play();
       await TrackPlayer.stop();
 
@@ -71,29 +63,32 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Play track
   const play = async () => {
     if (!isPlayerReady) return;
     try {
       await TrackPlayer.play();
+      setIsPlaying(true);
     } catch (err) {
       console.error('TrackPlayer.play() failed:', err);
+      setIsPlaying(false);
     }
   };
 
-  // Stop track
   const stop = async () => {
     if (!isPlayerReady) return;
     try {
       await TrackPlayer.stop();
+      setIsPlaying(false);
     } catch (err) {
       console.error('TrackPlayer.stop() failed:', err);
     }
   };
 
-  // Toggle between play and stop
   const togglePlayStop = async () => {
-    if (!isPlayerReady) return;
+    if (!isPlayerReady || isTogglingRef.current) return;
+
+    isTogglingRef.current = true;
+
     try {
       const currentState = await TrackPlayer.getState();
       if (currentState === State.Playing) {
@@ -103,10 +98,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       console.error('TrackPlayer.togglePlayStop() failed:', err);
+    } finally {
+      setTimeout(() => {
+        isTogglingRef.current = false;
+      }, TOGGLE_DEBOUNCE_MS);
     }
   };
 
-  // Update metadata for lock-screen/notification only
   const updateMetadata = async (
     title: string,
     artist: string,
@@ -118,10 +116,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const isDeadAir = title.trim().length === 0;
-
-    // If there's a valid artist/title, append éist to the artist field
-    const metadataArtist = isDeadAir
-      ? artist: `${artist} · éist`;
+    const metadataArtist = isDeadAir ? '' : `${artist} · éist`;
 
     try {
       if (artworkUrl && typeof artworkUrl === 'string') {
@@ -131,7 +126,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           artwork: { uri: artworkUrl },
         });
       } else {
-        // Fallback to a static asset if no artworkUrl is provided
         await TrackPlayer.updateMetadataForTrack('radio-stream', {
           title,
           artist: metadataArtist,
@@ -143,7 +137,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Listen for playback-state changes and initialize player on mount
   useEffect(() => {
     setupPlayer();
 
@@ -154,8 +147,17 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
+    const playbackErrorListener = TrackPlayer.addEventListener(
+      Event.PlaybackError,
+      (error) => {
+        console.warn('Playback error:', error);
+        setIsPlaying(false);
+      }
+    );
+
     return () => {
       playbackStateListener.remove();
+      playbackErrorListener.remove();
     };
   }, []);
 
