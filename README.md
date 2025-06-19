@@ -48,12 +48,18 @@ Use the development build, we are using native components so we can't use expo g
 
 ## Native dev build
 
+First delete previous App store installed éist app.
+
 ```cmd
 eas build --profile development --platform ios
 ```
 **Note**: Ignore `setSleepTimer` warnings, not using this in the app.
 
 **NB**: Use the dev build, not expo.
+
+```cmd
+npx expo start --clear --tunnel
+```
 
 ## Build and deploy to App stores
 

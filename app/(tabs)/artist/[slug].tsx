@@ -19,6 +19,7 @@ import { apiKey } from '../../../config';
 import { ThemedText } from '@/components/ThemedText';
 import { stripFormatting } from '../../../utils/stripFormatting';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SwipeNavigator } from '@/components/SwipeNavigator';
 
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
@@ -64,11 +65,13 @@ export default function ArtistScreen() {
 
   if (!slug) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.notification }}>
-          No artist specified.
-        </Text>
-      </View>
+      <SwipeNavigator>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
+          <Text style={{ color: colors.notification }}>
+            No artist specified.
+          </Text>
+        </View>
+      </SwipeNavigator>
     );
   }
 
@@ -102,7 +105,6 @@ export default function ArtistScreen() {
 
   const entries: Array<[string, string]> = [];
 
-  // Standard social links
   if (socials.site) entries.push(['Website', socials.site]);
   if (socials.twitterHandle)
     entries.push(['Twitter', `https://twitter.com/${socials.twitterHandle}`]);
@@ -115,7 +117,6 @@ export default function ArtistScreen() {
   if (socials.soundcloud)
     entries.push(['SoundCloud', `https://soundcloud.com/${socials.soundcloud}`]);
 
-  // Archive links from tags
   const mcUsername = extractTagValue(tags, 'MC-USERNAME_');
   const scUsername = extractTagValue(tags, 'SC-USERNAME_');
   const hostScPlaylist = extractTagValue(tags, 'HOST-SC-PLAYLIST_');
@@ -147,73 +148,75 @@ export default function ArtistScreen() {
     Linking.canOpenURL(url).then((ok) => ok && Linking.openURL(url));
 
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.avatarContainer}>
-        <Image
-          source={imageSource}
-          style={styles.fullWidthAvatar}
-          resizeMode="cover"
-          onError={() => setImageFailed(true)}
-        />
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.4)']}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
+    <SwipeNavigator>
+      <ScrollView
+        style={[styles.screen, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+      >
+        <View style={styles.avatarContainer}>
+          <Image
+            source={imageSource}
+            style={styles.fullWidthAvatar}
+            resizeMode="cover"
+            onError={() => setImageFailed(true)}
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.4)']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
 
-      <View style={styles.titleRow}>
-        <Ionicons
-          name="headset-outline"
-          size={36}
-          color={colors.primary}
-          style={styles.icon}
-        />
-        <ThemedText
-          type="subtitle"
-          style={[styles.header, { color: colors.primary }]}
-          numberOfLines={2}
-          ellipsizeMode="tail"
-        >
-          {artist.name || 'Unnamed Artist'}
-        </ThemedText>
-      </View>
-
-      <View style={styles.textContainer}>
-        {paragraphs.map((p, i) => (
+        <View style={styles.titleRow}>
+          <Ionicons
+            name="headset-outline"
+            size={36}
+            color={colors.primary}
+            style={styles.icon}
+          />
           <ThemedText
-            key={i}
-            type="body"
-            style={[styles.bodyText, { color: colors.text }]}
+            type="subtitle"
+            style={[styles.header, { color: colors.primary }]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
           >
-            {p}
+            {artist.name || 'Unnamed Artist'}
           </ThemedText>
-        ))}
+        </View>
 
-        {entries.length > 0 && (
-          <View style={styles.linkRow}>
-            {entries.map(([label, url], idx) => (
-              <React.Fragment key={label}>
-                <TouchableOpacity onPress={() => openLink(url)}>
-                  <Text style={[styles.linkText, { color: colors.primary }]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-                {idx < entries.length - 1 && (
-                  <Text style={[styles.separator, { color: colors.text }]}>
-                    {' / '}
-                  </Text>
-                )}
-              </React.Fragment>
-            ))}
-          </View>
-        )}
-      </View>
-    </ScrollView>
+        <View style={styles.textContainer}>
+          {paragraphs.map((p, i) => (
+            <ThemedText
+              key={i}
+              type="body"
+              style={[styles.bodyText, { color: colors.text }]}
+            >
+              {p}
+            </ThemedText>
+          ))}
+
+          {entries.length > 0 && (
+            <View style={styles.linkRow}>
+              {entries.map(([label, url], idx) => (
+                <React.Fragment key={label}>
+                  <TouchableOpacity onPress={() => openLink(url)}>
+                    <Text style={[styles.linkText, { color: colors.primary }]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                  {idx < entries.length - 1 && (
+                    <Text style={[styles.separator, { color: colors.text }]}>
+                      {' / '}
+                    </Text>
+                  )}
+                </React.Fragment>
+              ))}
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </SwipeNavigator>
   );
 }
 

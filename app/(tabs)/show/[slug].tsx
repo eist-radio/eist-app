@@ -6,8 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   Image,
-  TouchableOpacity,
-  Linking,
   Dimensions,
   Text,
 } from 'react-native';
@@ -19,6 +17,7 @@ import { apiKey } from '../../../config';
 import { ThemedText } from '@/components/ThemedText';
 import { stripFormatting } from '../../../utils/stripFormatting';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SwipeNavigator } from '@/components/SwipeNavigator';
 
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
@@ -75,12 +74,14 @@ function formatShowTime(start: string, end: string): string {
   const startDate = new Date(start);
   const endDate = new Date(end);
 
-  const startTime = startDate.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: tz,
-  }).replace(/ (AM|PM)$/, ''); // remove AM/PM from start
+  const startTime = startDate
+    .toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: tz,
+    })
+    .replace(/ (AM|PM)$/, '');
 
   const endTime = endDate.toLocaleTimeString('en-US', {
     hour: 'numeric',
@@ -92,16 +93,17 @@ function formatShowTime(start: string, end: string): string {
   return `${startTime} - ${endTime}`;
 }
 
-
 export default function ShowScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const { colors } = useTheme();
 
   if (!slug) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <Text style={{ color: colors.notification }}>No show selected.</Text>
-      </View>
+      <SwipeNavigator>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
+          <Text style={{ color: colors.notification }}>No show selected.</Text>
+        </View>
+      </SwipeNavigator>
     );
   }
 
@@ -127,81 +129,79 @@ export default function ShowScreen() {
   const timeString = formatShowTime(event.startDateUtc, event.endDateUtc);
 
   return (
-    <ScrollView
-      style={[styles.screen, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-    >
-      <View style={styles.bannerContainer}>
-        <Image
-          source={require('../../../assets/images/schedule.png')}
-          style={styles.bannerImage}
-          resizeMode="cover"
-        />
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.4)']}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
-
-      {/* Title row */}
-      <View style={styles.titleRow}>
-        <Ionicons
-          name="calendar-clear-outline"
-          size={36}
-          color={colors.primary}
-          style={styles.icon}
-        />
-        <ThemedText
-          type="subtitle"
-          style={[styles.header, { color: colors.primary }]}
-          numberOfLines={2}
-          ellipsizeMode="tail"
-        >
-          {event.title}
-        </ThemedText>
-      </View>
-
-      {/* Time */}
-      <View style={styles.timeRow}>
-        <ThemedText
-          type="body"
-          style={[styles.timeText, { color: colors.text }]}
-        >
-          {timeString}
-        </ThemedText>
-      </View>
-
-      {/* Host */}
-      {host?.name && (
-        <View style={styles.hostRow}>
-          <Link href={`/artist/${encodeURIComponent(host.id)}`}>
-            <ThemedText
-              type="body"
-              style={[styles.hostText, { color: colors.primary }]}
-              numberOfLines={2}
-              ellipsizeMode="tail"
-            >
-              {host.name}
-            </ThemedText>
-          </Link>
+    <SwipeNavigator>
+      <ScrollView
+        style={[styles.screen, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+      >
+        <View style={styles.bannerContainer}>
+          <Image
+            source={require('../../../assets/images/schedule.png')}
+            style={styles.bannerImage}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.4)']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
         </View>
-      )}
 
-      {/* Description */}
-      <View style={styles.textContainer}>
-        {paragraphs.map((p, i) => (
+        <View style={styles.titleRow}>
+          <Ionicons
+            name="calendar-clear-outline"
+            size={36}
+            color={colors.primary}
+            style={styles.icon}
+          />
           <ThemedText
-            key={i}
-            type="body"
-            style={[styles.bodyText, { color: colors.text }]}
+            type="subtitle"
+            style={[styles.header, { color: colors.primary }]}
+            numberOfLines={2}
+            ellipsizeMode="tail"
           >
-            {p}
+            {event.title}
           </ThemedText>
-        ))}
-      </View>
-    </ScrollView>
+        </View>
+
+        <View style={styles.timeRow}>
+          <ThemedText
+            type="body"
+            style={[styles.timeText, { color: colors.text }]}
+          >
+            {timeString}
+          </ThemedText>
+        </View>
+
+        {host?.name && (
+          <View style={styles.hostRow}>
+            <Link href={`/artist/${encodeURIComponent(host.id)}`}>
+              <ThemedText
+                type="body"
+                style={[styles.hostText, { color: colors.primary }]}
+                numberOfLines={2}
+                ellipsizeMode="tail"
+              >
+                {host.name}
+              </ThemedText>
+            </Link>
+          </View>
+        )}
+
+        <View style={styles.textContainer}>
+          {paragraphs.map((p, i) => (
+            <ThemedText
+              key={i}
+              type="body"
+              style={[styles.bodyText, { color: colors.text }]}
+            >
+              {p}
+            </ThemedText>
+          ))}
+        </View>
+      </ScrollView>
+    </SwipeNavigator>
   );
 }
 
