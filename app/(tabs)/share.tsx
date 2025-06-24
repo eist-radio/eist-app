@@ -1,15 +1,15 @@
 // app/(tabs)/share.tsx
 
+import * as Sharing from 'expo-sharing';
 import React, { useRef } from 'react';
 import {
-  View,
-  Button,
   Alert,
+  Button,
   findNodeHandle,
   StyleSheet,
+  View,
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import * as Sharing from 'expo-sharing';
 
 export default function ShareNow() {
   const viewRef = useRef<View>(null);

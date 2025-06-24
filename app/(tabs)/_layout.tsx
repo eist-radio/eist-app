@@ -1,27 +1,26 @@
 // app/(tabs)/_layout.tsx
 
+import { Ionicons } from '@expo/vector-icons'
+import { faMixcloud } from '@fortawesome/free-brands-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
+import { useTheme } from '@react-navigation/native'
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
+import { Tabs } from 'expo-router'
+import * as Sharing from 'expo-sharing'
 import React, { useRef, useState } from 'react'
 import {
-  View,
-  TouchableOpacity,
   Alert,
-  Platform,
   findNodeHandle,
-  PixelRatio,
   LayoutRectangle,
-  StyleSheet,
+  PixelRatio,
+  Platform,
   Share as RNShare,
-  Linking,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from 'react-native'
-import { Tabs } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
-import { faMixcloud } from '@fortawesome/free-brands-svg-icons'
-import { useTheme } from '@react-navigation/native'
-import { captureRef } from 'react-native-view-shot'
-import * as Sharing from 'expo-sharing'
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { captureRef } from 'react-native-view-shot'
 
 export default function TabLayout() {
   const { colors } = useTheme()
@@ -125,7 +124,7 @@ export default function TabLayout() {
               />
             ),
             tabBarButton: ({ children, ...props }) => (
-              <TouchableOpacity {...props} onPress={onShare}>
+              <TouchableOpacity {...(props as any)} onPress={onShare}>
                 {children}
               </TouchableOpacity>
             ),
@@ -145,7 +144,6 @@ export default function TabLayout() {
           }}
         />
 
-
         <Tabs.Screen
           name="instagram"
           options={{
@@ -155,14 +153,6 @@ export default function TabLayout() {
                 size={(size ?? 26) * 1.2}
                 color={color}
               />
-            ),
-            tabBarButton: ({ children, ...props }) => (
-              <TouchableOpacity
-                {...props}
-                onPress={() => Linking.openURL('https://instagram.com/eistradio')}
-              >
-                {children}
-              </TouchableOpacity>
             ),
           }}
         />
@@ -176,16 +166,6 @@ export default function TabLayout() {
                 size={(size ?? 24) * 1.4}
                 color={color}
               />
-            ),
-            tabBarButton: ({ children, ...props }) => (
-              <TouchableOpacity
-                {...props}
-                onPress={() =>
-                  Linking.openURL('https://www.mixcloud.com/eistcork/')
-                }
-              >
-                {children}
-              </TouchableOpacity>
             ),
           }}
         />
