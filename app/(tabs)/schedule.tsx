@@ -1,19 +1,19 @@
 // app/(tabs)/schedule.tsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import { SwipeNavigator } from '@/components/SwipeNavigator';
+import { API_KEY } from '@env';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@react-navigation/native';
+import { Link } from 'expo-router';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SectionList,
   ActivityIndicator,
   Animated,
+  SectionList,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
-import { SwipeNavigator } from '@/components/SwipeNavigator';
-import { Link } from 'expo-router';
-import { useTheme } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import { API_KEY } from '@env';
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
@@ -244,7 +244,14 @@ export default function ScheduleScreen() {
   return (
     <SwipeNavigator>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.primary }]}>Schedule</Text>
+        <View style={styles.titleContainer}>
+          <Text style={[styles.title, { color: colors.primary }]}>
+            Schedule{" "}
+          </Text>
+          <Text style={[styles.titleStatus, { color: colors.primary }]}>
+            {currentShowId ? "(Live)" : "(Offline)"}
+          </Text>
+        </View>
 
         <SectionList
           sections={sections}
@@ -376,5 +383,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     textAlign: 'left',
+  },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  titleStatus: {
+    fontSize: 22,
+    fontWeight: '400',
+    alignItems: 'center',
+    marginBottom: 5,
   },
 });

@@ -1,47 +1,163 @@
 // app/(tabs)/mixcloud.tsx
 
-import React from 'react'
-import { View, Text, StyleSheet, Linking } from 'react-native'
+import { SwipeNavigator } from '@/components/SwipeNavigator'
+import { ThemedText } from '@/components/ThemedText'
+import { faMixcloud } from '@fortawesome/free-brands-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
-import { useFocusEffect } from '@react-navigation/native'
-import { useRouter } from 'expo-router'
+import React, { useState } from 'react'
+import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 export default function MixcloudScreen() {
-  const router = useRouter()
   const { colors } = useTheme()
+  const [isLoading, setIsLoading] = useState(false)
 
-  useFocusEffect(
-    React.useCallback(() => {
-      // fire the link immediately
-      Linking.openURL('https://www.mixcloud.com/eistcork').catch(console.warn)
-
-      const timer = setTimeout(() => {
-        router.replace('/listen')
-      }, 600)
-
-      return () => clearTimeout(timer)
-    }, [router])
-  )
+  const openMixcloud = async () => {
+    setIsLoading(true)
+    try {
+      const url = 'https://www.mixcloud.com/eistcork'
+      const canOpen = await Linking.canOpenURL(url)
+      
+      if (canOpen) {
+        await Linking.openURL(url)
+      } else {
+        Alert.alert(
+          'Cannot Open Mixcloud',
+          'Unable to open Mixcloud. Please make sure you have an internet connection or the Mixcloud app installed.',
+          [{ text: 'OK' }]
+        )
+      }
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        'Failed to open Mixcloud. Please try again later.',
+        [{ text: 'OK' }]
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
-    <View style={styles.container}>
-      <Text style={[styles.title, { color: colors.primary }]}>
-        Opening Mixcloud...
-      </Text>
-    </View>
+    <SwipeNavigator>
+      <ScrollView 
+        style={[styles.container, { backgroundColor: colors.background }]}
+        contentContainerStyle={styles.content}
+      >
+        <View style={styles.header}>
+          <FontAwesomeIcon
+            icon={faMixcloud}
+            size={160}
+            color={colors.primary}
+          />
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.openButton,
+              { 
+                backgroundColor: colors.primary,
+                opacity: isLoading ? 0.7 : 1
+              }
+            ]}
+            onPress={openMixcloud}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? 'Opening...' : 'Open the éist Mixcloud'}
+            </Text>
+          </TouchableOpacity>
+
+                     <ThemedText 
+             type="default" 
+             style={[styles.disclaimer, { color: colors.text }]}
+           >
+             Opens Mixcloud in your browser or the Mixcloud app if installed.
+           </ThemedText>
+        </View>
+      </ScrollView>
+    </SwipeNavigator>
   )
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: 'space-between',
+  },
+  header: {
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 32,
+    marginTop: 106,
+  },
+  icon: {
+    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: '700',
     textAlign: 'center',
-    paddingHorizontal: 16,
+  },
+  descriptionContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  subtitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: 32,
+    maxWidth: 320,
+  },
+  featuresContainer: {
+    alignItems: 'flex-start',
+    gap: 16,
+  },
+  feature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  featureText: {
+    fontSize: 16,
+  },
+  buttonContainer: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    flex: 1,
+  },
+  openButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  buttonIcon: {
+    color: '#4733FF',
+    marginRight: 8,
+  },
+  buttonText: {
+    color: '#4733FF',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  disclaimer: {
+    fontSize: 16,
+    textAlign: 'center',
+    opacity: 0.7,
+    maxWidth: 280,
   },
 })
