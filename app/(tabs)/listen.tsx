@@ -1,24 +1,24 @@
 // app/(tabs)/listen.tsx
 
-import React, { useCallback, useState, useEffect } from 'react'
-import {
-  View,
-  StyleSheet,
-  Image,
-  TouchableOpacity,
-  Dimensions,
-  ScrollView,
-  Linking,
-  Text,
-} from 'react-native'
-import { useTheme, useFocusEffect } from '@react-navigation/native'
-import { useRouter } from 'expo-router'
-import { ThemedText } from '@/components/ThemedText'
-import { useTrackPlayer } from '../../context/TrackPlayerContext'
-import { Ionicons } from '@expo/vector-icons'
-import { apiKey } from '../../config'
 import { SwipeNavigator } from '@/components/SwipeNavigator'
+import { ThemedText } from '@/components/ThemedText'
+import { Ionicons } from '@expo/vector-icons'
+import { useFocusEffect, useTheme } from '@react-navigation/native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useRouter } from 'expo-router'
+import React, { useCallback, useEffect, useState } from 'react'
+import {
+    Dimensions,
+    Image,
+    Linking,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native'
+import { apiKey } from '../../config'
+import { useTrackPlayer } from '../../context/TrackPlayerContext'
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
@@ -87,7 +87,7 @@ export default function ListenScreen() {
       .map(block => {
         if (!Array.isArray(block.content)) return ''
         return block.content
-          .map(child => {
+          .map((child: any) => {
             if (child.type === 'text') return child.text
             if (child.type === 'hardBreak') return '\n'
             return ''
@@ -302,7 +302,7 @@ export default function ListenScreen() {
               {showTitle}
             </ThemedText>
             <ThemedText
-              type="body"
+              type="default"
               style={[styles.showDescription, { color: colors.text }]}
             >
               {showDescription}
