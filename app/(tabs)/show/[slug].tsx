@@ -1,23 +1,29 @@
 // app/(tabs)/show/[slug].tsx
 
-import React from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Image,
-  Dimensions,
-  Text,
-} from 'react-native';
-import { useTheme } from '@react-navigation/native';
-import { useLocalSearchParams, Link } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
-import { apiKey } from '../../../config';
-import { ThemedText } from '@/components/ThemedText';
-import { stripFormatting } from '../../../utils/stripFormatting';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SwipeNavigator } from '@/components/SwipeNavigator';
+import { ThemedText } from '@/components/ThemedText';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import React, { useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { captureRef } from 'react-native-view-shot';
+import { apiKey } from '../../../config';
+import { stripFormatting } from '../../../utils/stripFormatting';
 
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
@@ -40,7 +46,14 @@ type RawScheduleItem = {
     | { type: 'live' };
 };
 
-type Artist = { id: string; name?: string };
+type Artist = { 
+  id: string; 
+  name?: string;
+  logo?: {
+    '256x256'?: string;
+    [key: string]: string | undefined;
+  };
+};
 
 async function fetchEventById(id: string): Promise<RawScheduleItem> {
   const today = new Date();
@@ -96,6 +109,10 @@ function formatShowTime(start: string, end: string): string {
 export default function ShowScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const { colors } = useTheme();
+  const router = useRouter();
+  const shareViewRef = useRef<ScrollView>(null);
+  const shareContentRef = useRef<View>(null);
+  const [isSharing, setIsSharing] = useState(false);
 
   if (!slug) {
     return (
@@ -110,15 +127,24 @@ export default function ShowScreen() {
   const { data: event } = useQuery({
     queryKey: ['show', slug],
     queryFn: () => fetchEventById(slug),
-    suspense: true,
   });
 
-  const hostId = event.artistIds?.[0];
+  const hostId = event?.artistIds?.[0];
   const { data: host } = useQuery({
     queryKey: ['artist', hostId],
     queryFn: () => fetchHostArtist(hostId!),
     enabled: Boolean(hostId),
   });
+
+  if (!event) {
+    return (
+      <SwipeNavigator>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
+          <Text style={{ color: colors.notification }}>Loading...</Text>
+        </View>
+      </SwipeNavigator>
+    );
+  }
 
   const plain = stripFormatting(event.description?.content || []);
   const paragraphs = plain
@@ -128,77 +154,170 @@ export default function ShowScreen() {
 
   const timeString = formatShowTime(event.startDateUtc, event.endDateUtc);
 
+  // Determine which image to use - artist image if available, fallback to schedule image
+  const getBannerImage = () => {
+    const artistImageUrl = host?.logo?.['256x256'];
+    if (artistImageUrl) {
+      return { uri: artistImageUrl };
+    }
+    return require('../../../assets/images/schedule.png');
+  };
+
+  const shareShow = async () => {
+    if (!shareContentRef.current) {
+      Alert.alert('Error', 'Content not ready for sharing');
+      return;
+    }
+    
+    setIsSharing(true);
+    try {
+      // Longer delay to ensure logo renders and view is fully updated
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Double-check ref is still valid
+      if (!shareContentRef.current) {
+        throw new Error('Share content ref is null');
+      }
+
+      // Create a share-optimized view capture of just the content (excluding share button)
+      const uri = await captureRef(shareContentRef.current, {
+        format: 'png',
+        quality: 1,
+        result: 'tmpfile',
+        width: screenWidth,
+      });
+
+      // Resize image maintaining aspect ratio for optimal sharing
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: 1080 } }], // Only specify width, let height adjust proportionally
+        { compress: 0.9, format: ImageManipulator.SaveFormat.PNG }
+      );
+
+      // Check if sharing is available and share image directly
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(manipulatedImage.uri, {
+          mimeType: 'image/png',
+        });
+      } else {
+        // Fallback for platforms without native sharing
+        Alert.alert(
+          'Share Not Available',
+          'Sharing is not supported on this device',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Share creation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      Alert.alert(
+        'Share Failed', 
+        `Unable to create share image: ${errorMessage}. Please try again.`,
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
   return (
     <SwipeNavigator>
       <ScrollView
+        ref={shareViewRef}
         style={[styles.screen, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.bannerContainer}>
-          <Image
-            source={require('../../../assets/images/schedule.png')}
-            style={styles.bannerImage}
-            resizeMode="cover"
-          />
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.2)']}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-        </View>
-
-        <View style={styles.titleRow}>
-          <Ionicons
-            name="calendar-clear-outline"
-            size={36}
-            color={colors.primary}
-            style={styles.icon}
-          />
-          <ThemedText
-            type="subtitle"
-            style={[styles.header, { color: colors.primary }]}
-            numberOfLines={2}
-            ellipsizeMode="tail"
-          >
-            {event.title}
-          </ThemedText>
-        </View>
-
-        <View style={styles.timeRow}>
-          <ThemedText
-            type="body"
-            style={[styles.timeText, { color: colors.text }]}
-          >
-            {timeString}
-          </ThemedText>
-        </View>
-
-        {host?.name && (
-          <View style={styles.hostRow}>
-            <Link href={`/artist/${encodeURIComponent(host.id)}`}>
-              <ThemedText
-                type="body"
-                style={[styles.hostText, { color: colors.primary }]}
-                numberOfLines={2}
-                ellipsizeMode="tail"
-              >
-                {host.name}
-              </ThemedText>
-            </Link>
+        <View 
+          ref={shareContentRef} 
+          style={styles.shareableContent}
+          collapsable={false}
+        >
+          <View style={styles.bannerContainer}>
+            <Image
+              source={getBannerImage()}
+              style={styles.bannerImage}
+              resizeMode="cover"
+            />
+            {/* Desaturation overlay for monochrome effect */}
+            <View style={styles.desaturateOverlay} />
+            {/* Gauzey color overlay */}
+            <View style={styles.gauzeOverlay} />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.2)']}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
           </View>
-        )}
 
-        <View style={styles.textContainer}>
-          {paragraphs.map((p, i) => (
+          {/* All content - inside shareable content */}
+          <View style={styles.shareableTitle}>
             <ThemedText
-              key={i}
-              type="body"
-              style={[styles.bodyText, { color: colors.text }]}
+              type="subtitle"
+              style={[styles.header, { color: colors.primary }]}
             >
-              {p}
+              {event.title}
             </ThemedText>
-          ))}
+          </View>
+
+          <View style={styles.shareableText}>
+            <View style={styles.timeRow}>
+              <ThemedText
+                type="default"
+                style={[styles.timeText, { color: colors.text }]}
+              >
+                {timeString}
+              </ThemedText>
+            </View>
+
+            {host?.name && (
+              <View style={styles.hostRow}>
+                <TouchableOpacity
+                  onPress={() => hostId && router.push(`/artist/${hostId}`)}
+                  disabled={!hostId}
+                >
+                  <ThemedText
+                    type="default"
+                    style={[styles.hostText, { color: colors.primary }]}
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                  >
+                    {host.name}
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.textContainer}>
+              {paragraphs.map((p, i) => (
+                <ThemedText
+                  key={i}
+                  type="default"
+                  style={[styles.bodyText, { color: colors.text }]}
+                >
+                  {p}
+                </ThemedText>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Share button positioned outside shareable content */}
+        <View style={styles.shareButtonAbsolute}>
+          <TouchableOpacity 
+            onPress={shareShow} 
+            style={styles.shareButtonInline}
+            disabled={isSharing}
+            accessibilityLabel="Share show"
+            accessibilityHint="Share this show information as an image"
+            accessibilityRole="button"
+          >
+            {isSharing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="share-outline" size={28} color={colors.primary} />
+            )}
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SwipeNavigator>
@@ -223,16 +342,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  icon: {
-    marginRight: 8,
-  },
+
   header: {
     fontSize: 28,
     fontWeight: '700',
@@ -242,31 +352,78 @@ const styles = StyleSheet.create({
   },
   timeRow: {
     marginBottom: 6,
-    marginHorizontal: 16,
   },
   timeText: {
     fontSize: 18,
     fontStyle: 'italic',
+    marginHorizontal: 2,
+    marginVertical: 2,
   },
   hostRow: {
-    marginBottom: 12,
-    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   hostText: {
     fontSize: 19,
     fontWeight: '600',
     lineHeight: 22,
+    marginHorizontal: 2,
+    marginVertical: 2,
   },
   textContainer: {
     width: '100%',
-    maxWidth: 600,
-    paddingHorizontal: 16,
-    alignItems: 'flex-start',
   },
   bodyText: {
     fontSize: 18,
     lineHeight: 22,
+    marginHorizontal: 2,
+    marginVertical: 2,
     marginBottom: 12,
     textAlign: 'left',
   },
+
+  desaturateOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(128, 128, 128, 0.1)',
+  },
+  gauzeOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#AFFC41',
+    opacity: 0.2,
+  },
+  shareableContent: {
+    width: '100%',
+    backgroundColor: '#4733FF',
+  },
+
+  shareableTitle: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingRight: 60, // Extra space for share button
+  },
+
+  shareableText: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+
+  shareButtonInline: {
+    padding: 12, // Increased for better touch target (52x52 total)
+    borderRadius: 8,
+  },
+
+  shareButtonAbsolute: {
+    position: 'absolute',
+    top: screenWidth + 16, // Banner height + title padding
+    right: 16,
+    zIndex: 1,
+  },
+
 });
