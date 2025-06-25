@@ -1,25 +1,25 @@
 // app/(tabs)/artist/[slug].tsx
 
-import React, { useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  Linking,
-  Dimensions,
-  Text,
-} from 'react-native';
-import { useTheme } from '@react-navigation/native';
-import { useLocalSearchParams } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { Ionicons } from '@expo/vector-icons';
-import { apiKey } from '../../../config';
-import { ThemedText } from '@/components/ThemedText';
-import { stripFormatting } from '../../../utils/stripFormatting';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SwipeNavigator } from '@/components/SwipeNavigator';
+import { ThemedText } from '@/components/ThemedText';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@react-navigation/native';
+import { useQuery } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    Dimensions,
+    Image,
+    Linking,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { apiKey } from '../../../config';
+import { stripFormatting } from '../../../utils/stripFormatting';
 
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
@@ -30,6 +30,7 @@ type RawArtist = {
   description?: { content?: any[] };
   logo?: {
     default?: string;
+    '256x256'?: string;
     '512x512'?: string;
     '1024x1024'?: string;
   };
@@ -78,21 +79,45 @@ export default function ArtistScreen() {
   const { data: artist } = useQuery({
     queryKey: ['artist', slug],
     queryFn: () => fetchArtistBySlug(slug),
-    suspense: true,
   });
 
   const fallbackImage = require('../../../assets/images/eist_online.png');
   const [imageFailed, setImageFailed] = useState(false);
 
+  // Reset image failed state when artist changes
+  useEffect(() => {
+    setImageFailed(false);
+  }, [slug, artist?.id]);
+
+  if (!artist) {
+    return (
+      <SwipeNavigator>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
+          <Text style={{ color: colors.notification }}>
+            Loading artist...
+          </Text>
+        </View>
+      </SwipeNavigator>
+    );
+  }
+
   const remoteImage =
     artist.logo?.['1024x1024'] ||
     artist.logo?.['512x512'] ||
+    artist.logo?.['256x256'] ||
     artist.logo?.default;
+
+  // Debug logging
+  console.log('Artist logo data:', artist.logo);
+  console.log('Remote image URL:', remoteImage);
+  console.log('Image failed:', imageFailed);
 
   const imageSource =
     imageFailed || !remoteImage
       ? fallbackImage
       : { uri: remoteImage };
+
+  console.log('Final image source:', imageSource);
 
   const plain = stripFormatting(artist.description?.content);
   const paragraphs = plain
@@ -155,10 +180,17 @@ export default function ArtistScreen() {
       >
         <View style={styles.avatarContainer}>
           <Image
+            key={`${artist.id}-${remoteImage || 'fallback'}`}
             source={imageSource}
             style={styles.fullWidthAvatar}
             resizeMode="cover"
-            onError={() => setImageFailed(true)}
+            onError={(error) => {
+              console.log('Image load error:', error.nativeEvent.error);
+              setImageFailed(true);
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully');
+            }}
           />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.2)']}
@@ -189,7 +221,7 @@ export default function ArtistScreen() {
           {paragraphs.map((p, i) => (
             <ThemedText
               key={i}
-              type="body"
+              type="default"
               style={[styles.bodyText, { color: colors.text }]}
             >
               {p}

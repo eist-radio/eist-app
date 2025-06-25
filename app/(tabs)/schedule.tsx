@@ -7,12 +7,12 @@ import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  SectionList,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Animated,
+    SectionList,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 
 const STATION_ID = 'eist-radio';
@@ -310,7 +310,7 @@ export default function ScheduleScreen() {
                           styles.cellText,
                           {
                             color: colors.primary,
-                            fontWeight: '600',
+                            fontWeight: isCurrent ? '700' : '600',
                             fontStyle: isCurrent ? 'italic' : 'normal',
                           },
                         ]}
@@ -379,6 +379,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
     alignSelf: 'flex-start',
   },
+
   cellText: {
     flex: 1,
     fontSize: 18,
