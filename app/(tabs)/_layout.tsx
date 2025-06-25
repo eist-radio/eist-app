@@ -1,7 +1,7 @@
 // app/(tabs)/_layout.tsx
 
 import { Ionicons } from '@expo/vector-icons'
-import { faMixcloud } from '@fortawesome/free-brands-svg-icons'
+import { faMixcloud, faSoundcloud } from '@fortawesome/free-brands-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
 import { Tabs } from 'expo-router'
@@ -72,6 +72,19 @@ export default function TabLayout() {
             <Ionicons
               name="logo-instagram"
               size={(size ?? 26) * 1.2}
+              color={color}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="soundcloud"
+        options={{
+          tabBarIcon: ({ color, size }) => (
+            <FontAwesomeIcon
+              icon={faSoundcloud}
+              size={(size ?? 24) * 1.4}
               color={color}
             />
           ),

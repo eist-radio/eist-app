@@ -1,36 +1,34 @@
-// app/(tabs)/mixcloud.tsx
-
 import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { ThemedText } from '@/components/ThemedText'
-import { faMixcloud } from '@fortawesome/free-brands-svg-icons'
+import { faSoundcloud } from '@fortawesome/free-brands-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
 import React, { useState } from 'react'
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
-export default function MixcloudScreen() {
+export default function SoundCloudScreen() {
   const { colors } = useTheme()
   const [isLoading, setIsLoading] = useState(false)
 
-  const openMixcloud = async () => {
+  const openSoundCloud = async () => {
     setIsLoading(true)
     try {
-      const url = 'https://www.mixcloud.com/eistcork'
+      const url = 'https://soundcloud.com/eistcork'
       const canOpen = await Linking.canOpenURL(url)
       
       if (canOpen) {
         await Linking.openURL(url)
       } else {
         Alert.alert(
-          'Cannot Open Mixcloud',
-          'Unable to open Mixcloud. Please make sure you have an internet connection or the Mixcloud app installed.',
+          'Cannot Open SoundCloud',
+          'Unable to open SoundCloud. Please make sure you have an internet connection or the SoundCloud app installed.',
           [{ text: 'OK' }]
         )
       }
     } catch (error) {
       Alert.alert(
         'Error',
-        'Failed to open Mixcloud. Please try again later.',
+        'Failed to open SoundCloud. Please try again later.',
         [{ text: 'OK' }]
       )
     } finally {
@@ -46,7 +44,7 @@ export default function MixcloudScreen() {
       >
         <View style={styles.header}>
           <FontAwesomeIcon
-            icon={faMixcloud}
+            icon={faSoundcloud}
             size={160}
             color={colors.primary}
           />
@@ -61,20 +59,20 @@ export default function MixcloudScreen() {
                 opacity: isLoading ? 0.7 : 1
               }
             ]}
-            onPress={openMixcloud}
+            onPress={openSoundCloud}
             disabled={isLoading}
           >
             <Text style={styles.buttonText}>
-              {isLoading ? 'Opening...' : 'Listen back on Mixcloud'}
+              {isLoading ? 'Opening...' : 'Listen back on SoundCloud'}
             </Text>
           </TouchableOpacity>
 
-                     <ThemedText 
-             type="default" 
-             style={[styles.disclaimer, { color: colors.text }]}
-           >
-             Opens Mixcloud in your browser or the Mixcloud app if installed.
-           </ThemedText>
+          <ThemedText 
+            type="default" 
+            style={[styles.disclaimer, { color: colors.text }]}
+          >
+            Opens SoundCloud in your browser or the SoundCloud app if installed.
+          </ThemedText>
         </View>
       </ScrollView>
     </SwipeNavigator>
@@ -160,4 +158,4 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     maxWidth: 280,
   },
-})
+}) 
