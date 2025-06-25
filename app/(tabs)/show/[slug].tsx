@@ -6,20 +6,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { apiKey } from '../../../config';
@@ -106,6 +105,40 @@ function formatShowTime(start: string, end: string): string {
   return `${startTime} - ${endTime}`;
 }
 
+function formatShowDate(start: string): string {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const startDate = new Date(start);
+
+  const dayName = startDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    timeZone: tz,
+  });
+
+  const monthName = startDate.toLocaleDateString('en-US', {
+    month: 'long',
+    timeZone: tz,
+  });
+
+  const day = startDate.toLocaleDateString('en-US', {
+    day: 'numeric',
+    timeZone: tz,
+  });
+
+  // Add ordinal suffix to day
+  let dayWithSuffix = day;
+  if (day.endsWith('1') && day !== '11') {
+    dayWithSuffix = day + 'st';
+  } else if (day.endsWith('2') && day !== '12') {
+    dayWithSuffix = day + 'nd';
+  } else if (day.endsWith('3') && day !== '13') {
+    dayWithSuffix = day + 'rd';
+  } else {
+    dayWithSuffix = day + 'th';
+  }
+
+  return `${dayName}, ${monthName} ${dayWithSuffix}`;
+}
+
 export default function ShowScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const { colors } = useTheme();
@@ -139,8 +172,8 @@ export default function ShowScreen() {
   if (!event) {
     return (
       <SwipeNavigator>
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
-          <Text style={{ color: colors.notification }}>Loading...</Text>
+        <View style={[styles.screen, styles.loadingContainer, { backgroundColor: colors.background }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </SwipeNavigator>
     );
@@ -153,6 +186,7 @@ export default function ShowScreen() {
     .filter((p) => p);
 
   const timeString = formatShowTime(event.startDateUtc, event.endDateUtc);
+  const dateString = formatShowDate(event.startDateUtc);
 
   // Determine which image to use - artist image if available, fallback to schedule image
   const getBannerImage = () => {
@@ -238,16 +272,7 @@ export default function ShowScreen() {
               style={styles.bannerImage}
               resizeMode="cover"
             />
-            {/* Desaturation overlay for monochrome effect */}
-            <View style={styles.desaturateOverlay} />
-            {/* Gauzey color overlay */}
-            <View style={styles.gauzeOverlay} />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.2)']}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+
           </View>
 
           {/* All content - inside shareable content */}
@@ -261,15 +286,6 @@ export default function ShowScreen() {
           </View>
 
           <View style={styles.shareableText}>
-            <View style={styles.timeRow}>
-              <ThemedText
-                type="default"
-                style={[styles.timeText, { color: colors.text }]}
-              >
-                {timeString}
-              </ThemedText>
-            </View>
-
             {host?.name && (
               <View style={styles.hostRow}>
                 <TouchableOpacity
@@ -287,6 +303,21 @@ export default function ShowScreen() {
                 </TouchableOpacity>
               </View>
             )}
+
+            <View style={styles.dateTimeRow}>
+              <ThemedText
+                type="default"
+                style={[styles.dateText, { color: colors.text }]}
+              >
+                {dateString}
+              </ThemedText>
+              <ThemedText
+                type="default"
+                style={[styles.timeText, { color: colors.text }]}
+              >
+                {timeString}
+              </ThemedText>
+            </View>
 
             <View style={styles.textContainer}>
               {paragraphs.map((p, i) => (
@@ -329,6 +360,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 0,
   },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   content: {
     alignItems: 'flex-start',
     paddingBottom: 24,
@@ -350,17 +385,28 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     lineHeight: 32,
   },
-  timeRow: {
+  dateTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 6,
   },
-  timeText: {
+  dateText: {
     fontSize: 18,
+    fontWeight: '400',
+    fontStyle: 'italic',
+    marginHorizontal: 2,
+    marginVertical: 2,
+    marginRight: 6,
+  },
+  timeText: {
+    fontSize: 16,
+    fontWeight: '400',
     fontStyle: 'italic',
     marginHorizontal: 2,
     marginVertical: 2,
   },
   hostRow: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   hostText: {
     fontSize: 19,
@@ -406,6 +452,7 @@ const styles = StyleSheet.create({
   shareableTitle: {
     paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 2,
     paddingRight: 60, // Extra space for share button
   },
 

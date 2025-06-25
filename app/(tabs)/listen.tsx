@@ -8,14 +8,14 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-    Dimensions,
-    Image,
-    Linking,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Dimensions,
+  Image,
+  Linking,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
@@ -23,7 +23,12 @@ import { useTrackPlayer } from '../../context/TrackPlayerContext'
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   imageContainer: { width: '100%', position: 'relative', overflow: 'hidden' },
+  fullWidthImage: { width: '100%', height: '100%' },
   logoContainer: { position: 'absolute', top: 36, right: 18 },
+  logoBackground: { 
+    borderRadius: 37, 
+    padding: 8,
+  },
   bottom: { flex: 1, paddingBottom: 12, alignItems: 'flex-start' },
   controlContainer: {
     flexDirection: 'row',
@@ -81,6 +86,7 @@ export default function ListenScreen() {
   const [nextShowTitle, setNextShowTitle] = useState('')
   const [nextShowTime, setNextShowTime] = useState('')
   const [artistId, setArtistId] = useState<string | null>(null)
+  const [currentShowId, setCurrentShowId] = useState<string | null>(null)
 
   const parseDescription = (blocks: any[]): string =>
     blocks
@@ -115,7 +121,7 @@ export default function ListenScreen() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
       const artist = json.artist || {}
-      const imageUrl = artist.logo?.['256x256']
+      const imageUrl = artist.logo?.['1024x1024'] || artist.logo?.['512x512'] || artist.logo?.['256x256']
       return {
         name: artist.name || '',
         image: imageUrl ? { uri: imageUrl } : null,
@@ -132,6 +138,7 @@ export default function ListenScreen() {
     setArtistImage(placeholderOfflineImage)
     setShowDescription('')
     setArtistId(null)
+    setCurrentShowId(null)
     setNextShowId(null)
     setNextShowTitle('')
     setNextShowTime('')
@@ -178,6 +185,7 @@ export default function ListenScreen() {
         }
       } else {
         setShowTitle(content.title || '')
+        setCurrentShowId(content.id || null)
         const id = content.artistIds?.[0] ?? null
         setArtistId(id)
         const { name, image } = await getArtistDetails(id)
@@ -227,7 +235,7 @@ export default function ListenScreen() {
         <View style={[styles.imageContainer, { height: width }]}>
           <Image
             source={artistImage}
-            style={{ width, height: width }}
+            style={styles.fullWidthImage}
             resizeMode="cover"
           />
           <LinearGradient
@@ -242,11 +250,13 @@ export default function ListenScreen() {
             onPress={() => Linking.openURL('https://eist.radio/support')}
             accessibilityRole="link"
           >
-            <Image
-              source={logoImage}
-              style={{ width: 74, height: 74 }}
-              resizeMode="contain"
-            />
+            <View style={styles.logoBackground}>
+              <Image
+                source={logoImage}
+                style={{ width: 74, height: 74 }}
+                resizeMode="contain"
+              />
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -295,12 +305,26 @@ export default function ListenScreen() {
               </TouchableOpacity>
             )}
 
-            <ThemedText
-              type="subtitle"
-              style={[styles.showTitle, { color: colors.text }]}
-            >
-              {showTitle}
-            </ThemedText>
+            {currentShowId ? (
+              <TouchableOpacity
+                onPress={() => router.push(`/show/${currentShowId}`)}
+                activeOpacity={0.7}
+              >
+                <ThemedText
+                  type="subtitle"
+                  style={[styles.showTitle, { color: colors.primary }]}
+                >
+                  {showTitle}
+                </ThemedText>
+              </TouchableOpacity>
+            ) : (
+              <ThemedText
+                type="subtitle"
+                style={[styles.showTitle, { color: colors.text }]}
+              >
+                {showTitle}
+              </ThemedText>
+            )}
             <ThemedText
               type="default"
               style={[styles.showDescription, { color: colors.text }]}
