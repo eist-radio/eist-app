@@ -3,9 +3,13 @@ import TrackPlayer, { Event } from 'react-native-track-player';
 
 const playbackService = async () => {
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
-    console.log('Remote Play event received');
+    console.log('Remote Play event received (CarPlay/Control Center)');
     try {
-      await TrackPlayer.play();
+      // For CarPlay compatibility, ensure we're starting from a clean state
+      const state = await TrackPlayer.getState();
+      if (state !== 'playing') {
+        await TrackPlayer.play();
+      }
     } catch (error) {
       console.error('Error in remote play:', error);
     }

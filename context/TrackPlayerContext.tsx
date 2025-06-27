@@ -1,20 +1,20 @@
 // context/TrackPlayerContext.tsx
 
 import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-  ReactNode,
+    createContext,
+    ReactNode,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
 } from 'react';
-import TrackPlayer, {
-  Capability,
-  State,
-  Event,
-  AppKilledPlaybackBehavior,
-} from 'react-native-track-player';
 import { AppState } from 'react-native';
+import TrackPlayer, {
+    AppKilledPlaybackBehavior,
+    Capability,
+    Event,
+    State,
+} from 'react-native-track-player';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
@@ -45,8 +45,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await TrackPlayer.setupPlayer();
 
       await TrackPlayer.updateOptions({
-        stopWithApp: false,
-        alwaysPauseOnInterruption: true,
+        alwaysPauseOnInterruption: false,
         android: {
           appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
         },
@@ -62,9 +61,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         artist: 'éist',
         isLiveStream: true,
       });
-
-      await TrackPlayer.play();
-      await TrackPlayer.stop();
 
       setIsPlayerReady(true);
     } catch (err) {
