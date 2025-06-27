@@ -112,6 +112,7 @@ export default function ArtistScreen() {
   console.log('Remote image URL:', remoteImage);
   console.log('Image failed:', imageFailed);
 
+  // Determine which image to use - try artist image first, fallback to eist_online on error
   const imageSource =
     imageFailed || !remoteImage
       ? fallbackImage

@@ -8,14 +8,14 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-  Dimensions,
-  Image,
-  Linking,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Dimensions,
+    Image,
+    Linking,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
@@ -81,6 +81,8 @@ export default function ListenScreen() {
   const [showDescription, setShowDescription] = useState('')
   const [artistName, setArtistName] = useState('éist · off air')
   const [artistImage, setArtistImage] = useState<any>(placeholderArtistImage)
+  const [remoteImageUrl, setRemoteImageUrl] = useState<string | null>(null)
+  const [imageFailed, setImageFailed] = useState(false)
   const [broadcastStatus, setBroadcastStatus] = useState('off air')
   const [nextShowId, setNextShowId] = useState<string | null>(null)
   const [nextShowTitle, setNextShowTitle] = useState('')
@@ -136,6 +138,8 @@ export default function ListenScreen() {
     setShowTitle('')
     setArtistName('éist · off air')
     setArtistImage(placeholderOfflineImage)
+    setRemoteImageUrl(null)
+    setImageFailed(false)
     setShowDescription('')
     setArtistId(null)
     setCurrentShowId(null)
@@ -190,7 +194,19 @@ export default function ListenScreen() {
         setArtistId(id)
         const { name, image } = await getArtistDetails(id)
         setArtistName(name)
-        setArtistImage(image || placeholderArtistImage)
+        
+        // Reset image state when we get new artist data
+        setImageFailed(false)
+        
+        if (image?.uri) {
+          // Try to load remote image first
+          setRemoteImageUrl(image.uri)
+          setArtistImage(image)
+        } else {
+          // No remote image available, use fallback immediately
+          setRemoteImageUrl(null)
+          setArtistImage(placeholderArtistImage)
+        }
 
         let desc = parseDescription(content.description?.content || [])
         if (content.media?.type === 'playlist' && metadata?.title) {
@@ -202,7 +218,7 @@ export default function ListenScreen() {
         setNextShowTitle('')
         setNextShowTime('')
 
-        const artworkUri = (image || placeholderArtistImage).uri
+        const artworkUri = image?.uri
         await updateMetadata(content.title || 'éist', name, artworkUri)
       }
     } catch (err) {
@@ -229,14 +245,34 @@ export default function ListenScreen() {
     ? 'stop-circle-outline'
     : 'play-circle-outline'
 
+  // Determine which image to show based on loading state
+  const getImageSource = () => {
+    if (broadcastStatus !== 'schedule') {
+      return placeholderOfflineImage
+    }
+    
+    if (imageFailed || !remoteImageUrl) {
+      return placeholderArtistImage
+    }
+    
+    return { uri: remoteImageUrl }
+  }
+
+  const handleImageError = () => {
+    console.log('Remote image failed to load, falling back to placeholder')
+    setImageFailed(true)
+  }
+
   return (
     <SwipeNavigator>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <View style={[styles.imageContainer, { height: width }]}>
           <Image
-            source={artistImage}
+            key={`${artistId}-${remoteImageUrl || 'fallback'}`}
+            source={getImageSource()}
             style={styles.fullWidthImage}
             resizeMode="cover"
+            onError={handleImageError}
           />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.2)']}
