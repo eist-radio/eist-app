@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -146,6 +146,7 @@ export default function ShowScreen() {
   const shareViewRef = useRef<ScrollView>(null);
   const shareContentRef = useRef<View>(null);
   const [isSharing, setIsSharing] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
 
   if (!slug) {
     return (
@@ -169,6 +170,11 @@ export default function ShowScreen() {
     enabled: Boolean(hostId),
   });
 
+  // Reset image failed state when host changes
+  useEffect(() => {
+    setImageFailed(false);
+  }, [hostId, host?.id]);
+
   if (!event) {
     return (
       <SwipeNavigator>
@@ -188,13 +194,20 @@ export default function ShowScreen() {
   const timeString = formatShowTime(event.startDateUtc, event.endDateUtc);
   const dateString = formatShowDate(event.startDateUtc);
 
-  // Determine which image to use - artist image if available, fallback to schedule image
+  // Determine which image to use - try artist image first, fallback to schedule image on error
   const getBannerImage = () => {
     const artistImageUrl = host?.logo?.['256x256'];
-    if (artistImageUrl) {
-      return { uri: artistImageUrl };
+    
+    if (imageFailed || !artistImageUrl) {
+      return require('../../../assets/images/schedule.png');
     }
-    return require('../../../assets/images/schedule.png');
+    
+    return { uri: artistImageUrl };
+  };
+
+  const handleImageError = () => {
+    console.log('Host image failed to load, falling back to schedule image');
+    setImageFailed(true);
   };
 
   const shareShow = async () => {
@@ -268,9 +281,11 @@ export default function ShowScreen() {
         >
           <View style={styles.bannerContainer}>
             <Image
+              key={`${hostId}-${host?.logo?.['256x256'] || 'fallback'}`}
               source={getBannerImage()}
               style={styles.bannerImage}
               resizeMode="cover"
+              onError={handleImageError}
             />
 
           </View>
@@ -295,7 +310,7 @@ export default function ShowScreen() {
                   <ThemedText
                     type="default"
                     style={[styles.hostText, { color: colors.primary }]}
-                    numberOfLines={2}
+                    numberOfLines={3}
                     ellipsizeMode="tail"
                   >
                     {host.name}
@@ -407,6 +422,7 @@ const styles = StyleSheet.create({
   },
   hostRow: {
     marginBottom: 6,
+    paddingRight: 60, // Extra space to avoid share button collision
   },
   hostText: {
     fontSize: 19,
@@ -414,6 +430,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginHorizontal: 2,
     marginVertical: 2,
+    flexWrap: 'wrap',
   },
   textContainer: {
     width: '100%',
