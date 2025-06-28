@@ -8,14 +8,17 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-    Dimensions,
-    Image,
-    Linking,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
@@ -28,6 +31,16 @@ const styles = StyleSheet.create({
   logoBackground: { 
     borderRadius: 37, 
     padding: 8,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   bottom: { flex: 1, paddingBottom: 12, alignItems: 'flex-start' },
   controlContainer: {
@@ -89,6 +102,57 @@ export default function ListenScreen() {
   const [nextShowTime, setNextShowTime] = useState('')
   const [artistId, setArtistId] = useState<string | null>(null)
   const [currentShowId, setCurrentShowId] = useState<string | null>(null)
+  const [isContentLoading, setIsContentLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [imageReady, setImageReady] = useState(false)
+
+  // Preload image function
+  const preloadImage = useCallback((uri: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!uri) {
+        resolve(false)
+        return
+      }
+
+      // Check if we're on web or native
+      if (Platform.OS === 'web') {
+        // Web environment - use standard HTML Image preloading
+        try {
+          const img = new (global as any).Image()
+          img.onload = () => {
+            console.log('Image preloaded successfully (web):', uri)
+            resolve(true)
+          }
+          img.onerror = (error: any) => {
+            console.log('Image preload failed (web):', error)
+            resolve(false)
+          }
+          img.src = uri
+        } catch (error) {
+          console.log('Web image preload not supported:', error)
+          // Fallback: assume image will load fine
+          resolve(true)
+        }
+      } else {
+        // React Native environment
+        if (typeof Image.prefetch === 'function') {
+          Image.prefetch(uri)
+            .then(() => {
+              console.log('Image preloaded successfully:', uri)
+              resolve(true)
+            })
+            .catch((error) => {
+              console.log('Image preload failed:', error)
+              resolve(false)
+            })
+        } else {
+          // Fallback if prefetch is not available
+          console.log('Image.prefetch not available, skipping preload')
+          resolve(true)
+        }
+      }
+    })
+  }, [])
 
   const parseDescription = (blocks: any[]): string =>
     blocks
@@ -146,11 +210,17 @@ export default function ListenScreen() {
     setNextShowId(null)
     setNextShowTitle('')
     setNextShowTime('')
+    setIsContentLoading(false)
+    setImageReady(true) // Offline images are always "ready"
     await updateMetadata('éist · off air', '', undefined)
   }, [updateMetadata])
 
   const fetchNowPlaying = useCallback(async () => {
     if (!isPlayerReady) return
+
+    // Set loading state when starting to fetch new content
+    setIsContentLoading(true)
+    setImageReady(false) // Hide image until new content is ready
 
     try {
       const res = await fetch(`${apiUrl}/schedule/live`, {
@@ -187,46 +257,91 @@ export default function ListenScreen() {
         } catch (nextErr) {
           console.error('fetchNextShow failed', nextErr)
         }
+        // Loading finished for off-air state - clearNowPlayingState already set imageReady
+        setIsContentLoading(false)
       } else {
-        setShowTitle(content.title || '')
-        setCurrentShowId(content.id || null)
+        // Prepare new content
+        const newShowTitle = content.title || ''
+        const newCurrentShowId = content.id || null
         const id = content.artistIds?.[0] ?? null
-        setArtistId(id)
+        
         const { name, image } = await getArtistDetails(id)
-        setArtistName(name)
         
-        // Reset image state when we get new artist data
-        setImageFailed(false)
-        
-        if (image?.uri) {
-          // Try to load remote image first
-          setRemoteImageUrl(image.uri)
-          setArtistImage(image)
-        } else {
-          // No remote image available, use fallback immediately
-          setRemoteImageUrl(null)
-          setArtistImage(placeholderArtistImage)
-        }
-
+        // Prepare description
         let desc = parseDescription(content.description?.content || [])
         if (content.media?.type === 'playlist' && metadata?.title) {
           desc += `\n\nNow playing: ${metadata.title}`
         }
-        setShowDescription(desc)
 
-        setNextShowId(null)
-        setNextShowTitle('')
-        setNextShowTime('')
-
-        const artworkUri = image?.uri
-        await updateMetadata(content.title || 'éist', name, artworkUri)
+        // If we have a remote image, preload it before updating the UI
+        if (image?.uri) {
+          console.log('Preloading artist image:', image.uri)
+          const imageLoaded = await preloadImage(image.uri)
+          
+          if (imageLoaded) {
+            // Image loaded successfully - update all states together
+            setShowTitle(newShowTitle)
+            setCurrentShowId(newCurrentShowId)
+            setArtistId(id)
+            setArtistName(name)
+            setRemoteImageUrl(image.uri)
+            setArtistImage(image)
+            setImageFailed(false)
+            setShowDescription(desc)
+            
+            // Clear next show info
+            setNextShowId(null)
+            setNextShowTitle('')
+            setNextShowTime('')
+            
+            await updateMetadata(newShowTitle || 'éist', name, image.uri)
+          } else {
+            // Image failed to preload - use fallback
+            setShowTitle(newShowTitle)
+            setCurrentShowId(newCurrentShowId)
+            setArtistId(id)
+            setArtistName(name)
+            setRemoteImageUrl(null)
+            setArtistImage(placeholderArtistImage)
+            setImageFailed(true)
+            setShowDescription(desc)
+            
+            // Clear next show info
+            setNextShowId(null)
+            setNextShowTitle('')
+            setNextShowTime('')
+            
+            await updateMetadata(newShowTitle || 'éist', name, undefined)
+          }
+        } else {
+          // No remote image - use fallback immediately
+          setShowTitle(newShowTitle)
+          setCurrentShowId(newCurrentShowId)
+          setArtistId(id)
+          setArtistName(name)
+          setRemoteImageUrl(null)
+          setArtistImage(placeholderArtistImage)
+          setImageFailed(false)
+          setShowDescription(desc)
+          
+          // Clear next show info
+          setNextShowId(null)
+          setNextShowTitle('')
+          setNextShowTime('')
+          
+          await updateMetadata(newShowTitle || 'éist', name, undefined)
+        }
+        
+        // Mark image as ready and loading as finished
+        setImageReady(true)
+        setIsContentLoading(false)
       }
     } catch (err) {
       console.error('fetchNowPlaying failed', err)
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [isPlayerReady, getArtistDetails, updateMetadata, clearNowPlayingState])
+  }, [isPlayerReady, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage])
 
   useFocusEffect(
     useCallback(() => {
@@ -263,23 +378,43 @@ export default function ListenScreen() {
     setImageFailed(true)
   }
 
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      await fetchNowPlaying()
+    } catch (error) {
+      console.error('Refresh failed:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [fetchNowPlaying])
+
   return (
     <SwipeNavigator>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <View style={[styles.imageContainer, { height: width }]}>
-          <Image
-            key={`${artistId}-${remoteImageUrl || 'fallback'}`}
-            source={getImageSource()}
-            style={styles.fullWidthImage}
-            resizeMode="cover"
-            onError={handleImageError}
-          />
+          {imageReady ? (
+            <Image
+              key={`${artistId}-${remoteImageUrl || 'fallback'}`}
+              source={getImageSource()}
+              style={styles.fullWidthImage}
+              resizeMode="cover"
+              onError={handleImageError}
+            />
+          ) : (
+            <View style={[styles.fullWidthImage, { backgroundColor: colors.card }]} />
+          )}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.2)']}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
+          {isContentLoading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          )}
           <TouchableOpacity
             style={styles.logoContainer}
             activeOpacity={0.7}
@@ -321,6 +456,14 @@ export default function ListenScreen() {
           <ScrollView
             style={styles.nowPlayingContainer}
             contentContainerStyle={styles.nowPlayingContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+              />
+            }
           >
             {broadcastStatus !== 'schedule' && nextShowId && (
               <TouchableOpacity

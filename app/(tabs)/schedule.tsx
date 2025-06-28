@@ -5,10 +5,11 @@ import { API_KEY } from '@env';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
+    RefreshControl,
     SectionList,
     StyleSheet,
     Text,
@@ -54,6 +55,7 @@ export default function ScheduleScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [currentShowId, setCurrentShowId] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
@@ -61,26 +63,41 @@ export default function ScheduleScreen() {
     return d.toISOString().split('T')[0] + 'T' + suffix;
   }
 
+  const fetchScheduleData = useCallback(async () => {
+    try {
+      const today = new Date();
+      const endDate = new Date();
+      endDate.setDate(today.getDate() + NUM_DAYS);
+
+      const startIso = fmt(today, '00:00:00Z');
+      const endIso = fmt(endDate, '23:59:59Z');
+
+      const raw = await fetchSchedule(startIso, endIso);
+      setSections(groupByDate(raw.schedules || []));
+      setError(undefined);
+    } catch (err) {
+      console.warn('ScheduleScreen fetch error:', err);
+      setError('Could not load schedule.');
+    }
+  }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchScheduleData();
+    } catch (error) {
+      console.error('Refresh failed:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [fetchScheduleData]);
+
   useEffect(() => {
     (async () => {
-      try {
-        const today = new Date();
-        const endDate = new Date();
-        endDate.setDate(today.getDate() + NUM_DAYS);
-
-        const startIso = fmt(today, '00:00:00Z');
-        const endIso = fmt(endDate, '23:59:59Z');
-
-        const raw = await fetchSchedule(startIso, endIso);
-        setSections(groupByDate(raw.schedules || []));
-      } catch (err) {
-        console.warn('ScheduleScreen fetch error:', err);
-        setError('Could not load schedule.');
-      } finally {
-        setLoading(false);
-      }
+      await fetchScheduleData();
+      setLoading(false);
     })();
-  }, []);
+  }, [fetchScheduleData]);
 
   useEffect(() => {
     let isMounted = true;
@@ -257,6 +274,14 @@ export default function ScheduleScreen() {
           sections={sections}
           keyExtractor={(item, idx) => item.id + idx}
           stickySectionHeadersEnabled={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           renderSectionHeader={({ section: { title } }) => (
             <>
               <Text style={[styles.sectionHeader, { color: colors.primary }]}>

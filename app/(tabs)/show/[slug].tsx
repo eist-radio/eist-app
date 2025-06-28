@@ -8,12 +8,13 @@ import { useQuery } from '@tanstack/react-query';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
     Dimensions,
     Image,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -147,6 +148,55 @@ export default function ShowScreen() {
   const shareContentRef = useRef<View>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [preloadedImageUrl, setPreloadedImageUrl] = useState<string | null>(null);
+  const [imageReady, setImageReady] = useState(false);
+
+  // Preload image function (same as listen page)
+  const preloadImage = useCallback((uri: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!uri) {
+        resolve(false)
+        return
+      }
+
+      // Check if we're on web or native
+      if (Platform.OS === 'web') {
+        // Web environment - use standard HTML Image preloading
+        try {
+          const img = new (global as any).Image()
+          img.onload = () => {
+            console.log('Image preloaded successfully (web):', uri)
+            resolve(true)
+          }
+          img.onerror = (error: any) => {
+            console.log('Image preload failed (web):', error)
+            resolve(false)
+          }
+          img.src = uri
+        } catch (error) {
+          console.log('Web image preload not supported:', error)
+          resolve(true) // Fallback: assume image will load fine
+        }
+      } else {
+        // React Native environment
+        if (typeof Image.prefetch === 'function') {
+          Image.prefetch(uri)
+            .then(() => {
+              console.log('Image preloaded successfully:', uri)
+              resolve(true)
+            })
+            .catch((error) => {
+              console.log('Image preload failed:', error)
+              resolve(false)
+            })
+        } else {
+          console.log('Image.prefetch not available, skipping preload')
+          resolve(true)
+        }
+      }
+    })
+  }, []);
 
   if (!slug) {
     return (
@@ -170,10 +220,66 @@ export default function ShowScreen() {
     enabled: Boolean(hostId),
   });
 
-  // Reset image failed state when host changes
+  // Reset image states when host changes
   useEffect(() => {
     setImageFailed(false);
+    setPreloadedImageUrl(null);
+    setImageReady(false); // Hide image until new host image is ready
   }, [hostId, host?.id]);
+
+  // Preload artist image when host data becomes available
+  useEffect(() => {
+    const loadArtistImage = async () => {
+      // If there's no hostId at all, show fallback immediately
+      if (!hostId) {
+        setIsImageLoading(false);
+        setPreloadedImageUrl(null);
+        setImageFailed(false);
+        setImageReady(true);
+        return;
+      }
+
+      // If we have a hostId but no host data yet, wait
+      if (hostId && !host) {
+        setImageReady(false);
+        return;
+      }
+
+      // If we have host data but no image URL, show fallback
+      const artistImageUrl = host?.logo?.['256x256'];
+      if (!artistImageUrl) {
+        setIsImageLoading(false);
+        setPreloadedImageUrl(null);
+        setImageFailed(false);
+        setImageReady(true); // No remote image, fallback is ready
+        return;
+      }
+
+      // We have an image URL, try to preload it
+      setIsImageLoading(true);
+      
+      try {
+        const success = await preloadImage(artistImageUrl);
+        
+        if (success) {
+          setPreloadedImageUrl(artistImageUrl);
+          setImageFailed(false);
+        } else {
+          setImageFailed(true);
+          setPreloadedImageUrl(null);
+        }
+      } catch (error) {
+        console.error('Image preload error:', error);
+        setImageFailed(true);
+        setPreloadedImageUrl(null);
+      } finally {
+        setIsImageLoading(false);
+        setImageReady(true); // Image is ready (either preloaded or fallback)
+      }
+    };
+
+    loadArtistImage();
+  }, [hostId, host, host?.logo?.['256x256'], preloadImage]);
 
   if (!event) {
     return (
@@ -194,20 +300,19 @@ export default function ShowScreen() {
   const timeString = formatShowTime(event.startDateUtc, event.endDateUtc);
   const dateString = formatShowDate(event.startDateUtc);
 
-  // Determine which image to use - try artist image first, fallback to schedule image on error
+  // Determine which image to use - try preloaded artist image first, fallback to schedule image
   const getBannerImage = () => {
-    const artistImageUrl = host?.logo?.['256x256'];
-    
-    if (imageFailed || !artistImageUrl) {
+    if (imageFailed || !preloadedImageUrl) {
       return require('../../../assets/images/schedule.png');
     }
     
-    return { uri: artistImageUrl };
+    return { uri: preloadedImageUrl };
   };
 
   const handleImageError = () => {
     console.log('Host image failed to load, falling back to schedule image');
     setImageFailed(true);
+    setPreloadedImageUrl(null);
   };
 
   const shareShow = async () => {
@@ -280,14 +385,22 @@ export default function ShowScreen() {
           collapsable={false}
         >
           <View style={styles.bannerContainer}>
-            <Image
-              key={`${hostId}-${host?.logo?.['256x256'] || 'fallback'}`}
-              source={getBannerImage()}
-              style={styles.bannerImage}
-              resizeMode="cover"
-              onError={handleImageError}
-            />
-
+            {imageReady ? (
+              <Image
+                key={`${hostId}-${preloadedImageUrl || 'fallback'}`}
+                source={getBannerImage()}
+                style={styles.bannerImage}
+                resizeMode="cover"
+                onError={handleImageError}
+              />
+            ) : (
+              <View style={[styles.bannerImage, { backgroundColor: colors.card }]} />
+            )}
+            {isImageLoading && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            )}
           </View>
 
           {/* All content - inside shareable content */}
@@ -488,6 +601,17 @@ const styles = StyleSheet.create({
     top: screenWidth + 16, // Banner height + title padding
     right: 16,
     zIndex: 1,
+  },
+
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
 });
