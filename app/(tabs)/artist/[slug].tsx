@@ -7,11 +7,13 @@ import { useTheme } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
     Image,
     Linking,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -83,11 +85,114 @@ export default function ArtistScreen() {
 
   const fallbackImage = require('../../../assets/images/eist_online.png');
   const [imageFailed, setImageFailed] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [preloadedImageUrl, setPreloadedImageUrl] = useState<string | null>(null);
+  const [imageReady, setImageReady] = useState(false);
 
-  // Reset image failed state when artist changes
+  // Preload image function (same as other pages)
+  const preloadImage = useCallback((uri: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!uri) {
+        resolve(false)
+        return
+      }
+
+      // Check if we're on web or native
+      if (Platform.OS === 'web') {
+        // Web environment - use standard HTML Image preloading
+        try {
+          const img = new (global as any).Image()
+          img.onload = () => {
+            console.log('Image preloaded successfully (web):', uri)
+            resolve(true)
+          }
+          img.onerror = (error: any) => {
+            console.log('Image preload failed (web):', error)
+            resolve(false)
+          }
+          img.src = uri
+        } catch (error) {
+          console.log('Web image preload not supported:', error)
+          resolve(true) // Fallback: assume image will load fine
+        }
+      } else {
+        // React Native environment
+        if (typeof Image.prefetch === 'function') {
+          Image.prefetch(uri)
+            .then(() => {
+              console.log('Image preloaded successfully:', uri)
+              resolve(true)
+            })
+            .catch((error) => {
+              console.log('Image preload failed:', error)
+              resolve(false)
+            })
+        } else {
+          console.log('Image.prefetch not available, skipping preload')
+          resolve(true)
+        }
+      }
+    })
+  }, []);
+
+  // Reset image states when artist changes
   useEffect(() => {
     setImageFailed(false);
+    setPreloadedImageUrl(null);
+    setImageReady(false); // Hide image until new artist image is ready
   }, [slug, artist?.id]);
+
+  // Preload artist image when artist data becomes available
+  useEffect(() => {
+    const loadArtistImage = async () => {
+      // If there's no artist data yet, wait
+      if (!artist) {
+        setIsImageLoading(false);
+        setImageReady(false); // Still loading artist data
+        return;
+      }
+
+      // Check for any available image
+      const remoteImage =
+        artist.logo?.['1024x1024'] ||
+        artist.logo?.['512x512'] ||
+        artist.logo?.['256x256'] ||
+        artist.logo?.default;
+      
+      // If artist exists but has no image, show fallback
+      if (!remoteImage) {
+        setIsImageLoading(false);
+        setPreloadedImageUrl(null);
+        setImageFailed(false);
+        setImageReady(true); // No remote image, show fallback
+        return;
+      }
+
+      // We have an image URL, try to preload it
+      setIsImageLoading(true);
+      
+      try {
+        const success = await preloadImage(remoteImage);
+        
+        if (success) {
+          setPreloadedImageUrl(remoteImage);
+          setImageFailed(false);
+        } else {
+          setImageFailed(true);
+          setPreloadedImageUrl(null);
+        }
+      } catch (error) {
+        console.error('Image preload error:', error);
+        setImageFailed(true);
+        setPreloadedImageUrl(null);
+      } finally {
+        setIsImageLoading(false);
+        setImageReady(true); // Image is ready (either preloaded or fallback)
+      }
+    };
+
+    loadArtistImage();
+  }, [artist, artist?.logo, preloadImage]);
 
   if (!artist) {
     return (
@@ -101,24 +206,11 @@ export default function ArtistScreen() {
     );
   }
 
-  const remoteImage =
-    artist.logo?.['1024x1024'] ||
-    artist.logo?.['512x512'] ||
-    artist.logo?.['256x256'] ||
-    artist.logo?.default;
-
-  // Debug logging
-  console.log('Artist logo data:', artist.logo);
-  console.log('Remote image URL:', remoteImage);
-  console.log('Image failed:', imageFailed);
-
-  // Determine which image to use - try artist image first, fallback to eist_online on error
+  // Use preloaded image instead of direct remote image
   const imageSource =
-    imageFailed || !remoteImage
+    imageFailed || !preloadedImageUrl
       ? fallbackImage
-      : { uri: remoteImage };
-
-  console.log('Final image source:', imageSource);
+      : { uri: preloadedImageUrl };
 
   const plain = stripFormatting(artist.description?.content);
   const paragraphs = plain
@@ -180,25 +272,35 @@ export default function ArtistScreen() {
         contentContainerStyle={styles.content}
       >
         <View style={styles.avatarContainer}>
-          <Image
-            key={`${artist.id}-${remoteImage || 'fallback'}`}
-            source={imageSource}
-            style={styles.fullWidthAvatar}
-            resizeMode="cover"
-            onError={(error) => {
-              console.log('Image load error:', error.nativeEvent.error);
-              setImageFailed(true);
-            }}
-            onLoad={() => {
-              console.log('Image loaded successfully');
-            }}
-          />
+          {imageReady ? (
+            <Image
+              key={`${artist.id}-${preloadedImageUrl || 'fallback'}`}
+              source={imageSource}
+              style={styles.fullWidthAvatar}
+              resizeMode="cover"
+              onError={(error) => {
+                console.log('Image load error:', error.nativeEvent.error);
+                setImageFailed(true);
+                setPreloadedImageUrl(null);
+              }}
+              onLoad={() => {
+                console.log('Image loaded successfully');
+              }}
+            />
+          ) : (
+            <View style={[styles.fullWidthAvatar, { backgroundColor: colors.card }]} />
+          )}
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.2)']}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
             style={StyleSheet.absoluteFill}
           />
+          {isImageLoading && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          )}
         </View>
 
         <View style={styles.titleRow}>
@@ -312,5 +414,15 @@ const styles = StyleSheet.create({
   separator: {
     fontSize: 18,
     fontWeight: '600',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
 });
