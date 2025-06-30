@@ -27,6 +27,7 @@ type TrackPlayerContextType = {
   togglePlayStop: () => Promise<void>;
   setupPlayer: () => Promise<void>;
   updateMetadata: (title: string, artist: string, artworkUrl?: string) => Promise<void>;
+  recoverAudioSession: () => Promise<void>;
 };
 
 const TrackPlayerContext = createContext<TrackPlayerContextType | undefined>(undefined);
@@ -93,8 +94,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       await TrackPlayer.updateOptions({
         alwaysPauseOnInterruption: false,
+        stoppingAppPausesPlayback: false,
         android: {
           appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+          alwaysPauseOnInterruption: false,
         },
         capabilities: [Capability.Play, Capability.Stop],
         compactCapabilities: [Capability.Play, Capability.Stop],
@@ -107,6 +110,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         title: ' ',
         artist: 'éist',
         isLiveStream: true,
+        duration: 0, // Indicates live stream with no duration
       });
 
       setIsPlayerReady(true);
@@ -116,6 +120,60 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await syncPlayerState();
     } catch (err) {
       console.error('TrackPlayer setup failed:', err);
+    }
+  };
+
+  // Recovery function for audio session conflicts
+  const recoverFromAudioSessionConflict = async () => {
+    console.log('Attempting to recover from audio session conflict...');
+    
+    try {
+      // Stop any current playback
+      setIsPlaying(false);
+      setIsBusy(false);
+      
+      // Try to stop the current player
+      try {
+        await TrackPlayer.stop();
+      } catch (stopErr) {
+        console.warn('Stop failed during recovery:', stopErr);
+      }
+      
+      // Wait a moment for audio session to clear
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Reset the player setup to request audio session
+      try {
+        await TrackPlayer.setupPlayer();
+        
+                 // Re-add the stream
+         const queue = await TrackPlayer.getQueue();
+         if (queue.length === 0) {
+           await TrackPlayer.add({
+             id: 'radio-stream',
+             url: STREAM_URL,
+             title: ' ',
+             artist: 'éist',
+             isLiveStream: true,
+             duration: 0, // Indicates live stream with no duration
+           });
+         }
+        
+        // Try to play again
+        await TrackPlayer.play();
+        setIsPlaying(true);
+        setIsBusy(false);
+        
+        console.log('Audio session recovery successful');
+      } catch (retryErr) {
+        console.error('Audio session recovery failed:', retryErr);
+        setIsPlaying(false);
+        setIsBusy(false);
+      }
+    } catch (err) {
+      console.error('Recovery process failed:', err);
+      setIsPlaying(false);
+      setIsBusy(false);
     }
   };
 
@@ -129,6 +187,17 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       console.error('TrackPlayer.play() failed:', err);
       setIsBusy(false);
+      
+      // If play failed, it might be due to audio session conflict
+      // Try to reset and reinitialize the player
+      if (err instanceof Error && (
+        err.message.includes('audio session') || 
+        err.message.includes('interrupted') ||
+        err.message.includes('not initialized')
+      )) {
+        console.log('Audio session conflict detected, attempting recovery...');
+        await recoverFromAudioSessionConflict();
+      }
     }
   };
 
@@ -240,6 +309,45 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     );
 
+    // Add audio interruption handling
+    const audioInterruptionListener = TrackPlayer.addEventListener(
+      Event.PlaybackQueueEnded,
+      () => {
+        console.log('Playback queue ended - possible audio interruption');
+        setIsPlaying(false);
+        setIsBusy(false);
+        // Force state sync to ensure UI is consistent
+        setImmediate(() => syncPlayerState());
+      }
+    );
+
+    // Handle CarPlay pause commands as stop (since you can't pause live radio)
+    const remotePauseListener = TrackPlayer.addEventListener(
+      Event.RemotePause,
+      async () => {
+        console.log('CarPlay pause received - converting to stop for radio stream');
+        await stop();
+      }
+    );
+
+    // Also handle remote stop commands
+    const remoteStopListener = TrackPlayer.addEventListener(
+      Event.RemoteStop,
+      async () => {
+        console.log('CarPlay stop received');
+        await stop();
+      }
+    );
+
+    // Handle remote play commands
+    const remotePlayListener = TrackPlayer.addEventListener(
+      Event.RemotePlay,
+      async () => {
+        console.log('CarPlay play received');
+        await play();
+      }
+    );
+
     // Enhanced app state handling
     const appStateListener = AppState.addEventListener('change', async (nextAppState) => {
       console.log(`App state changed to: ${nextAppState}`);
@@ -248,6 +356,29 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         // App is becoming active - sync state and resume state checking
         startStateSync();
         await syncPlayerState();
+        
+        // Check if there might be an audio session conflict
+        // This happens when user switches from another music app
+        setTimeout(async () => {
+          try {
+            const currentState = await TrackPlayer.getState();
+            
+            // If we think we should be playing but we're not, or if we get an error,
+            // there might be an audio session conflict
+            if (isPlaying && currentState !== State.Playing) {
+              console.log('Potential audio session conflict detected on app focus');
+              // Don't automatically recover here, let the user try to play first
+              // Just sync state so UI is accurate
+              setIsPlaying(false);
+              setIsBusy(false);
+            }
+          } catch (err) {
+            console.warn('State check failed on app focus, possible audio session issue:', err);
+            // If we can't even check state, there's likely an audio session problem
+            setIsPlaying(false);
+            setIsBusy(false);
+          }
+        }, 1000);
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
         // App is going to background - we can reduce state checking frequency
         // but don't stop completely as CarPlay might still be active
@@ -259,6 +390,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       playbackStateListener.remove();
       playbackErrorListener.remove();
+      audioInterruptionListener.remove();
+      remotePauseListener.remove();
+      remoteStopListener.remove();
+      remotePlayListener.remove();
       appStateListener.remove();
       stopStateSync();
     };
@@ -282,6 +417,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         togglePlayStop,
         setupPlayer,
         updateMetadata,
+        recoverAudioSession: recoverFromAudioSessionConflict,
       }}
     >
       {children}

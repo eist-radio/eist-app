@@ -42,16 +42,23 @@ Clear previous build instances:
 ```cmd
 npx expo start --tunnel
 ```
-Use the development build, we are using native components so we can't use expo go. 
+
+Use the development build, we are using native components so we can't use expo go.
 
 `r` reloads the app.
 
 ## Native dev build
 
-First delete previous App store installed éist app.
+First delete previous App store installed éist app. Install the dev build from the App store.
 
 ```cmd
 eas build --platform ios --profile development
+```
+
+Then, start the dev server:
+
+```cmd
+npx expo start --tunnel
 ```
 
 Once complete, install the Dev build via QR code.
@@ -62,13 +69,9 @@ Once complete, install the Dev build via QR code.
 
 **NB**: New dev build only needed when new components are added. JS/CSS changes do not need a new build.
 
-```cmd
-npx expo start --tunnel
-```
-
 Scan the start QR code to build and serve in the dev server
 
-**NB**: be careful with `--clear` it will remove the old build. Duh. 
+**NB**: be careful with `--clear` it will remove the old build. Duh.
 
 ## Build and deploy to App stores
 
@@ -102,7 +105,7 @@ eas submit --platform android
 
 ## TODO
 
-* Get set up in the Android store: https://docs.expo.dev/submit/android/, Needs an Android v10 or later device.
-* Set up a Git CI
-* Google Cast https://github.com/react-native-google-cast/react-native-google-cast
-* Android Auto + CarPlay https://github.com/g4rb4g3/react-native-carplay
+- Get set up in the Android store: <https://docs.expo.dev/submit/android/>, Needs an Android v10 or later device.
+- Set up a Git CI
+- Google Cast <https://github.com/react-native-google-cast/react-native-google-cast>
+- Android Auto + CarPlay <https://github.com/g4rb4g3/react-native-carplay>
