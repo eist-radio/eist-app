@@ -7,13 +7,13 @@ import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    RefreshControl,
-    SectionList,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Animated,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
 const STATION_ID = 'eist-radio';
@@ -252,7 +252,7 @@ export default function ScheduleScreen() {
     return (
       <SwipeNavigator>
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-          <Text style={{ color: colors.notification }}>{error}</Text>
+          <Text style={{ color: colors.notification, fontSize: 18 }}>{error}</Text>
         </View>
       </SwipeNavigator>
     );
@@ -266,7 +266,7 @@ export default function ScheduleScreen() {
             Schedule{" "}
           </Text>
           <Text style={[styles.titleStatus, { color: colors.primary }]}>
-            {currentShowId ? "(Live)" : "(Offline)"}
+            {currentShowId ? "(We are live)" : "(Offline)"}
           </Text>
         </View>
 
