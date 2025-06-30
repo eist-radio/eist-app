@@ -11,5 +11,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       projectId: '4f034ae2-70e3-4215-8782-3aec98781aa6',
     },
   },
-  plugins: ['expo-web-browser'],
+  "plugins": [
+    "expo-audio",
+    "expo-router",
+    "expo-web-browser"
+  ]
 });
