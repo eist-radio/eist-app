@@ -58,6 +58,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const lastKnownState = useRef<State | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const isPlayingRef = useRef(isPlaying)
+  const wasPlayingBeforeCarConnection = useRef(false)
   useEffect(() => {
     isPlayingRef.current = isPlaying
   }, [isPlaying])
@@ -285,10 +286,18 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (!isWeb) {
       const onState = TrackPlayer.addEventListener(
         Event.PlaybackState,
-        ({ state }) => {
+        async ({ state }) => {
           const playing = state === State.Playing
           lastKnownState.current = state
           setIsPlaying(playing)
+          
+          // When audio session becomes ready and we were playing before car connection
+          if (state === State.Ready && wasPlayingBeforeCarConnection.current) {
+            console.log('Audio session ready, resuming playback from car connection')
+            wasPlayingBeforeCarConnection.current = false
+            await play()
+          }
+          
           if (
             state === State.Playing ||
             state === State.Paused ||
@@ -298,10 +307,23 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           }
         }
       )
-      const onError = TrackPlayer.addEventListener(Event.PlaybackError, () => {
-        setIsPlaying(false)
-        setIsBusy(false)
-        runImmediate(syncPlayerState)
+      const onError = TrackPlayer.addEventListener(Event.PlaybackError, async (error) => {
+        console.log('Playback error:', error)
+        // Check if this might be a CarPlay/Android Auto disconnect or audio session interruption
+        if (error.message?.includes('interrupted') || 
+            error.message?.includes('session') ||
+            error.message?.includes('carplay') ||
+            error.message?.includes('android auto') ||
+            error.message?.includes('bluetooth')) {
+          console.log('Possible CarPlay/Android Auto disconnect detected, stopping playback')
+          // Remember that we were playing before the disconnect
+          wasPlayingBeforeCarConnection.current = isPlayingRef.current
+          await stop()
+        } else {
+          setIsPlaying(false)
+          setIsBusy(false)
+          runImmediate(syncPlayerState)
+        }
       })
       const onQueueEnded = TrackPlayer.addEventListener(
         Event.PlaybackQueueEnded,
@@ -317,15 +339,36 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       )
       const onRemotePlay = TrackPlayer.addEventListener(
         Event.RemotePlay,
-        play
+        async () => {
+          console.log('Remote Play event received (CarPlay/Android Auto)')
+          // If we were playing before car connection, resume automatically
+          if (wasPlayingBeforeCarConnection.current) {
+            console.log('Resuming playback that was active before car connection')
+            wasPlayingBeforeCarConnection.current = false
+            await play()
+          } else {
+            // Normal play request from car interface
+            await play()
+          }
+        }
       )
+
+
+
+
 
       const onAppState = AppState.addEventListener('change', async (next) => {
         if (next === 'active') {
           startStateSync()
           await syncPlayerState()
+          
+          // Check if we should resume playback after car connection
           setTimeout(async () => {
-            if (!isPlayingRef.current && (await isPlayerInvalidState())) {
+            if (wasPlayingBeforeCarConnection.current && !isPlayingRef.current) {
+              console.log('App became active, resuming playback that was active before car connection')
+              wasPlayingBeforeCarConnection.current = false
+              await play()
+            } else if (!isPlayingRef.current && (await isPlayerInvalidState())) {
               await recoverFromAudioSessionConflict()
             }
           }, 1500)
