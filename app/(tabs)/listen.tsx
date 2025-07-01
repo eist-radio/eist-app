@@ -145,17 +145,13 @@ export default function ListenScreen() {
         try {
           const img = new (global as any).Image()
           img.onload = () => {
-            console.log('Image preloaded successfully (web):', uri)
             resolve(true)
           }
           img.onerror = (error: any) => {
-            console.log('Image preload failed (web):', error)
             resolve(false)
           }
           img.src = uri
         } catch (error) {
-          console.log('Web image preload not supported:', error)
-          // Fallback: assume image will load fine
           resolve(true)
         }
       } else {
@@ -163,16 +159,12 @@ export default function ListenScreen() {
         if (typeof Image.prefetch === 'function') {
           Image.prefetch(uri)
             .then(() => {
-              console.log('Image preloaded successfully:', uri)
               resolve(true)
             })
             .catch((error) => {
-              console.log('Image preload failed:', error)
               resolve(false)
             })
         } else {
-          // Fallback if prefetch is not available
-          console.log('Image.prefetch not available, skipping preload')
           resolve(true)
         }
       }
@@ -204,7 +196,6 @@ export default function ListenScreen() {
       setArtistCache(prev => ({ ...prev, [id]: artistData }))
       return artistData
     } catch (err) {
-      console.error('getArtistDetails failed', err)
       return { name: '', image: null }
     }
   }, [artistCache])
@@ -217,13 +208,17 @@ export default function ListenScreen() {
     setShowDescription('')
     setArtistId(null)
     setCurrentShowId(null)
-    setNextShowId(null)
-    setNextShowTitle('')
-    setNextShowTime('')
+    // Don't clear next show info - it should be preserved when station is off air
     setIsContentLoading(false)
     setImageReady(true) // Offline images are always "ready"
     await updateMetadata('éist · off air', '', undefined)
   }, [updateMetadata])
+
+  const clearNextShowInfo = useCallback(() => {
+    setNextShowId(null)
+    setNextShowTitle('')
+    setNextShowTime('')
+  }, [])
 
   const fetchLiveScheduleOnly = useCallback(async () => {
     if (!isPlayerReady) return
@@ -261,7 +256,6 @@ export default function ListenScreen() {
             setNextShowTime(formatTime(nextEvent.startDateUtc))
           }
         } catch (nextErr) {
-          console.error('fetchNextShow failed', nextErr)
         }
         setIsContentLoading(false)
       } else {
@@ -280,10 +274,8 @@ export default function ListenScreen() {
         setCurrentShowId(newCurrentShowId)
         setShowDescription(desc)
         
-        // Clear next show info
-        setNextShowId(null)
-        setNextShowTitle('')
-        setNextShowTime('')
+        // Clear next show info when station is live
+        clearNextShowInfo()
         
         // Only fetch artist details if artist ID changed
         if (newArtistId !== artistId) {
@@ -297,7 +289,6 @@ export default function ListenScreen() {
           setArtistName(name)
           
           if (image?.uri) {
-            console.log('Preloading artist image:', image.uri)
             const imageLoaded = await preloadImage(image.uri)
             
             if (imageLoaded) {
@@ -328,11 +319,10 @@ export default function ListenScreen() {
         }
       }
     } catch (err) {
-      console.error('fetchLiveScheduleOnly failed', err)
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [isPlayerReady, artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage])
+  }, [isPlayerReady, artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage])
 
   const fetchNowPlayingWithArtist = useCallback(async () => {
     if (!isPlayerReady) return
@@ -353,6 +343,29 @@ export default function ListenScreen() {
 
       if (status !== 'schedule') {
         await clearNowPlayingState()
+
+        // Fetch next show information when station is off air
+        try {
+          const now = new Date().toISOString()
+          const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString()
+          const nextRes = await fetch(
+            `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(weekAhead)}`,
+            {
+              headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+            }
+          )
+          if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`)
+          const nextJson = await nextRes.json()
+          const events: any[] = nextJson.schedules || []
+          if (events.length > 0) {
+            events.sort((a, b) => new Date(a.startDateUtc).getTime() - new Date(b.startDateUtc).getTime())
+            const nextEvent = events[0]
+            setNextShowId(nextEvent.id)
+            setNextShowTitle(nextEvent.title || '')
+            setNextShowTime(formatTime(nextEvent.startDateUtc))
+          }
+        } catch (nextErr) {
+        }
         return
       }
 
@@ -376,14 +389,11 @@ export default function ListenScreen() {
       setArtistName(name)
       setShowDescription(desc)
       
-      // Clear next show info
-      setNextShowId(null)
-      setNextShowTitle('')
-      setNextShowTime('')
+      // Clear next show info when station is live
+      clearNextShowInfo()
       
       // Handle image
       if (image?.uri) {
-        console.log('Preloading artist image:', image.uri)
         const imageLoaded = await preloadImage(image.uri)
         
         if (imageLoaded) {
@@ -405,11 +415,10 @@ export default function ListenScreen() {
       setImageReady(true)
       setIsContentLoading(false)
     } catch (err) {
-      console.error('fetchNowPlayingWithArtist failed', err)
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [isPlayerReady, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage])
+  }, [isPlayerReady, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage])
 
   useFocusEffect(
     useCallback(() => {
@@ -462,7 +471,6 @@ export default function ListenScreen() {
   }
 
   const handleImageError = () => {
-    console.log('Remote image failed to load, falling back to placeholder')
     setImageFailed(true)
   }
 
@@ -471,7 +479,6 @@ export default function ListenScreen() {
     try {
       await fetchNowPlayingWithArtist()
     } catch (error) {
-      console.error('Refresh failed:', error)
     } finally {
       setIsRefreshing(false)
     }
@@ -553,7 +560,9 @@ export default function ListenScreen() {
               />
             }
           >
-            {broadcastStatus !== 'schedule' && nextShowId && (
+            {(() => {
+              return broadcastStatus !== 'schedule' && nextShowId
+            })() && (
               <TouchableOpacity
                 onPress={() => router.push(`/show/${nextShowId}`)}
                 style={styles.nextRow}
