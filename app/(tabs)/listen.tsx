@@ -8,17 +8,18 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
-  Dimensions,
-  Image,
-  Linking,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    AppState,
+    Dimensions,
+    Image,
+    Linking,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
@@ -106,6 +107,30 @@ export default function ListenScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [imageReady, setImageReady] = useState(false)
 
+  const formatTime = (isoString: string): string => {
+    const date = new Date(isoString)
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    })
+  }
+
+  const parseDescription = (blocks: any[]): string =>
+    blocks
+      .map(block => {
+        if (!Array.isArray(block.content)) return ''
+        return block.content
+          .map((child: any) => {
+            if (child.type === 'text') return child.text
+            if (child.type === 'hardBreak') return '\n'
+            return ''
+          })
+          .join('')
+      })
+      .filter(Boolean)
+      .join('\n\n') || ''
+
   // Preload image function
   const preloadImage = useCallback((uri: string): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -153,30 +178,6 @@ export default function ListenScreen() {
       }
     })
   }, [])
-
-  const parseDescription = (blocks: any[]): string =>
-    blocks
-      .map(block => {
-        if (!Array.isArray(block.content)) return ''
-        return block.content
-          .map((child: any) => {
-            if (child.type === 'text') return child.text
-            if (child.type === 'hardBreak') return '\n'
-            return ''
-          })
-          .join('')
-      })
-      .filter(Boolean)
-      .join('\n\n') || ''
-
-  const formatTime = (isoString: string): string => {
-    const date = new Date(isoString)
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })
-  }
 
   const getArtistDetails = useCallback(async (id: string | null) => {
     if (!id) return { name: '', image: null }
@@ -355,6 +356,19 @@ export default function ListenScreen() {
   useEffect(() => {
     setupPlayer()
   }, [setupPlayer])
+
+  // Refresh now playing info whenever the app returns to the foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        fetchNowPlaying()
+      }
+    })
+
+    return () => {
+      subscription.remove()
+    }
+  }, [fetchNowPlaying])
 
   const iconName = isPlaying
     ? 'stop-circle-outline'
