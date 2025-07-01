@@ -26,7 +26,7 @@ export default function DiscordScreen() {
           [{ text: 'OK' }]
         )
       }
-    } catch (error) {
+    } catch {
       Alert.alert(
         'Error',
         'Failed to open Discord. Please try again later.',

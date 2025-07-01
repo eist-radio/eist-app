@@ -1,24 +1,25 @@
 // app/(tabs)/schedule.tsx
 
 import { SwipeNavigator } from '@/components/SwipeNavigator';
-import { API_KEY } from '@env';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  RefreshControl,
-  SectionList,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Animated,
+    RefreshControl,
+    SectionList,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
+import { apiKey } from '../../config';
+import { useTrackPlayer } from '../../context/TrackPlayerContext';
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
-const LIVE_POLL_INTERVAL = 60_000;
+const LIVE_POLL_INTERVAL = 300_000;
 
 type RawScheduleItem = {
   id: string;
@@ -40,16 +41,17 @@ type RawScheduleItem = {
 
 type SectionData = {
   title: string;
-  data: Array<{
+  data: {
     time: string;
     title: string;
     id: string;
     artistIds?: string[];
-  }>;
+  }[];
 };
 
 export default function ScheduleScreen() {
   const { colors } = useTheme();
+  const { isPlaying } = useTrackPlayer();
 
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,7 +110,7 @@ export default function ScheduleScreen() {
           `https://api.radiocult.fm/api/station/${STATION_ID}/schedule/live`,
           {
             headers: {
-              'x-api-key': API_KEY,
+              'x-api-key': apiKey,
               'Content-Type': 'application/json',
             },
           }
@@ -147,13 +149,19 @@ export default function ScheduleScreen() {
     };
 
     fetchLiveShow();
-    const interval = setInterval(fetchLiveShow, LIVE_POLL_INTERVAL);
+    // Only poll when playing
+    if (isPlaying) {
+      const interval = setInterval(fetchLiveShow, LIVE_POLL_INTERVAL);
+      return () => {
+        isMounted = false;
+        clearInterval(interval);
+      };
+    }
 
     return () => {
       isMounted = false;
-      clearInterval(interval);
     };
-  }, []);
+  }, [isPlaying, fadeAnim]);
 
   async function fetchSchedule(startDate: string, endDate: string) {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -163,7 +171,7 @@ export default function ScheduleScreen() {
       `&endDate=${encodeURIComponent(endDate)}` +
       `&timeZone=${encodeURIComponent(tz)}`;
     const res = await fetch(url, {
-      headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' },
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
     });
     if (!res.ok) throw new Error(res.statusText);
     return (await res.json()) as { schedules?: RawScheduleItem[] };

@@ -25,7 +25,7 @@ export default function SoundCloudScreen() {
           [{ text: 'OK' }]
         )
       }
-    } catch (error) {
+    } catch {
       Alert.alert(
         'Error',
         'Failed to open SoundCloud. Please try again later.',

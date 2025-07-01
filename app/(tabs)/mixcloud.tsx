@@ -27,7 +27,7 @@ export default function MixcloudScreen() {
           [{ text: 'OK' }]
         )
       }
-    } catch (error) {
+    } catch {
       Alert.alert(
         'Error',
         'Failed to open Mixcloud. Please try again later.',

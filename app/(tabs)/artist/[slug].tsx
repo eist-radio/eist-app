@@ -221,7 +221,7 @@ export default function ArtistScreen() {
   const socials = artist.socials ?? {};
   const tags = artist.tags ?? [];
 
-  const entries: Array<[string, string]> = [];
+  const entries: [string, string][] = [];
 
   if (socials.site) entries.push(['Website', socials.site]);
   if (socials.twitterHandle)

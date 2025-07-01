@@ -227,6 +227,9 @@ export default function ShowScreen() {
     setImageReady(false); // Hide image until new host image is ready
   }, [hostId, host?.id]);
 
+  // Extract host image URL for dependency array
+  const hostImageUrl = host?.logo?.['256x256'];
+
   // Preload artist image when host data becomes available
   useEffect(() => {
     const loadArtistImage = async () => {
@@ -246,8 +249,7 @@ export default function ShowScreen() {
       }
 
       // If we have host data but no image URL, show fallback
-      const artistImageUrl = host?.logo?.['256x256'];
-      if (!artistImageUrl) {
+      if (!hostImageUrl) {
         setIsImageLoading(false);
         setPreloadedImageUrl(null);
         setImageFailed(false);
@@ -259,10 +261,10 @@ export default function ShowScreen() {
       setIsImageLoading(true);
       
       try {
-        const success = await preloadImage(artistImageUrl);
+        const success = await preloadImage(hostImageUrl);
         
         if (success) {
-          setPreloadedImageUrl(artistImageUrl);
+          setPreloadedImageUrl(hostImageUrl);
           setImageFailed(false);
         } else {
           setImageFailed(true);
@@ -279,7 +281,7 @@ export default function ShowScreen() {
     };
 
     loadArtistImage();
-  }, [hostId, host, host?.logo?.['256x256'], preloadImage]);
+  }, [hostId, host, hostImageUrl, preloadImage]);
 
   if (!event) {
     return (
