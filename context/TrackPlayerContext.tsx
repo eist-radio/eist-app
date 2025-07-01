@@ -87,7 +87,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   const startStateSync = () => {
     if (isWeb || stateCheckInterval.current) return
-    stateCheckInterval.current = setInterval(syncPlayerState, 2000)
+    // Only start state sync if we're actually playing
+    if (isPlayingRef.current) {
+      stateCheckInterval.current = setInterval(syncPlayerState, 2000)
+    }
   }
 
   const stopStateSync = () => {
@@ -96,6 +99,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       stateCheckInterval.current = null
     }
   }
+
+  // Update state sync based on playing status
+  useEffect(() => {
+    if (isPlaying) {
+      startStateSync()
+    } else {
+      stopStateSync()
+    }
+  }, [isPlaying])
 
   const setupPlayer = async () => {
     if (hasInitialized.current) return
@@ -129,7 +141,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         duration: 0,
       })
       setIsPlayerReady(true)
-      startStateSync()
+      // Don't start state sync here - it will start when playing begins
       await syncPlayerState()
     } catch (err) {
       console.error('TrackPlayer setup failed:', err)
@@ -353,13 +365,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       )
 
-
-
-
-
       const onAppState = AppState.addEventListener('change', async (next) => {
         if (next === 'active') {
-          startStateSync()
+          // Only start state sync if we're playing
+          if (isPlayingRef.current) {
+            startStateSync()
+          }
           await syncPlayerState()
           
           // Check if we should resume playback after car connection

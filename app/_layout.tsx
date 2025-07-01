@@ -1,24 +1,23 @@
 // app/_layout.tsx
 
-import React, { Suspense, useEffect, useState, useRef } from 'react';
-import {
-  Animated,
-  View,
-  ActivityIndicator,
-  StyleSheet,
-  Image,
-  Platform,
-} from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
+import { useColorScheme } from '@/hooks/useColorScheme';
 import { ThemeProvider } from '@react-navigation/native';
-import { EistLightTheme, EistDarkTheme } from '../themes';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import React, { Suspense, useEffect, useRef, useState } from 'react';
+import {
+    ActivityIndicator,
+    Animated,
+    Image,
+    StyleSheet,
+    View,
+} from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TrackPlayerProvider } from '../context/TrackPlayerContext';
-import { useColorScheme } from '@/hooks/useColorScheme';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { EistDarkTheme, EistLightTheme } from '../themes';
 
 // Tell the native splash to stay visible until we explicitly hide it
 SplashScreen.preventAutoHideAsync();
@@ -67,7 +66,7 @@ export default function RootLayout() {
     };
 
     prepareApp();
-  }, [fontsLoaded]);
+  }, [fontsLoaded, appOpacity, splashOpacity]);
 
   if (!fontsLoaded) {
     return null;

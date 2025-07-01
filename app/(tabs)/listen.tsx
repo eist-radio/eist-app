@@ -94,7 +94,6 @@ export default function ListenScreen() {
   const [showTitle, setShowTitle] = useState('')
   const [showDescription, setShowDescription] = useState('')
   const [artistName, setArtistName] = useState('éist · off air')
-  const [artistImage, setArtistImage] = useState<any>(placeholderArtistImage)
   const [remoteImageUrl, setRemoteImageUrl] = useState<string | null>(null)
   const [imageFailed, setImageFailed] = useState(false)
   const [broadcastStatus, setBroadcastStatus] = useState('off air')
@@ -106,6 +105,7 @@ export default function ListenScreen() {
   const [isContentLoading, setIsContentLoading] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [imageReady, setImageReady] = useState(false)
+  const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
 
   const formatTime = (isoString: string): string => {
     const date = new Date(isoString)
@@ -181,6 +181,12 @@ export default function ListenScreen() {
 
   const getArtistDetails = useCallback(async (id: string | null) => {
     if (!id) return { name: '', image: null }
+    
+    // Check cache first
+    if (artistCache[id]) {
+      return artistCache[id]
+    }
+    
     try {
       const res = await fetch(`${apiUrl}/artists/${id}`, {
         headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
@@ -189,20 +195,23 @@ export default function ListenScreen() {
       const json = await res.json()
       const artist = json.artist || {}
       const imageUrl = artist.logo?.['1024x1024'] || artist.logo?.['512x512'] || artist.logo?.['256x256']
-      return {
+      const artistData = {
         name: artist.name || '',
         image: imageUrl ? { uri: imageUrl } : null,
       }
+      
+      // Cache the result
+      setArtistCache(prev => ({ ...prev, [id]: artistData }))
+      return artistData
     } catch (err) {
       console.error('getArtistDetails failed', err)
       return { name: '', image: null }
     }
-  }, [])
+  }, [artistCache])
 
   const clearNowPlayingState = useCallback(async () => {
     setShowTitle('')
     setArtistName('éist · off air')
-    setArtistImage(placeholderOfflineImage)
     setRemoteImageUrl(null)
     setImageFailed(false)
     setShowDescription('')
@@ -216,12 +225,8 @@ export default function ListenScreen() {
     await updateMetadata('éist · off air', '', undefined)
   }, [updateMetadata])
 
-  const fetchNowPlaying = useCallback(async () => {
+  const fetchLiveScheduleOnly = useCallback(async () => {
     if (!isPlayerReady) return
-
-    // Set loading state when starting to fetch new content
-    setIsContentLoading(true)
-    setImageReady(false) // Hide image until new content is ready
 
     try {
       const res = await fetch(`${apiUrl}/schedule/live`, {
@@ -258,15 +263,12 @@ export default function ListenScreen() {
         } catch (nextErr) {
           console.error('fetchNextShow failed', nextErr)
         }
-        // Loading finished for off-air state - clearNowPlayingState already set imageReady
         setIsContentLoading(false)
       } else {
-        // Prepare new content
+        // Update schedule data only
         const newShowTitle = content.title || ''
         const newCurrentShowId = content.id || null
-        const id = content.artistIds?.[0] ?? null
-        
-        const { name, image } = await getArtistDetails(id)
+        const newArtistId = content.artistIds?.[0] ?? null
         
         // Prepare description
         let desc = parseDescription(content.description?.content || [])
@@ -274,71 +276,136 @@ export default function ListenScreen() {
           desc += `\n\nNow playing: ${metadata.title}`
         }
 
-        // If we have a remote image, preload it before updating the UI
-        if (image?.uri) {
-          console.log('Preloading artist image:', image.uri)
-          const imageLoaded = await preloadImage(image.uri)
+        setShowTitle(newShowTitle)
+        setCurrentShowId(newCurrentShowId)
+        setShowDescription(desc)
+        
+        // Clear next show info
+        setNextShowId(null)
+        setNextShowTitle('')
+        setNextShowTime('')
+        
+        // Only fetch artist details if artist ID changed
+        if (newArtistId !== artistId) {
+          setArtistId(newArtistId)
+          setIsContentLoading(true)
+          setImageReady(false)
           
-          if (imageLoaded) {
-            // Image loaded successfully - update all states together
-            setShowTitle(newShowTitle)
-            setCurrentShowId(newCurrentShowId)
-            setArtistId(id)
-            setArtistName(name)
-            setRemoteImageUrl(image.uri)
-            setArtistImage(image)
-            setImageFailed(false)
-            setShowDescription(desc)
+          const { name, image } = await getArtistDetails(newArtistId)
+          
+          // Update artist-related state
+          setArtistName(name)
+          
+          if (image?.uri) {
+            console.log('Preloading artist image:', image.uri)
+            const imageLoaded = await preloadImage(image.uri)
             
-            // Clear next show info
-            setNextShowId(null)
-            setNextShowTitle('')
-            setNextShowTime('')
-            
-            await updateMetadata(newShowTitle || 'éist', name, image.uri)
+            if (imageLoaded) {
+              setRemoteImageUrl(image.uri)
+              setImageFailed(false)
+              await updateMetadata(newShowTitle || 'éist', name, image.uri)
+            } else {
+              setRemoteImageUrl(null)
+              setImageFailed(true)
+              await updateMetadata(newShowTitle || 'éist', name, undefined)
+            }
           } else {
-            // Image failed to preload - use fallback
-            setShowTitle(newShowTitle)
-            setCurrentShowId(newCurrentShowId)
-            setArtistId(id)
-            setArtistName(name)
             setRemoteImageUrl(null)
-            setArtistImage(placeholderArtistImage)
-            setImageFailed(true)
-            setShowDescription(desc)
-            
-            // Clear next show info
-            setNextShowId(null)
-            setNextShowTitle('')
-            setNextShowTime('')
-            
+            setImageFailed(false)
             await updateMetadata(newShowTitle || 'éist', name, undefined)
           }
+          
+          setImageReady(true)
+          setIsContentLoading(false)
         } else {
-          // No remote image - use fallback immediately
-          setShowTitle(newShowTitle)
-          setCurrentShowId(newCurrentShowId)
-          setArtistId(id)
-          setArtistName(name)
-          setRemoteImageUrl(null)
-          setArtistImage(placeholderArtistImage)
-          setImageFailed(false)
-          setShowDescription(desc)
-          
-          // Clear next show info
-          setNextShowId(null)
-          setNextShowTitle('')
-          setNextShowTime('')
-          
-          await updateMetadata(newShowTitle || 'éist', name, undefined)
+          // Artist ID hasn't changed, just update metadata with current artist info
+          if (artistId && artistCache[artistId]) {
+            const cachedArtist = artistCache[artistId]
+            await updateMetadata(newShowTitle || 'éist', cachedArtist.name, cachedArtist.image?.uri)
+          } else {
+            await updateMetadata(newShowTitle || 'éist', artistName, remoteImageUrl || undefined)
+          }
         }
-        
-        // Mark image as ready and loading as finished
-        setImageReady(true)
-        setIsContentLoading(false)
       }
     } catch (err) {
-      console.error('fetchNowPlaying failed', err)
+      console.error('fetchLiveScheduleOnly failed', err)
+      setBroadcastStatus('error')
+      await clearNowPlayingState()
+    }
+  }, [isPlayerReady, artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage])
+
+  const fetchNowPlayingWithArtist = useCallback(async () => {
+    if (!isPlayerReady) return
+
+    // Set loading state when starting to fetch new content
+    setIsContentLoading(true)
+    setImageReady(false) // Hide image until new content is ready
+
+    try {
+      const res = await fetch(`${apiUrl}/schedule/live`, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const { status, content, metadata } = data.result
+
+      setBroadcastStatus(status)
+
+      if (status !== 'schedule') {
+        await clearNowPlayingState()
+        return
+      }
+
+      // Prepare new content
+      const newShowTitle = content.title || ''
+      const newCurrentShowId = content.id || null
+      const newArtistId = content.artistIds?.[0] ?? null
+      
+      const { name, image } = await getArtistDetails(newArtistId)
+      
+      // Prepare description
+      let desc = parseDescription(content.description?.content || [])
+      if (content.media?.type === 'playlist' && metadata?.title) {
+        desc += `\n\nNow playing: ${metadata.title}`
+      }
+
+      // Update all states
+      setShowTitle(newShowTitle)
+      setCurrentShowId(newCurrentShowId)
+      setArtistId(newArtistId)
+      setArtistName(name)
+      setShowDescription(desc)
+      
+      // Clear next show info
+      setNextShowId(null)
+      setNextShowTitle('')
+      setNextShowTime('')
+      
+      // Handle image
+      if (image?.uri) {
+        console.log('Preloading artist image:', image.uri)
+        const imageLoaded = await preloadImage(image.uri)
+        
+        if (imageLoaded) {
+          setRemoteImageUrl(image.uri)
+          setImageFailed(false)
+          await updateMetadata(newShowTitle || 'éist', name, image.uri)
+        } else {
+          setRemoteImageUrl(null)
+          setImageFailed(true)
+          await updateMetadata(newShowTitle || 'éist', name, undefined)
+        }
+      } else {
+        setRemoteImageUrl(null)
+        setImageFailed(false)
+        await updateMetadata(newShowTitle || 'éist', name, undefined)
+      }
+      
+      // Mark image as ready and loading as finished
+      setImageReady(true)
+      setIsContentLoading(false)
+    } catch (err) {
+      console.error('fetchNowPlayingWithArtist failed', err)
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
@@ -347,10 +414,14 @@ export default function ListenScreen() {
   useFocusEffect(
     useCallback(() => {
       if (!isPlayerReady) return
-      fetchNowPlaying()
-      const interval = setInterval(fetchNowPlaying, 30000)
-      return () => clearInterval(interval)
-    }, [isPlayerReady, fetchNowPlaying])
+      // Initial load with full artist details
+      fetchNowPlayingWithArtist()
+      // Only poll when playing - use lightweight function
+      if (isPlaying) {
+        const interval = setInterval(fetchLiveScheduleOnly, 30000)
+        return () => clearInterval(interval)
+      }
+    }, [isPlayerReady, fetchNowPlayingWithArtist, fetchLiveScheduleOnly, isPlaying])
   )
 
   useEffect(() => {
@@ -361,14 +432,17 @@ export default function ListenScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
-        fetchNowPlaying()
+        // Only refresh if we're playing - use lightweight function
+        if (isPlaying) {
+          fetchLiveScheduleOnly()
+        }
       }
     })
 
     return () => {
       subscription.remove()
     }
-  }, [fetchNowPlaying])
+  }, [fetchLiveScheduleOnly, isPlaying])
 
   const iconName = isPlaying
     ? 'stop-circle-outline'
@@ -395,13 +469,13 @@ export default function ListenScreen() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     try {
-      await fetchNowPlaying()
+      await fetchNowPlayingWithArtist()
     } catch (error) {
       console.error('Refresh failed:', error)
     } finally {
       setIsRefreshing(false)
     }
-  }, [fetchNowPlaying])
+  }, [fetchNowPlayingWithArtist])
 
   return (
     <SwipeNavigator>

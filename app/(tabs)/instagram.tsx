@@ -26,7 +26,7 @@ export default function InstagramScreen() {
           [{ text: 'OK' }]
         )
       }
-    } catch (error) {
+    } catch {
       Alert.alert(
         'Error',
         'Failed to open Instagram. Please try again later.',
