@@ -14,6 +14,7 @@ import {
     Alert,
     Dimensions,
     Image,
+    Linking,
     Platform,
     ScrollView,
     StyleSheet,
@@ -27,6 +28,8 @@ import { stripFormatting } from '../../../utils/stripFormatting';
 
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
+
+const logoImage = require('../../../assets/images/eist-logo-header.png')
 
 type RawScheduleItem = {
   id: string;
@@ -403,6 +406,20 @@ export default function ShowScreen() {
                 <ActivityIndicator size="large" color={colors.primary} />
               </View>
             )}
+            <TouchableOpacity
+              style={styles.logoContainer}
+              activeOpacity={0.7}
+              onPress={() => Linking.openURL('https://eist.radio/support')}
+              accessibilityRole="link"
+            >
+              <View style={styles.logoBackground}>
+                <Image
+                  source={logoImage}
+                  style={{ width: 74, height: 74 }}
+                  resizeMode="contain"
+                />
+              </View>
+            </TouchableOpacity>
           </View>
 
           {/* All content - inside shareable content */}
@@ -614,6 +631,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  logoContainer: { 
+    position: 'absolute', 
+    top: 36, 
+    right: 18 
+  },
+  logoBackground: { 
+    borderRadius: 37, 
+    padding: 8,
   },
 
 });
