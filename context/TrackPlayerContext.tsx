@@ -133,9 +133,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   const startStateSync = () => {
     if (isWeb || stateCheckInterval.current) return
-    // Only start state sync if we're actually playing
-    if (isPlayingRef.current) {
-      stateCheckInterval.current = setInterval(syncPlayerState, 2000)
+    // Only start state sync if we're actually playing and app is active
+    if (isPlayingRef.current && AppState.currentState === 'active') {
+      stateCheckInterval.current = setInterval(syncPlayerState, 10000) // Reduced from 2s to 10s
     }
   }
 
@@ -433,6 +433,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
               await recoverFromAudioSessionConflict()
             }
           }, 1500)
+        } else if (next === 'background' || next === 'inactive') {
+          // Stop polling when app goes to background to save battery
+          stopStateSync()
         }
       })
 

@@ -8,6 +8,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
+    AppState,
     RefreshControl,
     SectionList,
     StyleSheet,
@@ -19,7 +20,7 @@ import { useTrackPlayer } from '../../context/TrackPlayerContext';
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
-const LIVE_POLL_INTERVAL = 300_000;
+const LIVE_POLL_INTERVAL = 600_000; // Reduced from 5 minutes to 10 minutes
 
 type RawScheduleItem = {
   id: string;
@@ -103,6 +104,7 @@ export default function ScheduleScreen() {
 
   useEffect(() => {
     let isMounted = true;
+    let interval: NodeJS.Timeout | null = null;
 
     const fetchLiveShow = async () => {
       try {
@@ -148,18 +150,35 @@ export default function ScheduleScreen() {
       }
     };
 
-    fetchLiveShow();
-    // Only poll when playing
-    if (isPlaying) {
-      const interval = setInterval(fetchLiveShow, LIVE_POLL_INTERVAL);
-      return () => {
-        isMounted = false;
+    const startPolling = () => {
+      if (isPlaying && AppState.currentState === 'active' && !interval) {
+        interval = setInterval(fetchLiveShow, LIVE_POLL_INTERVAL);
+      }
+    };
+
+    const stopPolling = () => {
+      if (interval) {
         clearInterval(interval);
-      };
-    }
+        interval = null;
+      }
+    };
+
+    fetchLiveShow();
+    startPolling();
+
+    // Listen for app state changes
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && isPlaying) {
+        startPolling();
+      } else if (nextState === 'background' || nextState === 'inactive') {
+        stopPolling();
+      }
+    });
 
     return () => {
       isMounted = false;
+      stopPolling();
+      subscription.remove();
     };
   }, [isPlaying, fadeAnim]);
 
