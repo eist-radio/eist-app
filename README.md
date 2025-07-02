@@ -108,4 +108,3 @@ eas submit --platform android
 - Get set up in the Android store: <https://docs.expo.dev/submit/android/>, Needs an Android v10 or later device.
 - Set up a Git CI
 - Google Cast <https://github.com/react-native-google-cast/react-native-google-cast>
-- Android Auto + CarPlay <https://github.com/g4rb4g3/react-native-carplay>
