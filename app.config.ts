@@ -1,5 +1,5 @@
 // app.config.ts
-import { ExpoConfig, ConfigContext } from '@expo/config';
+import { ConfigContext, ExpoConfig } from '@expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
@@ -15,5 +15,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-audio",
     "expo-router",
     "expo-web-browser"
-  ]
+  ],
+  ios: {
+    ...config.ios,
+    infoPlist: {
+      ...config.ios?.infoPlist,
+      UIBackgroundModes: [
+        "audio"
+      ],
+      NSMicrophoneUsageDescription: "This app streams audio and does not record you, but a library we use requires an infoPlist entry to work.",
+      ITSAppUsesNonExemptEncryption: false,
+    }
+  }
 });

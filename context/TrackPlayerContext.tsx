@@ -48,6 +48,10 @@ const runImmediate = (fn: () => void) => {
   }
 }
 
+// Storage keys for remembering last played state
+const LAST_PLAYED_KEY = 'eist_last_played_timestamp'
+const WAS_PLAYING_KEY = 'eist_was_playing'
+
 export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isWeb = Platform.OS === 'web'
   const [isPlaying, setIsPlaying] = useState(false)
@@ -59,9 +63,51 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const isPlayingRef = useRef(isPlaying)
   const wasPlayingBeforeCarConnection = useRef(false)
+  const isCarPlayConnected = useRef(false)
+  
   useEffect(() => {
     isPlayingRef.current = isPlaying
   }, [isPlaying])
+
+  // Helper functions for storing/retrieving last played state
+  const storeLastPlayedState = async (wasPlaying: boolean) => {
+    if (isWeb) return
+    try {
+      const AsyncStorage = await import('@react-native-async-storage/async-storage')
+      await AsyncStorage.default.setItem(LAST_PLAYED_KEY, Date.now().toString())
+      await AsyncStorage.default.setItem(WAS_PLAYING_KEY, wasPlaying.toString())
+    } catch (error) {
+      console.error('Failed to store last played state:', error)
+    }
+  }
+
+  const getLastPlayedState = async (): Promise<{ timestamp: number; wasPlaying: boolean } | null> => {
+    if (isWeb) return null
+    try {
+      const AsyncStorage = await import('@react-native-async-storage/async-storage')
+      const timestamp = await AsyncStorage.default.getItem(LAST_PLAYED_KEY)
+      const wasPlaying = await AsyncStorage.default.getItem(WAS_PLAYING_KEY)
+      
+      if (timestamp && wasPlaying) {
+        return {
+          timestamp: parseInt(timestamp, 10),
+          wasPlaying: wasPlaying === 'true'
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get last played state:', error)
+    }
+    return null
+  }
+
+  const shouldAutoPlayOnCarPlay = async (): Promise<boolean> => {
+    const lastState = await getLastPlayedState()
+    if (!lastState) return false
+    
+    // Check if the app was playing within the last 24 hours
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000)
+    return lastState.wasPlaying && lastState.timestamp > twentyFourHoursAgo
+  }
 
   const syncPlayerState = async () => {
     if (isWeb) return
@@ -201,6 +247,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       try {
         await audioRef.current.play()
         setIsPlaying(true)
+        await storeLastPlayedState(true)
       } catch (err) {
         console.error('Web audio play failed:', err)
       } finally {
@@ -212,6 +259,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     try {
       await TrackPlayer.play()
       setIsPlaying(true)
+      await storeLastPlayedState(true)
     } catch (err) {
       console.error('Play failed:', err)
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
@@ -235,6 +283,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (isWeb) {
       audioRef.current?.pause()
       setIsPlaying(false)
+      await storeLastPlayedState(false)
       setIsBusy(false)
       return
     }
@@ -242,6 +291,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     try {
       await TrackPlayer.stop()
       setIsPlaying(false)
+      await storeLastPlayedState(false)
     } catch (err) {
       console.error('Stop failed:', err)
     } finally {
