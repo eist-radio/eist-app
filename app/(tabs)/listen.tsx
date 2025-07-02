@@ -427,7 +427,7 @@ export default function ListenScreen() {
       fetchNowPlayingWithArtist()
       // Only poll when playing - use lightweight function
       if (isPlaying) {
-        const interval = setInterval(fetchLiveScheduleOnly, 30000)
+        const interval = setInterval(fetchLiveScheduleOnly, 60000) // Reduced from 30s to 60s
         return () => clearInterval(interval)
       }
     }, [isPlayerReady, fetchNowPlayingWithArtist, fetchLiveScheduleOnly, isPlaying])
