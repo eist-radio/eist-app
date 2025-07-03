@@ -1,5 +1,6 @@
 // app/(tabs)/listen.tsx
 
+import { LinkifiedText } from '@/components/LinkifiedText'
 import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
@@ -601,12 +602,11 @@ export default function ListenScreen() {
                 {showTitle}
               </ThemedText>
             )}
-            <ThemedText
-              type="default"
+            <LinkifiedText
+              text={showDescription}
               style={[styles.showDescription, { color: colors.text }]}
-            >
-              {showDescription}
-            </ThemedText>
+              linkStyle={{ color: colors.primary }}
+            />
           </ScrollView>
         </View>
       </View>
