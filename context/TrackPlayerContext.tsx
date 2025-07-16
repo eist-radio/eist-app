@@ -1,19 +1,19 @@
 // context/TrackPlayerContext.tsx
 
 import React, {
-    createContext,
-    ReactNode,
-    useContext,
-    useEffect,
-    useRef,
-    useState,
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
 } from 'react'
 import { AppState, Platform } from 'react-native'
 import TrackPlayer, {
-    AppKilledPlaybackBehavior,
-    Capability,
-    Event,
-    State,
+  AppKilledPlaybackBehavior,
+  Capability,
+  Event,
+  State,
 } from 'react-native-track-player'
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
@@ -66,6 +66,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isCarPlayConnected = useRef(false)
   // New state to track if user was playing before app went to background
   const wasPlayingBeforeBackground = useRef(false)
+  // Track reconnection attempts to avoid infinite loops
+  const reconnectAttempts = useRef(0)
+  const maxReconnectAttempts = 7
+  const reconnectDelay = 2000 // 2 seconds
   
   useEffect(() => {
     isPlayingRef.current = isPlaying
@@ -341,6 +345,39 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const attemptReconnection = async () => {
+    if (reconnectAttempts.current >= maxReconnectAttempts) {
+      console.log('Max reconnection attempts reached, giving up')
+      reconnectAttempts.current = 0
+      return
+    }
+
+    reconnectAttempts.current++
+    console.log(`Attempting reconnection ${reconnectAttempts.current}/${maxReconnectAttempts}`)
+    
+    try {
+      // Wait before attempting reconnection
+      await new Promise(resolve => setTimeout(resolve, reconnectDelay))
+      
+      // Try to play again
+      await play()
+      
+      // If successful, reset the attempt counter
+      reconnectAttempts.current = 0
+      console.log('Reconnection successful')
+    } catch (err) {
+      console.error('Reconnection attempt failed:', err)
+      
+      // If this wasn't the last attempt, try again
+      if (reconnectAttempts.current < maxReconnectAttempts) {
+        setTimeout(attemptReconnection, reconnectDelay)
+      } else {
+        console.log('All reconnection attempts failed')
+        reconnectAttempts.current = 0
+      }
+    }
+  }
+
   const play = async () => {
     setIsBusy(true)
 
@@ -453,9 +490,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // For live streaming, we need to be more aggressive about stopping
+      // For live streaming, just stop the playback without resetting
       await TrackPlayer.stop()
-      await TrackPlayer.reset() // Reset the player to clear the stream
       
       // Verify the stream is actually stopped
       const state = await TrackPlayer.getState()
@@ -573,9 +609,20 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           // Always stop on interruption, never pause
           await stop()
         } else {
-          setIsPlaying(false)
-          setIsBusy(false)
-          runImmediate(syncPlayerState)
+          // For stream/network errors, attempt reconnection if we were playing
+          if (isPlayingRef.current) {
+            console.log('Stream error detected, attempting reconnection')
+            setIsPlaying(false)
+            setIsBusy(false)
+            // Reset reconnection attempts for new error
+            reconnectAttempts.current = 0
+            // Attempt reconnection after a short delay
+            setTimeout(attemptReconnection, reconnectDelay)
+          } else {
+            setIsPlaying(false)
+            setIsBusy(false)
+            runImmediate(syncPlayerState)
+          }
         }
       })
       const onQueueEnded = TrackPlayer.addEventListener(
