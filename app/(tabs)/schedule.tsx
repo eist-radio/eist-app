@@ -7,14 +7,15 @@ import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    AppState,
-    RefreshControl,
-    SectionList,
-    StyleSheet,
-    View
+  ActivityIndicator,
+  Animated,
+  AppState,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  View
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiKey } from '../../config';
 import { useTrackPlayer } from '../../context/TrackPlayerContext';
 import { useTimezoneChange } from '../../hooks/useTimezoneChange';
@@ -55,6 +56,7 @@ export default function ScheduleScreen() {
   const { colors } = useTheme();
   const { isPlaying } = useTrackPlayer();
   const currentTimezone = useTimezoneChange();
+  const insets = useSafeAreaInsets();
 
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -244,12 +246,9 @@ export default function ScheduleScreen() {
           const endParts = endStr.split(/\s+/);
 
           let timeLabel: string;
-          if (
-            startParts.length === 2 &&
-            endParts.length === 2 &&
-            startParts[1] === endParts[1]
-          ) {
-            timeLabel = `${startParts[0]} – ${endParts[0]} ${endParts[1]}`;
+          if (startParts.length === 2 && endParts.length === 2) {
+            // Always show format: "11:00 – 12:00 PM" (no AM on start time)
+            timeLabel = `${startParts[0]} – ${endStr}`;
           } else {
             timeLabel = `${startStr} – ${endStr}`;
           }
@@ -289,13 +288,10 @@ export default function ScheduleScreen() {
 
   return (
     <SwipeNavigator>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 48 }]}>
         <View style={styles.titleContainer}>
           <SelectableThemedText style={[styles.title, { color: colors.primary }]}>
-            Schedule{" "}
-          </SelectableThemedText>
-          <SelectableThemedText style={[styles.titleStatus, { color: colors.primary }]}>
-            {currentShowId ? "(We are live)" : "(Offline)"}
+            Schedule
           </SelectableThemedText>
         </View>
 
@@ -387,14 +383,13 @@ export default function ScheduleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 32,
     paddingHorizontal: 8,
-    marginTop: 48,
   },
   title: {
     fontSize: 28,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 8,
+    paddingTop: 10,
   },
   sectionHeader: {
     fontSize: 20,
@@ -441,13 +436,8 @@ const styles = StyleSheet.create({
   },
   titleContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'baseline',
   },
-  titleStatus: {
-    fontSize: 22,
-    fontWeight: '400',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
+
+
 });
