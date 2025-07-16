@@ -64,6 +64,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isPlayingRef = useRef(isPlaying)
   const wasPlayingBeforeCarConnection = useRef(false)
   const isCarPlayConnected = useRef(false)
+  // New state to track if user was playing before app went to background
+  const wasPlayingBeforeBackground = useRef(false)
   
   useEffect(() => {
     isPlayingRef.current = isPlaying
@@ -207,11 +209,24 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+      console.log('Recovering from audio session conflict...')
       await TrackPlayer.stop().catch(() => { })
       await TrackPlayer.reset().catch(() => { })
       await new Promise((r) => setTimeout(r, 1000))
       hasInitialized.current = false
       await setupPlayer()
+      
+      // If we were playing before the conflict, try to resume
+      if (wasPlayingBeforeBackground.current || wasPlayingBeforeCarConnection.current) {
+        console.log('Attempting to resume playback after audio session recovery')
+        setTimeout(async () => {
+          try {
+            await play()
+          } catch (err) {
+            console.error('Failed to resume playback after recovery:', err)
+          }
+        }, 500)
+      }
     } catch (err) {
       console.error('Recovery failed:', err)
       setIsPlaying(false)
@@ -223,20 +238,21 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isPlayerInvalidState = async (): Promise<boolean> => {
     if (isWeb) return false
     try {
-      await TrackPlayer.getState()
-      await TrackPlayer.getQueue()
-      return false
+      const state = await TrackPlayer.getState()
+      const queue = await TrackPlayer.getQueue()
+      
+      // Check if player is in a valid state
+      const validStates = [State.Playing, State.Paused, State.Stopped, State.Ready, State.Buffering]
+      const isValidState = validStates.includes(state)
+      const hasQueue = queue && queue.length > 0
+      
+      return !isValidState || !hasQueue
     } catch {
       return true
     }
   }
 
   const play = async () => {
-    if (!isPlayerReady) {
-      await setupPlayer()
-      if (!isPlayerReady) return
-    }
-
     setIsBusy(true)
 
     if (isWeb) {
@@ -256,19 +272,47 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
+    // Ensure player is ready before attempting to play
+    if (!isPlayerReady) {
+      console.log('Player not ready, setting up before play')
+      await setupPlayer()
+      if (!isPlayerReady) {
+        console.log('Setup failed, attempting recovery')
+        await recoverFromAudioSessionConflict()
+        if (!isPlayerReady) {
+          setIsBusy(false)
+          return
+        }
+      }
+    }
+
     try {
+      console.log('Starting live stream...')
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
+      console.log('Live stream started successfully')
     } catch (err) {
       console.error('Play failed:', err)
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
       if (
         msg.includes('audio session') ||
         msg.includes('interrupted') ||
-        msg.includes('invalid state')
+        msg.includes('invalid state') ||
+        msg.includes('not ready')
       ) {
+        console.log('Audio session issue detected, attempting recovery')
         await recoverFromAudioSessionConflict()
+        // Try playing again after recovery
+        try {
+          console.log('Retrying live stream after recovery...')
+          await TrackPlayer.play()
+          setIsPlaying(true)
+          await storeLastPlayedState(true)
+          console.log('Live stream started successfully after recovery')
+        } catch (retryErr) {
+          console.error('Play failed after recovery:', retryErr)
+        }
       }
     } finally {
       setIsBusy(false)
@@ -277,11 +321,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const stop = async () => {
-    if (!isPlayerReady) return
     setIsBusy(true)
 
     if (isWeb) {
-      audioRef.current?.pause()
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.src = ''
+        audioRef.current.load()
+        audioRef.current = null
+      }
       setIsPlaying(false)
       await storeLastPlayedState(false)
       setIsBusy(false)
@@ -289,11 +337,23 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+      console.log('Stopping live stream...')
+      // For live streaming, we need to be more aggressive about stopping
       await TrackPlayer.stop()
+      await TrackPlayer.reset() // Reset the player to clear the stream
+      
+      // Verify the stream is actually stopped
+      const state = await TrackPlayer.getState()
+      console.log('Player state after stop:', state)
+      
       setIsPlaying(false)
       await storeLastPlayedState(false)
+      console.log('Live stream stopped successfully')
     } catch (err) {
       console.error('Stop failed:', err)
+      // Force stop even if there's an error
+      setIsPlaying(false)
+      await storeLastPlayedState(false)
     } finally {
       setIsBusy(false)
       runImmediate(syncPlayerState)
@@ -301,10 +361,18 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const togglePlayStop = async () => {
-    if (!isPlayerReady || isBusy) return
+    if (isBusy) return
+    
     if (isPlaying) {
+      console.log('User pressed stop - stopping live stream')
       await stop()
     } else {
+      console.log('User pressed play - starting live stream')
+      // If player is not ready, try to recover first
+      if (!isPlayerReady) {
+        console.log('Player not ready, attempting recovery before play')
+        await recoverFromAudioSessionConflict()
+      }
       await play()
     }
   }
@@ -377,9 +445,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             error.message?.includes('carplay') ||
             error.message?.includes('android auto') ||
             error.message?.includes('bluetooth')) {
-          console.log('Possible CarPlay/Android Auto disconnect detected, stopping playback')
-          // Remember that we were playing before the disconnect
+          console.log('Possible audio session interruption detected, stopping playback')
+          // Remember that we were playing before the interruption
           wasPlayingBeforeCarConnection.current = isPlayingRef.current
+          wasPlayingBeforeBackground.current = isPlayingRef.current
           await stop()
         } else {
           setIsPlaying(false)
@@ -423,9 +492,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           }
           await syncPlayerState()
           
-          // Check if we should resume playback after car connection
+          // Check if we should resume playback after returning from background
           setTimeout(async () => {
-            if (wasPlayingBeforeCarConnection.current && !isPlayingRef.current) {
+            if (wasPlayingBeforeBackground.current && !isPlayingRef.current) {
+              console.log('App became active, resuming playback that was active before background')
+              wasPlayingBeforeBackground.current = false
+              await play()
+            } else if (wasPlayingBeforeCarConnection.current && !isPlayingRef.current) {
               console.log('App became active, resuming playback that was active before car connection')
               wasPlayingBeforeCarConnection.current = false
               await play()
@@ -434,6 +507,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             }
           }, 1500)
         } else if (next === 'background' || next === 'inactive') {
+          // Remember if we were playing before going to background
+          wasPlayingBeforeBackground.current = isPlayingRef.current
           // Stop polling when app goes to background to save battery
           stopStateSync()
         }
