@@ -62,7 +62,8 @@
     "react-native-track-player": "^4.1.1",
     "react-native-view-shot": "^4.0.3",
     "react-native-web": "~0.20.0",
-    "react-native-webview": "13.13.5"
+    "react-native-webview": "13.13.5",
+    "expo-clipboard": "~7.1.5"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

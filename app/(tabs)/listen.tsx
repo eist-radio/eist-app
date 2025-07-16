@@ -1,6 +1,6 @@
 // app/(tabs)/listen.tsx
 
-import { LinkifiedText } from '@/components/LinkifiedText'
+import { SelectableText } from '@/components/SelectableText'
 import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
@@ -602,7 +602,7 @@ export default function ListenScreen() {
                 {showTitle}
               </ThemedText>
             )}
-            <LinkifiedText
+            <SelectableText
               text={showDescription}
               style={[styles.showDescription, { color: colors.text }]}
               linkStyle={{ color: colors.primary }}
