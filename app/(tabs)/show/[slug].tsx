@@ -11,17 +11,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Linking,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { apiKey } from '../../../config';
@@ -54,8 +54,10 @@ type Artist = {
   id: string; 
   name?: string;
   logo?: {
+    default?: string;
     '256x256'?: string;
-    [key: string]: string | undefined;
+    '512x512'?: string;
+    '1024x1024'?: string;
   };
 };
 
@@ -231,8 +233,11 @@ export default function ShowScreen() {
     setImageReady(false); // Hide image until new host image is ready
   }, [hostId, host?.id]);
 
-  // Extract host image URL for dependency array
-  const hostImageUrl = host?.logo?.['256x256'];
+  // Extract host image URL for dependency array (same priority as artist page)
+  const hostImageUrl = host?.logo?.['1024x1024'] ||
+    host?.logo?.['512x512'] ||
+    host?.logo?.['256x256'] ||
+    host?.logo?.default;
 
   // Preload artist image when host data becomes available
   useEffect(() => {
@@ -306,20 +311,16 @@ export default function ShowScreen() {
   const timeString = formatShowTime(event.startDateUtc, event.endDateUtc);
   const dateString = formatShowDate(event.startDateUtc);
 
-  // Determine which image to use - try preloaded artist image first, fallback to schedule image
+  // Determine which image to use - try preloaded artist image first, fallback to eist online image
   const getBannerImage = () => {
     if (imageFailed || !preloadedImageUrl) {
-      return require('../../../assets/images/schedule.png');
+      return require('../../../assets/images/eist_online.png');
     }
     
     return { uri: preloadedImageUrl };
   };
 
-  const handleImageError = () => {
-    console.log('Host image failed to load, falling back to schedule image');
-    setImageFailed(true);
-    setPreloadedImageUrl(null);
-  };
+
 
   const shareShow = async () => {
     if (!shareContentRef.current) {
@@ -397,7 +398,14 @@ export default function ShowScreen() {
                 source={getBannerImage()}
                 style={styles.bannerImage}
                 resizeMode="cover"
-                onError={handleImageError}
+                onError={(error) => {
+                  console.log('Image load error:', error.nativeEvent.error);
+                  setImageFailed(true);
+                  setPreloadedImageUrl(null);
+                }}
+                onLoad={() => {
+                  console.log('Image loaded successfully');
+                }}
               />
             ) : (
               <View style={[styles.bannerImage, { backgroundColor: colors.card }]} />
