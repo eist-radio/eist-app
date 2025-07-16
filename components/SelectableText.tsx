@@ -1,8 +1,8 @@
 import React from 'react';
-import { Linking, StyleSheet, Text } from 'react-native';
+import { Linking, Platform, StyleSheet, Text, TextProps } from 'react-native';
 import { detectUrls } from '../utils/urlDetection';
 
-interface SelectableTextProps {
+interface SelectableTextProps extends TextProps {
   text: string;
   style?: any;
   linkStyle?: any;
@@ -17,7 +17,8 @@ export function SelectableText({
   linkStyle, 
   numberOfLines, 
   ellipsizeMode,
-  selectable = true
+  selectable = true,
+  ...rest
 }: SelectableTextProps) {
   const segments = detectUrls(text);
 
@@ -34,47 +35,41 @@ export function SelectableText({
     }
   };
 
-  // If no URLs detected, render as simple selectable text
-  if (segments.length === 0) {
-    return (
-      <Text 
-        style={style}
-        numberOfLines={numberOfLines}
-        ellipsizeMode={ellipsizeMode}
-        selectable={selectable}
-      >
-        {text}
-      </Text>
-    );
-  }
+  // Platform-specific text selection improvements
+  const textSelectionProps = {
+    selectable,
+    allowFontScaling: true,
+    ...(Platform.OS === 'ios' && {
+      textBreakStrategy: 'simple' as const,
+      adjustsFontSizeToFit: false,
+    }),
+    ...(Platform.OS === 'android' && {
+      textAlignVertical: 'top' as const,
+    }),
+  };
 
-  // If URLs detected, render with link detection and selectable text
   return (
-    <Text 
+    <Text
       style={style}
       numberOfLines={numberOfLines}
       ellipsizeMode={ellipsizeMode}
-      selectable={selectable}
+      {...textSelectionProps}
+      {...rest}
     >
-      {segments.map((segment, index) => {
-        if (segment.type === 'link' && segment.url) {
-          return (
-            <Text
-              key={index}
-              style={[linkStyle, styles.link]}
-              onPress={() => handleLinkPress(segment.url!)}
-              selectable={false} // Links are not selectable, only clickable
-            >
-              {segment.content}
-            </Text>
-          );
-        }
-        return (
-          <Text key={index} selectable={selectable}>
+      {segments.map((segment, index) =>
+        segment.type === 'link' && segment.url ? (
+          <Text
+            key={index}
+            style={[linkStyle, styles.link]}
+            onPress={() => handleLinkPress(segment.url!)}
+            suppressHighlighting={true}
+          >
             {segment.content}
           </Text>
-        );
-      })}
+        ) : (
+          segment.content
+        )
+      )}
     </Text>
   );
 }

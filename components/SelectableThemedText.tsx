@@ -1,6 +1,6 @@
 import { useThemeColor } from '@/hooks/useThemeColor';
 import React from 'react';
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
 
 export type SelectableThemedTextProps = TextProps & {
   lightColor?: string;
@@ -22,6 +22,21 @@ export function SelectableThemedText({
    const colorKey = type === 'link' ? 'tint' : 'text';
    const color = useThemeColor({ light: lightColor, dark: darkColor }, colorKey);
 
+   // Platform-specific text selection improvements
+   const textSelectionProps = {
+     selectable,
+     allowFontScaling: true,
+     // iOS-specific improvements for better text selection
+     ...(Platform.OS === 'ios' && {
+       textBreakStrategy: 'simple' as const,
+       adjustsFontSizeToFit: false,
+     }),
+     // Android-specific improvements for better text selection
+     ...(Platform.OS === 'android' && {
+       textAlignVertical: 'top' as const,
+     }),
+   };
+
    return (
      <Text
        style={[
@@ -33,7 +48,7 @@ export function SelectableThemedText({
          type === 'link' ? styles.link : undefined,
          style,
        ]}
-       selectable={selectable}
+       {...textSelectionProps}
        {...rest}
      >
        {children}
