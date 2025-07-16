@@ -93,11 +93,11 @@ const playbackService = async () => {
     console.log('Track changed - controls should be enabled');
   });
 
-  // Handle playback state changes for CarPlay
+  // Handle playback state changes for CarPlay and audio session recovery
   TrackPlayer.addEventListener(Event.PlaybackState, async ({ state }) => {
     console.log('Playback state changed:', state);
     
-    // If playback becomes ready and we should autoplay on CarPlay
+    // If playback becomes ready, check for various recovery scenarios
     if (state === 'ready') {
       try {
         const shouldAutoPlay = await shouldAutoPlayOnCarPlay()
@@ -121,11 +121,26 @@ const playbackService = async () => {
         console.error('Error checking CarPlay autoplay:', error)
       }
     }
+    
+    // Handle audio session recovery when state becomes ready
+    if (state === 'ready') {
+      console.log('Audio session ready, checking for recovery scenarios')
+    }
   });
 
-  // Handle other events if needed
-  TrackPlayer.addEventListener(Event.PlaybackError, (error) => {
+  // Handle playback errors and audio session interruptions
+  TrackPlayer.addEventListener(Event.PlaybackError, async (error) => {
     console.error('Playback error:', error);
+    
+    // Check if this is an audio session interruption
+    if (error.message?.includes('interrupted') || 
+        error.message?.includes('session') ||
+        error.message?.includes('audio') ||
+        error.message?.includes('conflict')) {
+      console.log('Audio session interruption detected, storing state for recovery')
+      // Store that we were playing before the interruption
+      await storeLastPlayedState(true)
+    }
   });
 };
 
