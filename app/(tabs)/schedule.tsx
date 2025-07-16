@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { apiKey } from '../../config';
 import { useTrackPlayer } from '../../context/TrackPlayerContext';
+import { useTimezoneChange } from '../../hooks/useTimezoneChange';
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
@@ -53,6 +54,7 @@ type SectionData = {
 export default function ScheduleScreen() {
   const { colors } = useTheme();
   const { isPlaying } = useTrackPlayer();
+  const currentTimezone = useTimezoneChange();
 
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +84,7 @@ export default function ScheduleScreen() {
       console.warn('ScheduleScreen fetch error:', err);
       setError('Could not load schedule.');
     }
-  }, []);
+  }, [currentTimezone]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -183,12 +185,11 @@ export default function ScheduleScreen() {
   }, [isPlaying, fadeAnim]);
 
   async function fetchSchedule(startDate: string, endDate: string) {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const url =
       `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
       `?startDate=${encodeURIComponent(startDate)}` +
       `&endDate=${encodeURIComponent(endDate)}` +
-      `&timeZone=${encodeURIComponent(tz)}`;
+      `&timeZone=${encodeURIComponent(currentTimezone)}`;
     const res = await fetch(url, {
       headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
     });
@@ -198,7 +199,6 @@ export default function ScheduleScreen() {
 
   function groupByDate(items: RawScheduleItem[]): SectionData[] {
     const todayKey = new Date().toISOString().split('T')[0];
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const buckets: Record<string, RawScheduleItem[]> = {};
 
     items.forEach((item) => {
@@ -231,13 +231,13 @@ export default function ScheduleScreen() {
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
-            timeZone: tz,
+            timeZone: currentTimezone,
           });
           const endStr = endDate.toLocaleTimeString('en-US', {
             hour: 'numeric',
             minute: '2-digit',
             hour12: true,
-            timeZone: tz,
+            timeZone: currentTimezone,
           });
 
           const startParts = startStr.split(/\s+/);
