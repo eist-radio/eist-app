@@ -161,13 +161,35 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isPlaying])
 
+  // Helper function to check if the stream track exists
+  const hasStreamTrack = async (): Promise<boolean> => {
+    try {
+      const queue = await TrackPlayer.getQueue()
+      return queue && queue.length > 0
+    } catch {
+      return false
+    }
+  }
+
+  // Helper function to add the stream track
+  const addStreamTrack = async () => {
+    await TrackPlayer.add({
+      id: 'radio-stream',
+      url: STREAM_URL,
+      title: ' ',
+      artist: 'éist',
+      isLiveStream: true,
+      duration: 0,
+    })
+  }
+
   const setupPlayer = async () => {
     if (hasInitialized.current) {
       // Check if player is actually ready, if not, reset and try again
       try {
         const state = await TrackPlayer.getState()
-        const queue = await TrackPlayer.getQueue()
-        if (state && queue && queue.length > 0) {
+        const hasTrack = await hasStreamTrack()
+        if (state && hasTrack) {
           setIsPlayerReady(true)
           return
         }
@@ -197,14 +219,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         compactCapabilities: [Capability.Play, Capability.Stop],
         notificationCapabilities: [Capability.Play, Capability.Stop],
       })
-      await TrackPlayer.add({
-        id: 'radio-stream',
-        url: STREAM_URL,
-        title: ' ',
-        artist: 'éist',
-        isLiveStream: true,
-        duration: 0,
-      })
+      await addStreamTrack()
       setIsPlayerReady(true)
       // Don't start state sync here - it will start when playing begins
       await syncPlayerState()
@@ -229,16 +244,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           })
           
           // Check if track already exists
-          const queue = await TrackPlayer.getQueue()
-          if (!queue || queue.length === 0) {
-            await TrackPlayer.add({
-              id: 'radio-stream',
-              url: STREAM_URL,
-              title: ' ',
-              artist: 'éist',
-              isLiveStream: true,
-              duration: 0,
-            })
+          const hasTrack = await hasStreamTrack()
+          if (!hasTrack) {
+            await addStreamTrack()
           }
           
           setIsPlayerReady(true)
@@ -271,10 +279,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // First, check if the player is actually in a bad state
       try {
         const state = await TrackPlayer.getState()
-        const queue = await TrackPlayer.getQueue()
+        const hasTrack = await hasStreamTrack()
         
-        // If player is in a good state and has tracks, we might not need recovery
-        if (state && queue && queue.length > 0) {
+        // If player is in a good state and has the track, we might not need recovery
+        if (state && hasTrack) {
           setIsPlayerReady(true)
           return
         }
@@ -322,19 +330,18 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (isWeb) return false
     try {
       const state = await TrackPlayer.getState()
-      const queue = await TrackPlayer.getQueue()
+      const hasTrack = await hasStreamTrack()
       
       // Check if player is in a valid state
       const validStates = [State.Playing, State.Paused, State.Stopped, State.Ready, State.Buffering]
       const isValidState = validStates.includes(state)
-      const hasQueue = queue && queue.length > 0
       
-      // Only consider invalid if both state and queue are problematic
+      // Only consider invalid if both state and track are problematic
       // This prevents false positives during normal operations
-      const isInvalid = !isValidState && !hasQueue
+      const isInvalid = !isValidState && !hasTrack
       
       if (isInvalid) {
-        console.log('Player invalid state detected:', { state, queueLength: queue?.length })
+        console.log('Player invalid state detected:', { state, hasTrack })
       }
       
       return isInvalid
@@ -411,17 +418,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Check if queue has tracks before playing
-      const queue = await TrackPlayer.getQueue()
-      if (!queue || queue.length === 0) {
-        await TrackPlayer.add({
-          id: 'radio-stream',
-          url: STREAM_URL,
-          title: ' ',
-          artist: 'éist',
-          isLiveStream: true,
-          duration: 0,
-        })
+      // Check if track exists before playing
+      const hasTrack = await hasStreamTrack()
+      if (!hasTrack) {
+        await addStreamTrack()
       }
       
       // Check player state before attempting to play
@@ -531,10 +531,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (!isPlayerReady || isWeb) return
     
     try {
-      // Check if the queue has tracks before updating metadata
-      const queue = await TrackPlayer.getQueue()
-      if (!queue || queue.length === 0) {
-        console.log('Queue is empty, skipping metadata update')
+      // Check if the track exists before updating metadata
+      const hasTrack = await hasStreamTrack()
+      if (!hasTrack) {
+        console.log('Stream track not found, skipping metadata update')
         return
       }
       
