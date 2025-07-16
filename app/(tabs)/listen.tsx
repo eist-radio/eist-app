@@ -24,6 +24,7 @@ import {
 } from 'react-native'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
+import { useTimezoneChange } from '../../hooks/useTimezoneChange'
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
@@ -91,6 +92,7 @@ export default function ListenScreen() {
   } = useTrackPlayer()
   const { width } = Dimensions.get('window')
   const router = useRouter()
+  const currentTimezone = useTimezoneChange()
 
   const [showTitle, setShowTitle] = useState('')
   const [showDescription, setShowDescription] = useState('')
@@ -114,6 +116,7 @@ export default function ListenScreen() {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
+      timeZone: currentTimezone,
     })
   }
 
@@ -323,7 +326,7 @@ export default function ListenScreen() {
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [isPlayerReady, artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage])
+  }, [isPlayerReady, artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, currentTimezone])
 
   const fetchNowPlayingWithArtist = useCallback(async () => {
     if (!isPlayerReady) return
@@ -419,7 +422,7 @@ export default function ListenScreen() {
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [isPlayerReady, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage])
+  }, [isPlayerReady, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, currentTimezone])
 
   useFocusEffect(
     useCallback(() => {

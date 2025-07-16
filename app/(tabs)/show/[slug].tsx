@@ -25,6 +25,7 @@ import {
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { apiKey } from '../../../config';
+import { useTimezoneChange } from '../../../hooks/useTimezoneChange';
 import { stripFormatting } from '../../../utils/stripFormatting';
 
 const STATION_ID = 'eist-radio';
@@ -87,9 +88,7 @@ async function fetchHostArtist(artistId: string): Promise<Artist> {
   return json.artist;
 }
 
-function formatShowTime(start: string, end: string): string {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
+function formatShowTime(start: string, end: string, timezone: string): string {
   const startDate = new Date(start);
   const endDate = new Date(end);
 
@@ -98,7 +97,7 @@ function formatShowTime(start: string, end: string): string {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
-      timeZone: tz,
+      timeZone: timezone,
     })
     .replace(/ (AM|PM)$/, '');
 
@@ -106,29 +105,28 @@ function formatShowTime(start: string, end: string): string {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-    timeZone: tz,
+    timeZone: timezone,
   });
 
   return `${startTime} - ${endTime}`;
 }
 
-function formatShowDate(start: string): string {
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+function formatShowDate(start: string, timezone: string): string {
   const startDate = new Date(start);
 
   const dayName = startDate.toLocaleDateString('en-US', {
     weekday: 'long',
-    timeZone: tz,
+    timeZone: timezone,
   });
 
   const monthName = startDate.toLocaleDateString('en-US', {
     month: 'long',
-    timeZone: tz,
+    timeZone: timezone,
   });
 
   const day = startDate.toLocaleDateString('en-US', {
     day: 'numeric',
-    timeZone: tz,
+    timeZone: timezone,
   });
 
   // Add ordinal suffix to day
@@ -150,6 +148,7 @@ export default function ShowScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
+  const currentTimezone = useTimezoneChange();
   const shareViewRef = useRef<ScrollView>(null);
   const shareContentRef = useRef<View>(null);
   const [isSharing, setIsSharing] = useState(false);
@@ -308,8 +307,8 @@ export default function ShowScreen() {
     .map((p) => p.trim())
     .filter((p) => p);
 
-  const timeString = formatShowTime(event.startDateUtc, event.endDateUtc);
-  const dateString = formatShowDate(event.startDateUtc);
+  const timeString = formatShowTime(event.startDateUtc, event.endDateUtc, currentTimezone);
+  const dateString = formatShowDate(event.startDateUtc, currentTimezone);
 
   // Determine which image to use - try preloaded artist image first, fallback to eist online image
   const getBannerImage = () => {
