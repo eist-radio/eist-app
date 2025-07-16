@@ -1,6 +1,6 @@
 // app/(tabs)/artist/[slug].tsx
 
-import { LinkifiedText } from '@/components/LinkifiedText';
+import { SelectableText } from '@/components/SelectableText';
 import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
@@ -323,7 +323,7 @@ export default function ArtistScreen() {
 
         <View style={styles.textContainer}>
           {paragraphs.map((p, i) => (
-            <LinkifiedText
+            <SelectableText
               key={i}
               text={p}
               style={[styles.bodyText, { color: colors.text }]}
