@@ -1,19 +1,19 @@
 // context/TrackPlayerContext.tsx
 
 import React, {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
+    createContext,
+    ReactNode,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
 } from 'react'
 import { AppState, Platform } from 'react-native'
 import TrackPlayer, {
-  AppKilledPlaybackBehavior,
-  Capability,
-  Event,
-  State,
+    AppKilledPlaybackBehavior,
+    Capability,
+    Event,
+    State,
 } from 'react-native-track-player'
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
@@ -158,7 +158,20 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }, [isPlaying])
 
   const setupPlayer = async () => {
-    if (hasInitialized.current) return
+    if (hasInitialized.current) {
+      // Check if player is actually ready, if not, reset and try again
+      try {
+        const state = await TrackPlayer.getState()
+        const queue = await TrackPlayer.getQueue()
+        if (state && queue && queue.length > 0) {
+          setIsPlayerReady(true)
+          return
+        }
+      } catch (err) {
+        hasInitialized.current = false
+      }
+    }
+
     hasInitialized.current = true
 
     if (isWeb) {
@@ -170,7 +183,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await TrackPlayer.setupPlayer()
       await TrackPlayer.updateOptions({
         alwaysPauseOnInterruption: false,
-        stoppingAppPausesPlayback: false,
+        stoppingAppPausesPlayback: true,
         android: {
           appKilledPlaybackBehavior:
             AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
@@ -192,7 +205,49 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Don't start state sync here - it will start when playing begins
       await syncPlayerState()
     } catch (err) {
-      console.error('TrackPlayer setup failed:', err)
+      const errorMsg = err instanceof Error ? err.message.toLowerCase() : ''
+      
+      // If the player is already initialized, that's actually okay - we can proceed
+      if (errorMsg.includes('already been initialized')) {
+        try {
+          // Try to add the track and update options even if already initialized
+          await TrackPlayer.updateOptions({
+            alwaysPauseOnInterruption: false,
+            stoppingAppPausesPlayback: true,
+            android: {
+              appKilledPlaybackBehavior:
+                AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+              alwaysPauseOnInterruption: false,
+            },
+            capabilities: [Capability.Play, Capability.Stop],
+            compactCapabilities: [Capability.Play, Capability.Stop],
+            notificationCapabilities: [Capability.Play, Capability.Stop],
+          })
+          
+          // Check if track already exists
+          const queue = await TrackPlayer.getQueue()
+          if (!queue || queue.length === 0) {
+            await TrackPlayer.add({
+              id: 'radio-stream',
+              url: STREAM_URL,
+              title: ' ',
+              artist: 'éist',
+              isLiveStream: true,
+              duration: 0,
+            })
+          }
+          
+          setIsPlayerReady(true)
+          await syncPlayerState()
+          return
+        } catch (setupErr) {
+          console.error('Failed to complete setup after already initialized error:', setupErr)
+        }
+      }
+      
+      // For other errors, reset the initialization flag so we can try again
+      hasInitialized.current = false
+      setIsPlayerReady(false)
     }
   }
 
@@ -209,16 +264,38 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('Recovering from audio session conflict...')
+      // First, check if the player is actually in a bad state
+      try {
+        const state = await TrackPlayer.getState()
+        const queue = await TrackPlayer.getQueue()
+        
+        // If player is in a good state and has tracks, we might not need recovery
+        if (state && queue && queue.length > 0) {
+          setIsPlayerReady(true)
+          return
+        }
+      } catch (checkErr) {
+        // Player state check failed, proceeding with recovery
+      }
+      
+      // Reset the initialization flag first
+      hasInitialized.current = false
+      
+      // Reset the track player service state
+      // Note: Service will be reinitialized automatically on next access
+      
+      // Stop and reset the player
       await TrackPlayer.stop().catch(() => { })
       await TrackPlayer.reset().catch(() => { })
+      
+      // Wait a bit for the reset to complete
       await new Promise((r) => setTimeout(r, 1000))
-      hasInitialized.current = false
+      
+      // Try to setup the player again
       await setupPlayer()
       
       // If we were playing before the conflict, try to resume
       if (wasPlayingBeforeBackground.current || wasPlayingBeforeCarConnection.current) {
-        console.log('Attempting to resume playback after audio session recovery')
         setTimeout(async () => {
           try {
             await play()
@@ -232,6 +309,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setIsPlaying(false)
       setIsBusy(false)
       setIsPlayerReady(false)
+      // Reset initialization flag on recovery failure
+      hasInitialized.current = false
     }
   }
 
@@ -246,9 +325,19 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const isValidState = validStates.includes(state)
       const hasQueue = queue && queue.length > 0
       
-      return !isValidState || !hasQueue
-    } catch {
-      return true
+      // Only consider invalid if both state and queue are problematic
+      // This prevents false positives during normal operations
+      const isInvalid = !isValidState && !hasQueue
+      
+      if (isInvalid) {
+        console.log('Player invalid state detected:', { state, queueLength: queue?.length })
+      }
+      
+      return isInvalid
+    } catch (err) {
+      console.log('Error checking player state:', err)
+      // Don't assume invalid state on error, just return false
+      return false
     }
   }
 
@@ -274,10 +363,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     // Ensure player is ready before attempting to play
     if (!isPlayerReady) {
-      console.log('Player not ready, setting up before play')
       await setupPlayer()
       if (!isPlayerReady) {
-        console.log('Setup failed, attempting recovery')
         await recoverFromAudioSessionConflict()
         if (!isPlayerReady) {
           setIsBusy(false)
@@ -287,29 +374,58 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('Starting live stream...')
+      // Check if queue has tracks before playing
+      const queue = await TrackPlayer.getQueue()
+      if (!queue || queue.length === 0) {
+        await TrackPlayer.add({
+          id: 'radio-stream',
+          url: STREAM_URL,
+          title: ' ',
+          artist: 'éist',
+          isLiveStream: true,
+          duration: 0,
+        })
+      }
+      
+      // Check player state before attempting to play
+      const currentState = await TrackPlayer.getState()
+      if (currentState === State.Playing) {
+        setIsPlaying(true)
+        setIsBusy(false)
+        return
+      }
+      
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
-      console.log('Live stream started successfully')
     } catch (err) {
-      console.error('Play failed:', err)
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
+      
+      // Handle "already initialized" error specifically
+      if (msg.includes('already been initialized')) {
+        try {
+          await TrackPlayer.play()
+          setIsPlaying(true)
+          await storeLastPlayedState(true)
+          return
+        } catch (retryErr) {
+          console.error('Play failed after already initialized error:', retryErr)
+        }
+      }
+      
+      // Handle other audio session issues
       if (
         msg.includes('audio session') ||
         msg.includes('interrupted') ||
         msg.includes('invalid state') ||
         msg.includes('not ready')
       ) {
-        console.log('Audio session issue detected, attempting recovery')
         await recoverFromAudioSessionConflict()
         // Try playing again after recovery
         try {
-          console.log('Retrying live stream after recovery...')
           await TrackPlayer.play()
           setIsPlaying(true)
           await storeLastPlayedState(true)
-          console.log('Live stream started successfully after recovery')
         } catch (retryErr) {
           console.error('Play failed after recovery:', retryErr)
         }
@@ -337,18 +453,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('Stopping live stream...')
       // For live streaming, we need to be more aggressive about stopping
       await TrackPlayer.stop()
       await TrackPlayer.reset() // Reset the player to clear the stream
       
       // Verify the stream is actually stopped
       const state = await TrackPlayer.getState()
-      console.log('Player state after stop:', state)
       
       setIsPlaying(false)
       await storeLastPlayedState(false)
-      console.log('Live stream stopped successfully')
     } catch (err) {
       console.error('Stop failed:', err)
       // Force stop even if there's an error
@@ -364,13 +477,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (isBusy) return
     
     if (isPlaying) {
-      console.log('User pressed stop - stopping live stream')
       await stop()
     } else {
-      console.log('User pressed play - starting live stream')
       // If player is not ready, try to recover first
       if (!isPlayerReady) {
-        console.log('Player not ready, attempting recovery before play')
         await recoverFromAudioSessionConflict()
       }
       await play()
@@ -383,9 +493,18 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     artworkUrl?: string
   ) => {
     if (!isPlayerReady || isWeb) return
-    const isDeadAir = title.trim().length === 0
-    const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
+    
     try {
+      // Check if the queue has tracks before updating metadata
+      const queue = await TrackPlayer.getQueue()
+      if (!queue || queue.length === 0) {
+        console.log('Queue is empty, skipping metadata update')
+        return
+      }
+      
+      const isDeadAir = title.trim().length === 0
+      const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
+      
       if (isDeadAir) {
         await TrackPlayer.updateMetadataForTrack(0, {
           title,
@@ -407,6 +526,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       console.error('Metadata update failed:', err)
+      // Don't throw the error, just log it and continue
+      // This prevents the error from breaking the app flow
     }
   }
 
@@ -445,10 +566,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             error.message?.includes('carplay') ||
             error.message?.includes('android auto') ||
             error.message?.includes('bluetooth')) {
-          console.log('Possible audio session interruption detected, stopping playback')
+          console.log('Audio session interruption detected, stopping playback')
           // Remember that we were playing before the interruption
           wasPlayingBeforeCarConnection.current = isPlayingRef.current
           wasPlayingBeforeBackground.current = isPlayingRef.current
+          // Always stop on interruption, never pause
           await stop()
         } else {
           setIsPlaying(false)
@@ -495,15 +617,23 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           // Check if we should resume playback after returning from background
           setTimeout(async () => {
             if (wasPlayingBeforeBackground.current && !isPlayingRef.current) {
-              console.log('App became active, resuming playback that was active before background')
               wasPlayingBeforeBackground.current = false
               await play()
             } else if (wasPlayingBeforeCarConnection.current && !isPlayingRef.current) {
-              console.log('App became active, resuming playback that was active before car connection')
               wasPlayingBeforeCarConnection.current = false
               await play()
-            } else if (!isPlayingRef.current && (await isPlayerInvalidState())) {
-              await recoverFromAudioSessionConflict()
+            } else if (!isPlayingRef.current) {
+              // Only check for invalid state if we're not playing and player is ready
+              if (isPlayerReady) {
+                try {
+                  const isInvalid = await isPlayerInvalidState()
+                  if (isInvalid) {
+                    await recoverFromAudioSessionConflict()
+                  }
+                } catch (err) {
+                  // Error checking player state, skipping recovery
+                }
+              }
             }
           }, 1500)
         } else if (next === 'background' || next === 'inactive') {

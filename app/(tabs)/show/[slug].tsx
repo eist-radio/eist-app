@@ -432,12 +432,28 @@ export default function ShowScreen() {
 
           {/* All content - inside shareable content */}
           <View style={styles.shareableTitle}>
-            <ThemedText
-              type="subtitle"
-              style={[styles.header, { color: colors.primary }]}
-            >
-              {event.title}
-            </ThemedText>
+            <View style={styles.titleRow}>
+              <ThemedText
+                type="subtitle"
+                style={[styles.header, { color: colors.primary }]}
+              >
+                {event.title}
+              </ThemedText>
+              <TouchableOpacity 
+                onPress={shareShow} 
+                style={styles.shareButtonInline}
+                disabled={isSharing}
+                accessibilityLabel="Share show"
+                accessibilityHint="Share this show information as an image"
+                accessibilityRole="button"
+              >
+                {isSharing ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="share-outline" size={28} color={colors.primary} />
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.shareableText}>
@@ -485,24 +501,6 @@ export default function ShowScreen() {
               ))}
             </View>
           </View>
-        </View>
-
-        {/* Share button positioned outside shareable content */}
-        <View style={styles.shareButtonAbsolute}>
-          <TouchableOpacity 
-            onPress={shareShow} 
-            style={styles.shareButtonInline}
-            disabled={isSharing}
-            accessibilityLabel="Share show"
-            accessibilityHint="Share this show information as an image"
-            accessibilityRole="button"
-          >
-            {isSharing ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Ionicons name="share-outline" size={28} color={colors.primary} />
-            )}
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </SwipeNavigator>
@@ -561,7 +559,6 @@ const styles = StyleSheet.create({
   },
   hostRow: {
     marginBottom: 6,
-    paddingRight: 60, // Extra space to avoid share button collision
   },
   hostText: {
     fontSize: 19,
@@ -609,7 +606,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 2,
-    paddingRight: 60, // Extra space for share button
+  },
+
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
 
   shareableText: {
@@ -618,15 +620,13 @@ const styles = StyleSheet.create({
   },
 
   shareButtonInline: {
-    padding: 12, // Increased for better touch target (52x52 total)
-    borderRadius: 8,
-  },
-
-  shareButtonAbsolute: {
-    position: 'absolute',
-    top: screenWidth + 16, // Banner height + title padding
-    right: 16,
-    zIndex: 1,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
   },
 
   loadingOverlay: {
@@ -648,5 +648,6 @@ const styles = StyleSheet.create({
     borderRadius: 37, 
     padding: 8,
   },
+
 
 });

@@ -1,5 +1,6 @@
 // app/(tabs)/schedule.tsx
 
+import { SelectableThemedText } from '@/components/SelectableThemedText';
 import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
@@ -12,8 +13,7 @@ import {
     RefreshControl,
     SectionList,
     StyleSheet,
-    Text,
-    View,
+    View
 } from 'react-native';
 import { apiKey } from '../../config';
 import { useTrackPlayer } from '../../context/TrackPlayerContext';
@@ -279,7 +279,9 @@ export default function ScheduleScreen() {
     return (
       <SwipeNavigator>
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-          <Text style={{ color: colors.notification, fontSize: 18 }}>{error}</Text>
+          <SelectableThemedText style={{ color: colors.notification, fontSize: 18 }}>
+            {error}
+          </SelectableThemedText>
         </View>
       </SwipeNavigator>
     );
@@ -289,12 +291,12 @@ export default function ScheduleScreen() {
     <SwipeNavigator>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: colors.primary }]}>
+          <SelectableThemedText style={[styles.title, { color: colors.primary }]}>
             Schedule{" "}
-          </Text>
-          <Text style={[styles.titleStatus, { color: colors.primary }]}>
+          </SelectableThemedText>
+          <SelectableThemedText style={[styles.titleStatus, { color: colors.primary }]}>
             {currentShowId ? "(We are live)" : "(Offline)"}
-          </Text>
+          </SelectableThemedText>
         </View>
 
         <SectionList
@@ -311,16 +313,16 @@ export default function ScheduleScreen() {
           }
           renderSectionHeader={({ section: { title } }) => (
             <>
-              <Text style={[styles.sectionHeader, { color: colors.primary }]}>
+              <SelectableThemedText style={[styles.sectionHeader, { color: colors.primary }]}>
                 {title}
-              </Text>
+              </SelectableThemedText>
               <View style={styles.headerRow}>
-                <Text style={[styles.headerCell, { color: colors.primary }]}>
+                <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
                   Time
-                </Text>
-                <Text style={[styles.headerCell, { color: colors.primary }]}>
+                </SelectableThemedText>
+                <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
                   Show
-                </Text>
+                </SelectableThemedText>
               </View>
             </>
           )}
@@ -331,7 +333,7 @@ export default function ScheduleScreen() {
             return (
               <CellWrapper style={isCurrent ? { opacity: fadeAnim } : undefined}>
                 <View style={styles.row}>
-                  <Text
+                  <SelectableThemedText
                     style={[
                       styles.cell,
                       {
@@ -342,7 +344,7 @@ export default function ScheduleScreen() {
                     ]}
                   >
                     {item.time}
-                  </Text>
+                  </SelectableThemedText>
 
                   <Link
                     href={`/show/${encodeURIComponent(item.id)}`}
@@ -357,7 +359,7 @@ export default function ScheduleScreen() {
                           style={styles.playIcon}
                         />
                       )}
-                      <Text
+                      <SelectableThemedText
                         style={[
                           styles.cellText,
                           {
@@ -368,7 +370,7 @@ export default function ScheduleScreen() {
                         ]}
                       >
                         {item.title}
-                      </Text>
+                      </SelectableThemedText>
                     </View>
                   </Link>
                 </View>

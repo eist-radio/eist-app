@@ -64,8 +64,8 @@ async function fetchArtistBySlug(slug: string): Promise<RawArtist> {
 }
 
 export default function ArtistScreen() {
-  const { colors } = useTheme();
   const { slug } = useLocalSearchParams<{ slug?: string }>();
+  const { colors } = useTheme();
 
   if (!slug) {
     return (
