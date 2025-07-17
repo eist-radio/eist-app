@@ -1,7 +1,6 @@
 // app/(tabs)/instagram.tsx
 
 import { SwipeNavigator } from '@/components/SwipeNavigator'
-import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
 import React, { useState } from 'react'
@@ -67,13 +66,6 @@ export default function InstagramScreen() {
               {isLoading ? 'Opening...' : 'Follow us on Instagram'}
             </Text>
           </TouchableOpacity>
-
-                     <ThemedText 
-             type="default" 
-             style={[styles.disclaimer, { color: colors.text }]}
-           >
-             Opens Instagram in your browser or the Instagram app if installed.
-           </ThemedText>
         </View>
       </ScrollView>
     </SwipeNavigator>
