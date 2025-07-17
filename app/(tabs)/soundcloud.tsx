@@ -1,5 +1,4 @@
 import { SwipeNavigator } from '@/components/SwipeNavigator'
-import { ThemedText } from '@/components/ThemedText'
 import { faSoundcloud } from '@fortawesome/free-brands-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
@@ -66,13 +65,6 @@ export default function SoundCloudScreen() {
               {isLoading ? 'Opening...' : 'Listen back on SoundCloud'}
             </Text>
           </TouchableOpacity>
-
-          <ThemedText 
-            type="default" 
-            style={[styles.disclaimer, { color: colors.text }]}
-          >
-            Opens SoundCloud in your browser or the SoundCloud app if installed.
-          </ThemedText>
         </View>
       </ScrollView>
     </SwipeNavigator>
