@@ -662,28 +662,30 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           await syncPlayerState()
           
           // Check if we should resume playback after returning from background
-          setTimeout(async () => {
-            if (wasPlayingBeforeBackground.current && !isPlayingRef.current) {
-              wasPlayingBeforeBackground.current = false
-              await play()
-            } else if (wasPlayingBeforeCarConnection.current && !isPlayingRef.current) {
-              wasPlayingBeforeCarConnection.current = false
-              await play()
-            } else if (!isPlayingRef.current) {
-              // Only check for invalid state if we're not playing and player is ready
-              if (isPlayerReady) {
-                try {
-                  const isInvalid = await isPlayerInvalidState()
-                  if (isInvalid) {
-                    await recoverFromAudioSessionConflict()
-                  }
-                } catch (err) {
-                  // Error checking player state, skipping recovery
+          if (wasPlayingBeforeBackground.current && !isPlayingRef.current) {
+            wasPlayingBeforeBackground.current = false
+            // This is a more forceful way to ensure playback resumes
+            await recoverFromAudioSessionConflict()
+          } else if (
+            wasPlayingBeforeCarConnection.current &&
+            !isPlayingRef.current
+          ) {
+            wasPlayingBeforeCarConnection.current = false
+            await play()
+          } else if (!isPlayingRef.current) {
+            // Only check for invalid state if we're not playing and player is ready
+            if (isPlayerReady) {
+              try {
+                const isInvalid = await isPlayerInvalidState()
+                if (isInvalid) {
+                  await recoverFromAudioSessionConflict()
                 }
+              } catch (err) {
+                // Error checking player state, skipping recovery
               }
             }
-          }, 1500)
-        } else if (next === 'background' || next === 'inactive') {
+          }
+        } else if (next === 'background') {
           // Remember if we were playing before going to background
           wasPlayingBeforeBackground.current = isPlayingRef.current
           // Stop polling when app goes to background to save battery
