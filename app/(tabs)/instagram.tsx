@@ -4,7 +4,9 @@ import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
 import React, { useState } from 'react'
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Dimensions, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function InstagramScreen() {
   const { colors } = useTheme()
@@ -42,12 +44,19 @@ export default function InstagramScreen() {
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.header}>
-          <Ionicons
-            name="logo-instagram"
-            size={160}
-            color={colors.primary}
+        <View style={styles.imageContainer}>
+          <Image
+            source={require('../../assets/images/schedule.png')}
+            style={[styles.fullWidthImage, { opacity: 0.3 }]}
+            resizeMode="cover"
           />
+          <View style={styles.logoContainer}>
+            <Ionicons
+              name="logo-instagram"
+              size={160}
+              color={colors.primary}
+            />
+          </View>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -78,13 +87,30 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    padding: 24,
-    justifyContent: 'space-between',
   },
-  header: {
+  imageContainer: {
+    width: screenWidth,
+    height: screenWidth,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  fullWidthImage: {
+    width: '100%',
+    height: '100%',
+    transform: [
+      { scale: 2 },
+      { translateX: 75 },
+      { translateY: -50 }
+    ],
+  },
+  logoContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
   },
   icon: {
     marginBottom: 16,
@@ -125,8 +151,8 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    flex: 1,
+    justifyContent: 'center',
+    height: screenWidth,
   },
   followButton: {
     flexDirection: 'row',
