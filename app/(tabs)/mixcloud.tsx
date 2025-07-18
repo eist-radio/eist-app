@@ -272,8 +272,8 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   showDate: {
-    fontSize: 14,
-    opacity: 0.7,
+    fontSize: 16,
+    opacity: 0.8,
     marginBottom: 2,
   },
   loadingContainer: {

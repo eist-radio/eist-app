@@ -3,7 +3,9 @@ import { faSoundcloud } from '@fortawesome/free-brands-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
 import React, { useState } from 'react'
-import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { Alert, Dimensions, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+
+const { width: screenWidth } = Dimensions.get('window');
 
 export default function SoundCloudScreen() {
   const { colors } = useTheme()
@@ -41,12 +43,19 @@ export default function SoundCloudScreen() {
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.header}>
-          <FontAwesomeIcon
-            icon={faSoundcloud}
-            size={160}
-            color={colors.primary}
+        <View style={styles.imageContainer}>
+          <Image
+            source={require('../../assets/images/schedule.png')}
+            style={[styles.fullWidthImage, { opacity: 0.3 }]}
+            resizeMode="cover"
           />
+          <View style={styles.logoContainer}>
+            <FontAwesomeIcon
+              icon={faSoundcloud}
+              size={160}
+              color={colors.primary}
+            />
+          </View>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -77,13 +86,30 @@ const styles = StyleSheet.create({
   },
   content: {
     flexGrow: 1,
-    padding: 24,
-    justifyContent: 'space-between',
   },
-  header: {
+  imageContainer: {
+    width: screenWidth,
+    height: screenWidth,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  fullWidthImage: {
+    width: '100%',
+    height: '100%',
+    transform: [
+      { scale: 2 },
+      { translateX: 90 },
+      { translateY: -90 }
+    ],
+  },
+  logoContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
-    marginBottom: 32,
-    marginTop: 106,
+    justifyContent: 'center',
   },
   icon: {
     marginBottom: 16,
@@ -124,8 +150,8 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    flex: 1,
+    justifyContent: 'center',
+    height: screenWidth,
   },
   openButton: {
     flexDirection: 'row',
