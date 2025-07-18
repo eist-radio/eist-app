@@ -383,7 +383,7 @@ export default function ScheduleScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
   },
   title: {
     fontSize: 28,
