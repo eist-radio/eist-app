@@ -11,17 +11,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  Linking,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    Linking,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { apiKey } from '../../../config';
@@ -423,7 +423,7 @@ export default function ShowScreen() {
               <View style={styles.logoBackground}>
                 <Image
                   source={logoImage}
-                  style={{ width: 74, height: 74 }}
+                  style={{ width: 81.4, height: 81.4 }}
                   resizeMode="contain"
                 />
               </View>

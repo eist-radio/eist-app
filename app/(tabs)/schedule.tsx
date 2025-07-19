@@ -13,6 +13,7 @@ import {
   RefreshControl,
   SectionList,
   StyleSheet,
+  TouchableOpacity,
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,6 +53,48 @@ type SectionData = {
   }[];
 };
 
+const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
+  const animatedValue = React.useRef(new Animated.Value(0)).current
+  
+  React.useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start()
+  }, [visible, animatedValue])
+  
+  return (
+    <Animated.View
+      style={[
+        styles.backToTopButton,
+        { 
+          opacity: animatedValue,
+          transform: [{
+            scale: animatedValue.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.8, 1],
+            })
+          }]
+        }
+      ]}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.8}
+        style={styles.backToTopTouchable}
+      >
+        <Ionicons 
+          name="chevron-up" 
+          size={32} 
+          color="#AFFC41" 
+          style={styles.chevronIcon}
+        />
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
+
 export default function ScheduleScreen() {
   const { colors } = useTheme();
   const { isPlaying } = useTrackPlayer();
@@ -63,8 +106,10 @@ export default function ScheduleScreen() {
   const [error, setError] = useState<string>();
   const [currentShowId, setCurrentShowId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const sectionListRef = useRef<SectionList>(null);
 
   function fmt(d: Date, suffix: string) {
     return d.toISOString().split('T')[0] + 'T' + suffix;
@@ -98,6 +143,20 @@ export default function ScheduleScreen() {
       setIsRefreshing(false);
     }
   }, [fetchScheduleData]);
+
+  const handleScroll = (event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y;
+    // Show back button when scrolled past 100px (adjust as needed)
+    setShowBackToTop(scrollY > 100);
+  };
+
+  const scrollToTop = () => {
+    sectionListRef.current?.scrollToLocation({ 
+      sectionIndex: 0, 
+      itemIndex: 0, 
+      animated: true 
+    });
+  };
 
   useEffect(() => {
     (async () => {
@@ -296,9 +355,12 @@ export default function ScheduleScreen() {
         </View>
 
         <SectionList
+          ref={sectionListRef}
           sections={sections}
           keyExtractor={(item, idx) => item.id + idx}
           stickySectionHeadersEnabled={false}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -375,6 +437,10 @@ export default function ScheduleScreen() {
           }}
           contentContainerStyle={styles.list}
         />
+        <BackToTopButton
+          onPress={scrollToTop}
+          visible={showBackToTop}
+        />
       </View>
     </SwipeNavigator>
   );
@@ -438,6 +504,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
   },
-
+  backToTopButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: '45%',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backToTopTouchable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chevronIcon: {
+    // No specific style needed, icon handles its own color
+  },
 
 });

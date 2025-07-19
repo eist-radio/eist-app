@@ -7,21 +7,22 @@ import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useTheme } from '@react-navigation/native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-    ActivityIndicator,
-    AppState,
-    Dimensions,
-    Image,
-    Linking,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  AppState,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native'
+import TrackPlayer, { Event } from 'react-native-track-player'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
@@ -61,7 +62,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   nowPlayingContainer: { flex: 1, width: '100%' },
-  nowPlayingContent: { paddingHorizontal: 16 },
+  nowPlayingContent: { paddingHorizontal: 8 },
   nextRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -86,7 +87,6 @@ export default function ListenScreen() {
   const {
     isPlaying,
     togglePlayStop,
-    isPlayerReady,
     setupPlayer,
     updateMetadata,
   } = useTrackPlayer()
@@ -109,6 +109,8 @@ export default function ListenScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [imageReady, setImageReady] = useState(false)
   const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
+  const [isCarConnected, setIsCarConnected] = useState(false)
+  const carRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   const formatTime = (isoString: string): string => {
     const date = new Date(isoString)
@@ -225,7 +227,6 @@ export default function ListenScreen() {
   }, [])
 
   const fetchLiveScheduleOnly = useCallback(async () => {
-    if (!isPlayerReady) return
 
     try {
       const res = await fetch(`${apiUrl}/schedule/live`, {
@@ -326,10 +327,9 @@ export default function ListenScreen() {
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [isPlayerReady, artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, currentTimezone])
+  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, currentTimezone])
 
   const fetchNowPlayingWithArtist = useCallback(async () => {
-    if (!isPlayerReady) return
 
     // Set loading state when starting to fetch new content
     setIsContentLoading(true)
@@ -422,11 +422,95 @@ export default function ListenScreen() {
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [isPlayerReady, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, currentTimezone])
+  }, [getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, currentTimezone])
+
+  // Function to calculate time until next 1 minute past the hour
+  const getTimeUntilNextRefresh = () => {
+    const now = new Date()
+    const nextRefresh = new Date(now)
+    nextRefresh.setMinutes(1, 0, 0) // Set to 1 minute past the hour
+    nextRefresh.setSeconds(0, 0)
+    
+    // If we're already past 1 minute, move to next hour
+    if (now.getMinutes() >= 1) {
+      nextRefresh.setHours(nextRefresh.getHours() + 1)
+    }
+    
+    return nextRefresh.getTime() - now.getTime()
+  }
+
+  // Function to refresh metadata at exactly 1 minute past the hour
+  const scheduleCarRefresh = useCallback(() => {
+    if (!isCarConnected || !isPlaying) return
+
+    // Clear existing interval
+    if (carRefreshIntervalRef.current) {
+      clearTimeout(carRefreshIntervalRef.current)
+    }
+
+    const timeUntilRefresh = getTimeUntilNextRefresh()
+    
+    carRefreshIntervalRef.current = setTimeout(() => {
+      // Refresh metadata
+      fetchLiveScheduleOnly()
+      
+      // Schedule next refresh (every hour)
+      carRefreshIntervalRef.current = setInterval(() => {
+        if (isCarConnected && isPlaying) {
+          fetchLiveScheduleOnly()
+        }
+      }, 60 * 60 * 1000) // 1 hour
+    }, timeUntilRefresh)
+  }, [isCarConnected, isPlaying, fetchLiveScheduleOnly])
+
+  // Car connectivity detection
+  useEffect(() => {
+    let remotePlayListener: any
+    let remoteStopListener: any
+    let remotePauseListener: any
+
+    const setupCarDetection = async () => {
+      try {
+        // Listen for remote events which indicate car connectivity
+        remotePlayListener = TrackPlayer.addEventListener(Event.RemotePlay, () => {
+          setIsCarConnected(true)
+        })
+
+        remoteStopListener = TrackPlayer.addEventListener(Event.RemoteStop, () => {
+          setIsCarConnected(true)
+        })
+
+        remotePauseListener = TrackPlayer.addEventListener(Event.RemotePause, () => {
+          setIsCarConnected(true)
+        })
+      } catch (error) {
+        console.log('Car detection setup error:', error)
+      }
+    }
+
+    setupCarDetection()
+
+    return () => {
+      if (remotePlayListener) remotePlayListener.remove()
+      if (remoteStopListener) remoteStopListener.remove()
+      if (remotePauseListener) remotePauseListener.remove()
+    }
+  }, [])
+
+  // Schedule car refresh when car connectivity or playing state changes
+  useEffect(() => {
+    scheduleCarRefresh()
+    
+    return () => {
+      if (carRefreshIntervalRef.current) {
+        clearTimeout(carRefreshIntervalRef.current)
+        carRefreshIntervalRef.current = null
+      }
+    }
+  }, [scheduleCarRefresh])
 
   useFocusEffect(
     useCallback(() => {
-      if (!isPlayerReady) return
       // Initial load with full artist details
       fetchNowPlayingWithArtist()
       // Only poll when playing - use lightweight function
@@ -434,11 +518,13 @@ export default function ListenScreen() {
         const interval = setInterval(fetchLiveScheduleOnly, 60000) // Reduced from 30s to 60s
         return () => clearInterval(interval)
       }
-    }, [isPlayerReady, fetchNowPlayingWithArtist, fetchLiveScheduleOnly, isPlaying])
+    }, [fetchNowPlayingWithArtist, fetchLiveScheduleOnly, isPlaying])
   )
 
   useEffect(() => {
-    setupPlayer()
+    setupPlayer().catch(error => {
+      console.error('Failed to setup player:', error)
+    })
   }, [setupPlayer])
 
   // Refresh now playing info whenever the app returns to the foreground
@@ -492,17 +578,13 @@ export default function ListenScreen() {
     <SwipeNavigator>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <View style={[styles.imageContainer, { height: width }]}>
-          {imageReady ? (
-            <Image
-              key={`${artistId}-${remoteImageUrl || 'fallback'}`}
-              source={getImageSource()}
-              style={styles.fullWidthImage}
-              resizeMode="cover"
-              onError={handleImageError}
-            />
-          ) : (
-            <View style={[styles.fullWidthImage, { backgroundColor: colors.card }]} />
-          )}
+          <Image
+            key={`${artistId}-${remoteImageUrl || 'fallback'}`}
+            source={getImageSource()}
+            style={styles.fullWidthImage}
+            resizeMode="cover"
+            onError={handleImageError}
+          />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.2)']}
             start={{ x: 0.5, y: 0 }}
@@ -523,7 +605,7 @@ export default function ListenScreen() {
             <View style={styles.logoBackground}>
               <Image
                 source={logoImage}
-                style={{ width: 74, height: 74 }}
+                style={{ width: 81.4, height: 81.4 }}
                 resizeMode="contain"
               />
             </View>
