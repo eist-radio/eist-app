@@ -63,15 +63,18 @@ const playbackService = async () => {
   // Handle CarPlay connection and autoplay
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
     try {
-      // Check if we should autoplay based on last played state
+      // Only autoplay if we have a clear indication of car connectivity
+      // and the user was previously playing within 24 hours
       const shouldAutoPlay = await shouldAutoPlayOnCarPlay()
       
-      // For CarPlay compatibility, ensure we're starting from a clean state
-      const state = await TrackPlayer.getState();
-      if (state !== 'playing') {
-        await TrackPlayer.play();
-        // Store that we're now playing
-        await storeLastPlayedState(true)
+      if (shouldAutoPlay) {
+        // For CarPlay compatibility, ensure we're starting from a clean state
+        const state = await TrackPlayer.getState();
+        if (state !== 'playing') {
+          await TrackPlayer.play();
+          // Store that we're now playing
+          await storeLastPlayedState(true)
+        }
       }
     } catch (error) {
       console.error('Error in remote play:', error);
@@ -107,28 +110,8 @@ const playbackService = async () => {
 
   // Handle playback state changes for CarPlay and audio session recovery
   TrackPlayer.addEventListener(Event.PlaybackState, async ({ state }) => {
-    // If playback becomes ready, check for various recovery scenarios
-    if (state === 'ready') {
-      try {
-        const shouldAutoPlay = await shouldAutoPlayOnCarPlay()
-        if (shouldAutoPlay) {
-          // Small delay to ensure CarPlay is fully connected
-          setTimeout(async () => {
-            try {
-              const currentState = await TrackPlayer.getState()
-              if (currentState === 'ready') {
-                await TrackPlayer.play()
-                await storeLastPlayedState(true)
-              }
-            } catch (error) {
-              console.error('Error during CarPlay autoplay:', error)
-            }
-          }, 1000)
-        }
-      } catch (error) {
-        console.error('Error checking CarPlay autoplay:', error)
-      }
-    }
+    // Remove the automatic autoplay on ready state - this was causing the issue
+    // The app should only autoplay when there's explicit user interaction or car connectivity
   });
 
   // Handle playback errors and audio session interruptions - always stop on interruption
