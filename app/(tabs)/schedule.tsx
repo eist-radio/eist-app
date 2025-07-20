@@ -1,5 +1,6 @@
 // app/(tabs)/schedule.tsx
 
+import { FormattedShowTitle } from '@/components/FormattedShowTitle';
 import { SelectableThemedText } from '@/components/SelectableThemedText';
 import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { Ionicons } from '@expo/vector-icons';
@@ -425,18 +426,19 @@ export default function ScheduleScreen() {
                           style={styles.playIcon}
                         />
                       )}
-                      <SelectableThemedText
+                      <FormattedShowTitle
+                        title={item.title}
+                        color={colors.primary}
+                        size={18}
+                        inline={true}
                         style={[
                           styles.cellText,
                           {
-                            color: colors.primary,
                             fontWeight: isCurrent ? '700' : '600',
                             fontStyle: isCurrent ? 'italic' : 'normal',
                           },
                         ]}
-                      >
-                        {item.title}
-                      </SelectableThemedText>
+                      />
                     </View>
                   </Link>
                 </View>

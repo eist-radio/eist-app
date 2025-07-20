@@ -164,35 +164,41 @@ export const TrackPlayerProvider = ({
   }, [setupPlayer])
 
   const stop = useCallback(async () => {
+    console.log('Stop function called, isBusy:', isBusy, 'isOperationInProgress:', isOperationInProgress.current)
+    
     if (isBusy || isOperationInProgress.current) {
+      console.log('Stop blocked - operation in progress')
       return
     }
     
     isOperationInProgress.current = true
     setIsBusy(true)
     try {
-      // Stop playback but keep the track in queue to maintain notification
-      await TrackPlayer.stop()
+      // Clear any pending stalled timeout to prevent interference
+      if (stalledTimeoutRef.current) {
+        clearTimeout(stalledTimeoutRef.current)
+        stalledTimeoutRef.current = null
+        console.log('Cleared stalled timeout')
+      }
       
-      // Re-add the track to keep notification visible in stopped state
-      await TrackPlayer.add({
-        id: 'radio-stream',
-        url: STREAM_URL,
-        title: 'éist',
-        artist: '',
-        isLiveStream: true,
-        duration: 0,
-      })
+      console.log('Calling TrackPlayer.stop()...')
+      // Stop playback completely
+      await TrackPlayer.stop()
+      console.log('TrackPlayer.stop() completed successfully')
+      
+      // Don't re-add the track immediately - this was causing the audio to restart
+      // The track will be added when play() is called again
       
       console.log('Stop command successful')
     } catch (error) {
       console.error('Stop error:', error)
     } finally {
+      console.log('Setting isPlaying to false and clearing busy state')
       setIsPlaying(false)
       setIsBusy(false)
       isOperationInProgress.current = false
     }
-  }, [])
+  }, [isBusy])
 
   const togglePlayStop = useCallback(async () => {
     if (isBusy) return
@@ -221,19 +227,28 @@ export const TrackPlayerProvider = ({
     const s = TrackPlayer.addEventListener(
       Event.PlaybackState,
       ({ state }) => {
+        console.log('PlaybackState changed to:', state)
         setIsPlaying(state === State.Playing)
         setIsBusy(state === State.Buffering)
       }
     )
-    const e = TrackPlayer.addEventListener(Event.PlaybackError, () => {
-      reconnectAttempt.current = 0
-      attemptReconnection()
+    const e = TrackPlayer.addEventListener(Event.PlaybackError, (error) => {
+      console.log('PlaybackError event:', error)
+      // Only attempt reconnection if we're supposed to be playing
+      // Don't interfere with intentional stops
+      if (isPlaying && !isOperationInProgress.current) {
+        console.log('Attempting reconnection due to playback error')
+        reconnectAttempt.current = 0
+        attemptReconnection()
+      } else {
+        console.log('Skipping reconnection - not playing or operation in progress')
+      }
     })
     return () => {
       s.remove()
       e.remove()
     }
-  }, [attemptReconnection])
+  }, [attemptReconnection, isPlaying])
 
   useEffect(() => {
     const d = TrackPlayer.addEventListener(
