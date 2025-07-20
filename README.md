@@ -2,7 +2,7 @@
 
 A React Native/Expo app for listening to <https://eist.radio/>.
 
-Get [Éist on the App Store](https://apps.apple.com/ie/app/%C3%A9ist/id6746519137).
+Get [éist on the App Store](https://apps.apple.com/ie/app/%C3%A9ist/id6746519137).
 
 ## Development
 
