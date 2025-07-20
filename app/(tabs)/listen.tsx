@@ -24,6 +24,7 @@ import {
   View
 } from 'react-native'
 import TrackPlayer, { Event } from 'react-native-track-player'
+import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
@@ -745,7 +746,12 @@ export default function ListenScreen() {
                 />
                 <Text style={[styles.nextUp, { color: colors.text }]}>
                   <Text style={{ fontWeight: '400' }}>Next up: </Text>
-                  <Text style={{ fontWeight: '700' }}>{nextShowTitle}</Text>
+                  <FormattedShowTitle
+                    title={nextShowTitle}
+                    color={colors.text}
+                    size={20}
+                    style={{ fontWeight: '700' }}
+                  />
                   <Text style={{ fontWeight: '400' }}> at {nextShowTime}</Text>
                 </Text>
               </TouchableOpacity>
@@ -756,20 +762,20 @@ export default function ListenScreen() {
                 onPress={() => router.push(`/show/${currentShowId}`)}
                 activeOpacity={0.7}
               >
-                <ThemedText
-                  type="subtitle"
-                  style={[styles.showTitle, { color: colors.primary }]}
-                >
-                  {showTitle}
-                </ThemedText>
+                <FormattedShowTitle
+                  title={showTitle}
+                  color={colors.primary}
+                  size={24}
+                  style={styles.showTitle}
+                />
               </TouchableOpacity>
             ) : (
-              <ThemedText
-                type="subtitle"
-                style={[styles.showTitle, { color: colors.text }]}
-              >
-                {showTitle}
-              </ThemedText>
+              <FormattedShowTitle
+                title={showTitle}
+                color={colors.text}
+                size={24}
+                style={styles.showTitle}
+              />
             )}
             <SelectableText
               text={showDescription}

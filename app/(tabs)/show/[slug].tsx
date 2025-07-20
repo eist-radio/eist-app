@@ -25,6 +25,7 @@ import {
   View
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
+import { FormattedShowTitle } from '../../../components/FormattedShowTitle';
 import { apiKey } from '../../../config';
 import { useTimezoneChange } from '../../../hooks/useTimezoneChange';
 import { stripFormatting } from '../../../utils/stripFormatting';
@@ -505,16 +506,12 @@ export default function ShowScreen() {
               styles.titleRow, 
               hideShareButton && { justifyContent: 'flex-start' }
             ]}>
-              <ThemedText
-                type="subtitle"
-                style={[
-                  styles.header, 
-                  { color: colors.primary },
-                  hideShareButton && { flex: 1 }
-                ]}
-              >
-                {event.title}
-              </ThemedText>
+              <FormattedShowTitle
+                title={event.title}
+                color={colors.primary}
+                size={28}
+                style={styles.header}
+              />
               {!hideShareButton && (
                 <TouchableOpacity 
                   onPress={shareShow} 
@@ -694,6 +691,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
+    width: '100%',
   },
 
   shareableText: {
