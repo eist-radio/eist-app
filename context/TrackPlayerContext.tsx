@@ -92,7 +92,7 @@ export const TrackPlayerProvider = ({
       stoppingAppPausesPlayback: true,
       android: {
         appKilledPlaybackBehavior:
-          AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
+          AppKilledPlaybackBehavior.PausePlayback,
         alwaysPauseOnInterruption: true,
       },
 
@@ -171,7 +171,19 @@ export const TrackPlayerProvider = ({
     isOperationInProgress.current = true
     setIsBusy(true)
     try {
+      // Stop playback but keep the track in queue to maintain notification
       await TrackPlayer.stop()
+      
+      // Re-add the track to keep notification visible in stopped state
+      await TrackPlayer.add({
+        id: 'radio-stream',
+        url: STREAM_URL,
+        title: 'éist',
+        artist: '',
+        isLiveStream: true,
+        duration: 0,
+      })
+      
       console.log('Stop command successful')
     } catch (error) {
       console.error('Stop error:', error)
@@ -209,7 +221,6 @@ export const TrackPlayerProvider = ({
     const s = TrackPlayer.addEventListener(
       Event.PlaybackState,
       ({ state }) => {
-        console.log('PlaybackState event:', state, 'Setting isPlaying to:', state === State.Playing)
         setIsPlaying(state === State.Playing)
         setIsBusy(state === State.Buffering)
       }
