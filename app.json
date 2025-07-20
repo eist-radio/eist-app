@@ -2,7 +2,7 @@
   "expo": {
     "name": "éist",
     "slug": "eist-app",
-    "version": "2.4.1",
+    "version": "2.4.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "eistapp",

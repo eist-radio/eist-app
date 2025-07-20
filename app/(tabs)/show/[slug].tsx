@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Dimensions,
   Image,
   Linking,
@@ -27,6 +28,48 @@ import { captureRef } from 'react-native-view-shot';
 import { apiKey } from '../../../config';
 import { useTimezoneChange } from '../../../hooks/useTimezoneChange';
 import { stripFormatting } from '../../../utils/stripFormatting';
+
+const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
+  const animatedValue = React.useRef(new Animated.Value(0)).current
+  
+  React.useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start()
+  }, [visible, animatedValue])
+  
+  return (
+    <Animated.View
+      style={[
+        styles.backToTopButton,
+        { 
+          opacity: animatedValue,
+          transform: [{
+            scale: animatedValue.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.8, 1],
+            })
+          }]
+        }
+      ]}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.8}
+        style={styles.backToTopTouchable}
+      >
+        <Ionicons 
+          name="chevron-up" 
+          size={32} 
+          color="#AFFC41" 
+          style={styles.chevronIcon}
+        />
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
 
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
@@ -157,6 +200,9 @@ export default function ShowScreen() {
   const [preloadedImageUrl, setPreloadedImageUrl] = useState<string | null>(null);
   const [imageReady, setImageReady] = useState(false);
   const [hideShareButton, setHideShareButton] = useState(false);
+  const [showBackToTop, setShowBackToTop] = useState(false);
+  const [isScrollable, setIsScrollable] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Preload image function (same as listen page)
   const preloadImage = useCallback((uri: string): Promise<boolean> => {
@@ -382,12 +428,31 @@ export default function ShowScreen() {
     }
   };
 
+  const handleScroll = (event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y
+    const contentHeight = event.nativeEvent.contentSize.height
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height
+    
+    // Check if content is scrollable
+    const scrollable = contentHeight > layoutHeight
+    setIsScrollable(scrollable)
+    
+    // Show back button when scrolled past 100px AND content is scrollable
+    setShowBackToTop(scrollable && scrollY > 100)
+  }
+
+  const scrollToTop = () => {
+    shareViewRef.current?.scrollTo({ y: 0, animated: true })
+  }
+
   return (
     <SwipeNavigator>
       <ScrollView
         ref={shareViewRef}
         style={[styles.screen, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.content}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         <View 
           ref={shareContentRef} 
@@ -516,6 +581,10 @@ export default function ShowScreen() {
           </View>
         </View>
       </ScrollView>
+              <BackToTopButton
+          onPress={scrollToTop}
+          visible={showBackToTop && isScrollable}
+        />
     </SwipeNavigator>
   );
 }
@@ -662,5 +731,23 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
+  backToTopButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: '45%',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backToTopTouchable: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chevronIcon: {
+    // No specific styling needed, icon will be centered
+  },
 
 });
