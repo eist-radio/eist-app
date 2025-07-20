@@ -11,17 +11,17 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    Linking,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { apiKey } from '../../../config';
@@ -156,6 +156,7 @@ export default function ShowScreen() {
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [preloadedImageUrl, setPreloadedImageUrl] = useState<string | null>(null);
   const [imageReady, setImageReady] = useState(false);
+  const [hideShareButton, setHideShareButton] = useState(false);
 
   // Preload image function (same as listen page)
   const preloadImage = useCallback((uri: string): Promise<boolean> => {
@@ -328,6 +329,8 @@ export default function ShowScreen() {
     }
     
     setIsSharing(true);
+    setHideShareButton(true); // Hide share button before screenshot
+    
     try {
       // Longer delay to ensure logo renders and view is fully updated
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -375,6 +378,7 @@ export default function ShowScreen() {
       );
     } finally {
       setIsSharing(false);
+      setHideShareButton(false); // Show share button again after screenshot
     }
   };
 
@@ -432,27 +436,36 @@ export default function ShowScreen() {
 
           {/* All content - inside shareable content */}
           <View style={styles.shareableTitle}>
-            <View style={styles.titleRow}>
+            <View style={[
+              styles.titleRow, 
+              hideShareButton && { justifyContent: 'flex-start' }
+            ]}>
               <ThemedText
                 type="subtitle"
-                style={[styles.header, { color: colors.primary }]}
+                style={[
+                  styles.header, 
+                  { color: colors.primary },
+                  hideShareButton && { flex: 1 }
+                ]}
               >
                 {event.title}
               </ThemedText>
-              <TouchableOpacity 
-                onPress={shareShow} 
-                style={styles.shareButtonInline}
-                disabled={isSharing}
-                accessibilityLabel="Share show"
-                accessibilityHint="Share this show information as an image"
-                accessibilityRole="button"
-              >
-                {isSharing ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Ionicons name="share-outline" size={28} color={colors.primary} />
-                )}
-              </TouchableOpacity>
+              {!hideShareButton && (
+                <TouchableOpacity 
+                  onPress={shareShow} 
+                  style={styles.shareButtonInline}
+                  disabled={isSharing}
+                  accessibilityLabel="Share show"
+                  accessibilityHint="Share this show information as an image"
+                  accessibilityRole="button"
+                >
+                  {isSharing ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="share-outline" size={28} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
