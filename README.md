@@ -2,6 +2,8 @@
 
 A React Native/Expo app for listening to <https://eist.radio/>.
 
+[Éist on the App Store](https://apps.apple.com/ie/app/%C3%A9ist/id6746519137)
+
 ## Development
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
