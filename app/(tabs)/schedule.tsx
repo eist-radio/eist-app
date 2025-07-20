@@ -107,6 +107,7 @@ export default function ScheduleScreen() {
   const [currentShowId, setCurrentShowId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [isScrollable, setIsScrollable] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const sectionListRef = useRef<SectionList>(null);
@@ -146,8 +147,15 @@ export default function ScheduleScreen() {
 
   const handleScroll = (event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y;
-    // Show back button when scrolled past 100px (adjust as needed)
-    setShowBackToTop(scrollY > 100);
+    const contentHeight = event.nativeEvent.contentSize.height;
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height;
+    
+    // Check if content is scrollable
+    const scrollable = contentHeight > layoutHeight;
+    setIsScrollable(scrollable);
+    
+    // Show back button when scrolled past 100px AND content is scrollable
+    setShowBackToTop(scrollable && scrollY > 100);
   };
 
   const scrollToTop = () => {
@@ -439,7 +447,7 @@ export default function ScheduleScreen() {
         />
         <BackToTopButton
           onPress={scrollToTop}
-          visible={showBackToTop}
+          visible={showBackToTop && isScrollable}
         />
       </View>
     </SwipeNavigator>

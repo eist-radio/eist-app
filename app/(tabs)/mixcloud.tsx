@@ -122,6 +122,7 @@ export default function MixcloudScreen() {
   
   // Scroll state management
   const [showBackToTop, setShowBackToTop] = useState(false)
+  const [isScrollable, setIsScrollable] = useState(false)
   const flatListRef = useRef<FlatList>(null)
 
   const openShow = async (show: MixcloudShow) => {
@@ -153,8 +154,15 @@ export default function MixcloudScreen() {
 
   const handleScroll = (event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y
-    // Show back button when scrolled past 100px (adjust as needed)
-    setShowBackToTop(scrollY > 100)
+    const contentHeight = event.nativeEvent.contentSize.height
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height
+    
+    // Check if content is scrollable
+    const scrollable = contentHeight > layoutHeight
+    setIsScrollable(scrollable)
+    
+    // Show back button when scrolled past 100px AND content is scrollable
+    setShowBackToTop(scrollable && scrollY > 100)
   }
 
   const scrollToTop = () => {
@@ -219,7 +227,7 @@ export default function MixcloudScreen() {
           )}
         </View>
         
-        <BackToTopButton onPress={scrollToTop} visible={showBackToTop} />
+        <BackToTopButton onPress={scrollToTop} visible={showBackToTop && isScrollable} />
       </View>
     </SwipeNavigator>
   )

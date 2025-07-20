@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Animated,
   AppState,
   Dimensions,
   Image,
@@ -26,6 +27,48 @@ import TrackPlayer, { Event } from 'react-native-track-player'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
+
+const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
+  const animatedValue = React.useRef(new Animated.Value(0)).current
+  
+  React.useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start()
+  }, [visible, animatedValue])
+  
+  return (
+    <Animated.View
+      style={[
+        styles.backToTopButton,
+        { 
+          opacity: animatedValue,
+          transform: [{
+            scale: animatedValue.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.8, 1],
+            })
+          }]
+        }
+      ]}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.8}
+        style={styles.backToTopTouchable}
+      >
+        <Ionicons 
+          name="chevron-up" 
+          size={32} 
+          color="#AFFC41" 
+          style={styles.chevronIcon}
+        />
+      </TouchableOpacity>
+    </Animated.View>
+  )
+}
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
@@ -73,6 +116,24 @@ const styles = StyleSheet.create({
   nextUp: { fontSize: 20, fontWeight: '500', flex: 1, flexWrap: 'wrap' },
   showTitle: { fontSize: 24, fontWeight: '500', marginHorizontal: 2, marginVertical: 2 },
   showDescription: { fontSize: 18, lineHeight: 22, marginHorizontal: 2, marginVertical: 2 },
+  backToTopButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: '45%',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backToTopTouchable: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chevronIcon: {
+    // No specific style needed, icon will handle its own size and color
+  },
 })
 
 const placeholderArtistImage = require('../../assets/images/eist_online.png')
@@ -111,6 +172,9 @@ export default function ListenScreen() {
   const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
   const [isCarConnected, setIsCarConnected] = useState(false)
   const carRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [showBackToTop, setShowBackToTop] = useState(false)
+  const [isScrollable, setIsScrollable] = useState(false)
+  const scrollViewRef = useRef<ScrollView>(null)
 
   const formatTime = (isoString: string): string => {
     const date = new Date(isoString)
@@ -574,6 +638,23 @@ export default function ListenScreen() {
     }
   }, [fetchNowPlayingWithArtist])
 
+  const handleScroll = (event: any) => {
+    const scrollY = event.nativeEvent.contentOffset.y
+    const contentHeight = event.nativeEvent.contentSize.height
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height
+    
+    // Check if content is scrollable
+    const scrollable = contentHeight > layoutHeight
+    setIsScrollable(scrollable)
+    
+    // Show back button when scrolled past 100px AND content is scrollable
+    setShowBackToTop(scrollable && scrollY > 100)
+  }
+
+  const scrollToTop = () => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: true })
+  }
+
   return (
     <SwipeNavigator>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -635,8 +716,11 @@ export default function ListenScreen() {
           </View>
 
           <ScrollView
+            ref={scrollViewRef}
             style={styles.nowPlayingContainer}
             contentContainerStyle={styles.nowPlayingContent}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
             refreshControl={
               <RefreshControl
                 refreshing={isRefreshing}
@@ -694,6 +778,10 @@ export default function ListenScreen() {
             />
           </ScrollView>
         </View>
+        <BackToTopButton
+          onPress={scrollToTop}
+          visible={showBackToTop && isScrollable}
+        />
       </View>
     </SwipeNavigator>
   )
