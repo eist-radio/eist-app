@@ -8,14 +8,14 @@ import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  AppState,
-  RefreshControl,
-  SectionList,
-  StyleSheet,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Animated,
+    AppState,
+    RefreshControl,
+    SectionList,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiKey } from '../../config';
@@ -431,6 +431,7 @@ export default function ScheduleScreen() {
                         color={colors.primary}
                         size={18}
                         inline={true}
+                        noWrap={true}
                         style={[
                           styles.cellText,
                           {
