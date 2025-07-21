@@ -33,6 +33,10 @@ type TrackPlayerContextType = {
   ) => Promise<void>
   recoverAudioSession: () => Promise<void>
   forcePlayerReset: () => Promise<void>
+  // Expose current show metadata in context
+  showTitle: string;
+  showArtist: string;
+  showArtworkUrl: string | undefined;
 }
 
 const TrackPlayerContext = createContext<TrackPlayerContextType | undefined>(
@@ -57,6 +61,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayerReady, setIsPlayerReady] = useState(false)
   const [isBusy, setIsBusy] = useState(false)
+  // Store the latest show metadata in state
+  const [showTitle, setShowTitle] = useState<string>('éist');
+  const [showArtist, setShowArtist] = useState<string>('');
+  const [showArtworkUrl, setShowArtworkUrl] = useState<string | undefined>(undefined);
   const hasInitialized = useRef(false)
   const stateCheckInterval = useRef<NodeJS.Timeout | null>(null)
   const lastKnownState = useRef<State | null>(null)
@@ -219,7 +227,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await TrackPlayer.setupPlayer();
       await TrackPlayer.updateOptions({
         alwaysPauseOnInterruption: false,
-        stoppingAppPausesPlayback: true,
+        stoppingAppPausesPlayback: false,
         android: {
           appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
           alwaysPauseOnInterruption: false,
@@ -366,6 +374,28 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  // Fetch the latest show metadata from the radiocult API and update state/metadata
+  const fetchAndUpdateShowMetadata = async () => {
+    try {
+      // Example API endpoint for current show metadata
+      const response = await fetch('https://api.radiocult.fm/api/station/eist/schedule/live');
+      if (!response.ok) throw new Error('Failed to fetch show metadata');
+      const data = await response.json();
+      // Adjust these property names based on actual API response
+      const title = data?.title || 'éist';
+      const artist = data?.artist || '';
+      const artworkUrl = data?.artworkUrl || undefined;
+      setShowTitle(title);
+      setShowArtist(artist);
+      setShowArtworkUrl(artworkUrl);
+      await updateMetadata(title, artist, artworkUrl);
+    } catch (err) {
+      console.error('Failed to fetch or update show metadata:', err);
+      // Fallback to previous state/metadata
+      await updateMetadata(showTitle, showArtist, showArtworkUrl);
+    }
+  };
+
   const play = async () => {
     setIsBusy(true)
 
@@ -405,6 +435,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
+
+      // Fetch and update the latest show metadata after playback starts
+      await fetchAndUpdateShowMetadata();
 
       // Wait a short time, then check if actually playing
       setTimeout(async () => {
@@ -462,17 +495,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       console.log('Stopping live stream...')
-      // For live streaming, we need to be more aggressive about stopping
+      // Stop playback, don't reset
       await TrackPlayer.stop()
-      await TrackPlayer.reset() // Reset the player to clear the stream
-
-      // Verify the stream is actually stopped
-      const state = await TrackPlayer.getState()
-      console.log('Player state after stop:', state)
 
       setIsPlaying(false)
       await storeLastPlayedState(false)
-      console.log('Live stream stopped successfully')
     } catch (err) {
       console.error('Stop failed:', err)
       // Force stop even if there's an error
@@ -488,10 +515,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (isBusy) return
 
     if (isPlaying) {
-      console.log('User pressed stop - stopping live stream')
+      console.log('Stopping live stream')
       await stop()
     } else {
-      console.log('User pressed play - starting live stream')
+      console.log('Starting live stream')
       // If player is not ready, try to recover first
       if (!isPlayerReady) {
         console.log('Player not ready, attempting recovery before play')
@@ -551,7 +578,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       console.error('Metadata update failed:', err);
-      // Don't throw the error, just log it and continue
+      // Don't throw the error, just log and continue
     }
   }
 
@@ -690,6 +717,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         updateMetadata,
         recoverAudioSession: recoverFromAudioSessionConflict,
         forcePlayerReset: recoverFromAudioSessionConflict,
+        // Expose current show metadata in context
+        showTitle,
+        showArtist,
+        showArtworkUrl,
       }}
     >
       {children}
