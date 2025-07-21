@@ -405,6 +405,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
+
+      // Wait a short time, then check if actually playing
+      setTimeout(async () => {
+        const state = await TrackPlayer.getState();
+        if (state !== State.Playing) {
+          console.log('Player did not start, attempting recovery and replay');
+          await recoverFromAudioSessionConflict();
+          await play();
+        }
+      }, 1500);
       console.log('Live stream started successfully')
     } catch (err) {
       console.error('Play failed:', err)
