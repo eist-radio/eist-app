@@ -81,7 +81,7 @@ const playbackService = async () => {
     }
   });
 
-  // Handle remote stop events - always stop, never pause
+  // Handle remote stop events
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
     try {
       await TrackPlayer.stop();

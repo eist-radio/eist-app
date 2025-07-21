@@ -25,7 +25,7 @@ export type TrackPlayerContextType = {
   isBusy: boolean
   setupPlayer: () => Promise<void>
   play: () => Promise<void>
-  stop: () => Promise<void>
+  stop: () => Promise<void>         // still called "stop" in API, but now calls pause()
   togglePlayStop: () => Promise<void>
   updateMetadata: (
     title: string,
@@ -47,11 +47,11 @@ export const TrackPlayerProvider = ({
   const [isBusy, setIsBusy] = useState(false)
   const reconnectAttempt = useRef(0)
   const wasInterrupted = useRef(false)
-    const stalledTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const stalledTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isInitialized = useRef(false)
   const isOperationInProgress = useRef(false)
 
-  // Stalled stream detection
+  // Detect stalled stream
   useEffect(() => {
     if (!isPlaying) return
     
@@ -59,20 +59,15 @@ export const TrackPlayerProvider = ({
       try {
         const state = await TrackPlayer.getState()
         if (state === State.Buffering) {
-          // Start stalled timeout
           stalledTimeoutRef.current = setTimeout(() => {
-            console.log('Stream appears stalled, attempting reconnection...')
             attemptReconnection()
           }, STALLED_TIMEOUT)
-        } else {
-          // Clear timeout if not buffering
-          if (stalledTimeoutRef.current) {
-            clearTimeout(stalledTimeoutRef.current)
-            stalledTimeoutRef.current = null
-          }
+        } else if (stalledTimeoutRef.current) {
+          clearTimeout(stalledTimeoutRef.current)
+          stalledTimeoutRef.current = null
         }
-      } catch (error) {
-        console.error('Error checking stream state:', error)
+      } catch {
+        // ignore
       }
     }
 
@@ -91,14 +86,12 @@ export const TrackPlayerProvider = ({
       alwaysPauseOnInterruption: true,
       stoppingAppPausesPlayback: true,
       android: {
-        appKilledPlaybackBehavior:
-          AppKilledPlaybackBehavior.PausePlayback,
+        appKilledPlaybackBehavior: AppKilledPlaybackBehavior.PausePlayback,
         alwaysPauseOnInterruption: true,
       },
-
-      capabilities: [Capability.Play, Capability.Stop],
-      compactCapabilities: [Capability.Play, Capability.Stop],
-      notificationCapabilities: [Capability.Play, Capability.Stop],
+      capabilities: [Capability.Play, Capability.Pause],
+      compactCapabilities: [Capability.Play, Capability.Pause],
+      notificationCapabilities: [Capability.Play, Capability.Pause],
     })
     await TrackPlayer.add({
       id: 'radio-stream',
@@ -108,93 +101,66 @@ export const TrackPlayerProvider = ({
       isLiveStream: true,
       duration: 0,
     })
-
   }, [])
 
-  // Initialize TrackPlayer on mount
+  // Initialize on mount
   useEffect(() => {
-    const initPlayer = async () => {
+    const init = async () => {
       if (isInitialized.current) return
       try {
         await setupPlayer()
         isInitialized.current = true
-      } catch (error) {
-        console.error('Failed to initialize TrackPlayer on mount:', error)
+      } catch {
+        // ignore
       }
     }
-    
-    initPlayer()
+    init()
   }, [setupPlayer])
 
   const play = useCallback(async () => {
-    if (isBusy || isOperationInProgress.current) {
-      return
-    }
-    
+    if (isBusy || isOperationInProgress.current) return
     isOperationInProgress.current = true
     setIsBusy(true)
     try {
-      // Try to reset and setup, but handle initialization errors
-      try {
-        await TrackPlayer.reset()
-        await setupPlayer()
-      } catch (error) {
-        await TrackPlayer.add({
-          id: 'radio-stream',
-          url: STREAM_URL,
-          title: 'éist',
-          artist: '',
-          isLiveStream: true,
-          duration: 0,
-        })
-      }
+      // Reset the stream to get current live content
+      await TrackPlayer.reset()
       
-      // Always try to play - let TrackPlayer handle the state
+      // Add the track back to the queue
+      await TrackPlayer.add({
+        id: 'radio-stream',
+        url: STREAM_URL,
+        title: 'éist',
+        artist: '',
+        isLiveStream: true,
+        duration: 0,
+      })
+      
       await TrackPlayer.play()
-      console.log('Play command successful')
       setIsPlaying(true)
       reconnectAttempt.current = 0
-    } catch (error) {
-      console.error('Play error:', error)
+    } catch {
       setIsPlaying(false)
     } finally {
       setIsBusy(false)
       isOperationInProgress.current = false
     }
-  }, [setupPlayer])
+  }, [isBusy])
 
+  // stop() now pauses the stream
   const stop = useCallback(async () => {
-    console.log('Stop function called, isBusy:', isBusy, 'isOperationInProgress:', isOperationInProgress.current)
-    
-    if (isBusy || isOperationInProgress.current) {
-      console.log('Stop blocked - operation in progress')
-      return
-    }
-    
+    if (isBusy || isOperationInProgress.current) return
     isOperationInProgress.current = true
     setIsBusy(true)
     try {
-      // Clear any pending stalled timeout to prevent interference
       if (stalledTimeoutRef.current) {
         clearTimeout(stalledTimeoutRef.current)
         stalledTimeoutRef.current = null
-        console.log('Cleared stalled timeout')
       }
-      
-      console.log('Calling TrackPlayer.stop()...')
-      // Stop playback completely
-      await TrackPlayer.stop()
-      console.log('TrackPlayer.stop() completed successfully')
-      
-      // Don't re-add the track immediately - this was causing the audio to restart
-      // The track will be added when play() is called again
-      
-      console.log('Stop command successful')
-    } catch (error) {
-      console.error('Stop error:', error)
-    } finally {
-      console.log('Setting isPlaying to false and clearing busy state')
+      await TrackPlayer.pause()
       setIsPlaying(false)
+    } catch {
+      // ignore
+    } finally {
       setIsBusy(false)
       isOperationInProgress.current = false
     }
@@ -206,52 +172,45 @@ export const TrackPlayerProvider = ({
   }, [isBusy, isPlaying, play, stop])
 
   const attemptReconnection = useCallback(async () => {
-    if (reconnectAttempt.current >= MAX_RECONNECT_ATTEMPTS) {
-      return
-    }
-    
+    if (reconnectAttempt.current >= MAX_RECONNECT_ATTEMPTS) return
     reconnectAttempt.current++
     const delay = Math.min(10000, 1000 * 2 ** reconnectAttempt.current)
-
     setTimeout(async () => {
       try {
         await play()
         reconnectAttempt.current = 0
-      } catch (error) {
+      } catch {
         attemptReconnection()
       }
     }, delay)
   }, [play])
 
+  // Event listeners
   useEffect(() => {
-    const s = TrackPlayer.addEventListener(
+    const sub1 = TrackPlayer.addEventListener(
       Event.PlaybackState,
       ({ state }) => {
-        console.log('PlaybackState changed to:', state)
         setIsPlaying(state === State.Playing)
         setIsBusy(state === State.Buffering)
       }
     )
-    const e = TrackPlayer.addEventListener(Event.PlaybackError, (error) => {
-      console.log('PlaybackError event:', error)
-      // Only attempt reconnection if we're supposed to be playing
-      // Don't interfere with intentional stops
-      if (isPlaying && !isOperationInProgress.current) {
-        console.log('Attempting reconnection due to playback error')
-        reconnectAttempt.current = 0
-        attemptReconnection()
-      } else {
-        console.log('Skipping reconnection - not playing or operation in progress')
+    const sub2 = TrackPlayer.addEventListener(
+      Event.PlaybackError,
+      () => {
+        if (isPlaying && !isOperationInProgress.current) {
+          reconnectAttempt.current = 0
+          attemptReconnection()
+        }
       }
-    })
+    )
     return () => {
-      s.remove()
-      e.remove()
+      sub1.remove()
+      sub2.remove()
     }
-  }, [attemptReconnection, isPlaying])
+  }, [isPlaying, attemptReconnection])
 
   useEffect(() => {
-    const d = TrackPlayer.addEventListener(
+    const duck = TrackPlayer.addEventListener(
       Event.RemoteDuck,
       async ({ paused }) => {
         if (paused) {
@@ -263,7 +222,7 @@ export const TrackPlayerProvider = ({
         }
       }
     )
-    return () => d.remove()
+    return () => duck.remove()
   }, [isPlaying, play, stop])
 
   return (

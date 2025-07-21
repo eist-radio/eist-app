@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   nowPlayingContainer: { flex: 1, width: '100%' },
-  nowPlayingContent: { paddingHorizontal: 8 },
+  nowPlayingContent: { paddingHorizontal: 16 },
   nextRow: {
     flexDirection: 'row',
     alignItems: 'center',
