@@ -110,10 +110,9 @@ const styles = StyleSheet.create({
   nextRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 8,
     marginVertical: 4,
   },
-  nextIcon: { marginRight: 6 },
+  nextIcon: { marginRight: 6, alignSelf: 'flex-start' },
   nextUp: { fontSize: 20, fontWeight: '500', flex: 1, flexWrap: 'wrap' },
   showTitle: { fontSize: 24, fontWeight: '500', marginHorizontal: 2, marginVertical: 2 },
   showDescription: { fontSize: 18, lineHeight: 22, marginHorizontal: 2, marginVertical: 2 },
@@ -745,12 +744,13 @@ export default function ListenScreen() {
                   style={styles.nextIcon}
                 />
                 <Text style={[styles.nextUp, { color: colors.text }]}>
-                  <Text style={{ fontWeight: '400' }}>Next up: </Text>
+                  <Text style={{ fontWeight: '400' }}>Next: </Text>
                   <FormattedShowTitle
                     title={nextShowTitle}
                     color={colors.text}
                     size={20}
                     style={{ fontWeight: '700' }}
+                    asContent={true}
                   />
                   <Text style={{ fontWeight: '400' }}> at {nextShowTime}</Text>
                 </Text>
