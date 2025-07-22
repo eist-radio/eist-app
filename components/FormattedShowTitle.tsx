@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Text } from 'react-native';
 
 interface FormattedShowTitleProps {
   title: string;
@@ -10,6 +10,7 @@ interface FormattedShowTitleProps {
   inline?: boolean;
   numberOfLines?: number;
   noWrap?: boolean;
+  asContent?: boolean;
 }
 
 export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({ 
@@ -19,30 +20,44 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
   style,
   inline = false,
   numberOfLines,
-  noWrap = false
+  noWrap = false,
+  asContent = false
 }) => {
   // Platform-specific icon sizing adjustments for better alignment
   const iconSize = Platform.OS === 'ios' ? size * 0.9 : size;
   
   // Case 1: If title is exactly "éist arís", add repeat icon at the end
   if (title === 'éist arís') {
+    if (asContent) {
+      return (
+        <>
+          {title}{' '}
+          <Ionicons 
+            name="repeat" 
+            size={iconSize} 
+            color={color} 
+            style={{ 
+              // Platform-specific adjustments for better alignment
+              ...(Platform.OS === 'ios' && {
+                marginTop: -1,
+              }),
+              ...(Platform.OS === 'android' && {
+                marginTop: 0,
+              }),
+            }} 
+          />
+        </>
+      );
+    }
+    
     return (
-      <View style={{ 
-        flexDirection: 'row', 
-        alignItems: 'flex-end',
-        flexWrap: 'wrap',
-        flexShrink: noWrap ? 0 : 1
-      }}>
-        <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>
-          {title}
-        </Text>
+      <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>
+        {title}{' '}
         <Ionicons 
           name="repeat" 
           size={iconSize} 
           color={color} 
           style={{ 
-            marginLeft: 4,
-            flexShrink: 0,
             // Platform-specific adjustments for better alignment
             ...(Platform.OS === 'ios' && {
               marginTop: -1,
@@ -52,7 +67,7 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
             }),
           }} 
         />
-      </View>
+      </Text>
     );
   }
 
@@ -68,23 +83,40 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
   for (const pattern of patterns) {
     if (pattern.test(title)) {
       const parts = title.split(pattern);
-      return (
-        <View style={{ 
-          flexDirection: 'row', 
-          alignItems: 'flex-end',
-          flexWrap: 'wrap',
-          flexShrink: noWrap ? 0 : 1
-        }}>
-          <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>
+      
+      if (asContent) {
+        return (
+          <>
             {parts[0]}
-          </Text>
+            <Ionicons 
+              name="repeat" 
+              size={iconSize} 
+              color={color} 
+              style={{ 
+                marginHorizontal: 2,
+                // Platform-specific adjustments for better alignment
+                ...(Platform.OS === 'ios' && {
+                  marginTop: -1,
+                }),
+                ...(Platform.OS === 'android' && {
+                  marginTop: 0,
+                }),
+              }} 
+            />
+            {parts[1]}
+          </>
+        );
+      }
+      
+      return (
+        <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>
+          {parts[0]}
           <Ionicons 
             name="repeat" 
             size={iconSize} 
             color={color} 
             style={{ 
               marginHorizontal: 2,
-              flexShrink: 0,
               // Platform-specific adjustments for better alignment
               ...(Platform.OS === 'ios' && {
                 marginTop: -1,
@@ -94,14 +126,15 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
               }),
             }} 
           />
-          <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>
-            {parts[1]}
-          </Text>
-        </View>
+          {parts[1]}
+        </Text>
       );
     }
   }
 
   // Default case: return title as is
+  if (asContent) {
+    return <>{title}</>;
+  }
   return <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>{title}</Text>;
 }; 
