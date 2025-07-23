@@ -8,14 +8,14 @@ import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    AppState,
-    RefreshControl,
-    SectionList,
-    StyleSheet,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Animated,
+  AppState,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiKey } from '../../config';
@@ -138,7 +138,34 @@ export default function ScheduleScreen() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await fetchScheduleData();
+      // Refresh both schedule data and live show data
+      await Promise.all([
+        fetchScheduleData(),
+        (async () => {
+          try {
+            const res = await fetch(
+              `https://api.radiocult.fm/api/station/${STATION_ID}/schedule/live`,
+              {
+                headers: {
+                  'x-api-key': apiKey,
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+            if (!res.ok) throw new Error(`Live fetch error: ${res.statusText}`);
+            const json = await res.json();
+
+            const newId =
+              json?.result?.status === 'schedule'
+                ? json?.result?.content?.id
+                : null;
+
+            setCurrentShowId(newId || null);
+          } catch (err) {
+            console.warn('Live-show fetch error during refresh:', err);
+          }
+        })()
+      ]);
     } catch (error) {
       console.error('Refresh failed:', error);
     } finally {
@@ -202,11 +229,17 @@ export default function ScheduleScreen() {
         // Use a functional update to access the latest value
         setCurrentShowId((prevId) => {
           if (prevId !== newId) {
+            // Show changed - refresh schedule data and animate
             Animated.timing(fadeAnim, {
               toValue: 0,
               duration: 300,
               useNativeDriver: true,
             }).start(() => {
+              // Refresh schedule data when show changes
+              fetchScheduleData().catch(err => {
+                console.warn('Failed to refresh schedule on show change:', err);
+              });
+              
               Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 300,
@@ -252,7 +285,7 @@ export default function ScheduleScreen() {
       stopPolling();
       subscription.remove();
     };
-  }, [isPlaying, fadeAnim]);
+  }, [isPlaying, fadeAnim, fetchScheduleData]);
 
   async function fetchSchedule(startDate: string, endDate: string) {
     const url =
