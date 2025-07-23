@@ -33,7 +33,6 @@ type TrackPlayerContextType = {
   ) => Promise<void>
   recoverAudioSession: () => Promise<void>
   forcePlayerReset: () => Promise<void>
-  // Expose current show metadata in context
   showTitle: string;
   showArtist: string;
   showArtworkUrl: string | undefined;
@@ -42,15 +41,6 @@ type TrackPlayerContextType = {
 const TrackPlayerContext = createContext<TrackPlayerContextType | undefined>(
   undefined
 )
-
-const runImmediate = (fn: () => void) => {
-  if (typeof setImmediate === 'function') {
-    // @ts-ignore
-    setImmediate(fn)
-  } else {
-    setTimeout(fn, 0)
-  }
-}
 
 // Storage keys for remembering last played state
 const LAST_PLAYED_KEY = 'eist_last_played_timestamp'
@@ -61,24 +51,17 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayerReady, setIsPlayerReady] = useState(false)
   const [isBusy, setIsBusy] = useState(false)
+  
   // Store the latest show metadata in state
   const [showTitle, setShowTitle] = useState<string>('éist');
   const [showArtist, setShowArtist] = useState<string>('');
   const [showArtworkUrl, setShowArtworkUrl] = useState<string | undefined>(undefined);
+  
   const hasInitialized = useRef(false)
-  const stateCheckInterval = useRef<NodeJS.Timeout | null>(null)
-  const lastKnownState = useRef<State | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const isPlayingRef = useRef(isPlaying)
-  const wasPlayingBeforeCarConnection = useRef(false)
-  const isCarPlayConnected = useRef(false)
-  // New state to track if user was playing before app went to background
   const wasPlayingBeforeBackground = useRef(false)
-  // Track reconnection attempts to avoid infinite loops
-  const reconnectAttempts = useRef(0)
-  const maxReconnectAttempts = 7
-  const reconnectDelay = 2000 // 2 seconds
-
+  
   // Recovery guard to prevent infinite recovery loops
   const maxRecoveryAttempts = 3;
   const recoveryAttempts = useRef(0);
@@ -119,112 +102,96 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     return null
   }
 
-  const shouldAutoPlayOnCarPlay = async (): Promise<boolean> => {
-    const lastState = await getLastPlayedState()
-    if (!lastState) return false
-
-    // Check if the app was playing within the last 24 hours
-    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000)
-    return lastState.wasPlaying && lastState.timestamp > twentyFourHoursAgo
-  }
-
-  const syncPlayerState = async () => {
-    if (isWeb) return
-    try {
-      const currentState = await TrackPlayer.getState()
-      const playing = currentState === State.Playing
-      const stable =
-        currentState === State.Playing ||
-        currentState === State.Stopped ||
-        currentState === State.Paused ||
-        currentState === State.Ready
-
-      if (lastKnownState.current !== currentState) {
-        lastKnownState.current = currentState
-        setIsPlaying(playing)
-        if (stable) setIsBusy(false)
+  // Clean reset of the stream while preserving metadata display
+  const cleanResetPlayer = async () => {
+    if (isWeb) {
+      // Clean reset for web audio
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.src = ''
+        audioRef.current.load()
+        audioRef.current = null
       }
-    } catch {
-      setIsPlaying(false)
-      setIsBusy(false)
+      return
+    }
+
+    try {
+      console.log('Performing clean reset of stream...')
+      
+      // Stop current playback but don't reset queue yet
+      await TrackPlayer.stop().catch(() => {})
+      
+      // Get current queue to preserve metadata
+      const currentQueue = await TrackPlayer.getQueue().catch(() => [])
+      const currentTrack = currentQueue[0]
+      
+      // Reset queue to clear any buffered data
+      await TrackPlayer.reset().catch(() => {})
+      
+      // Small delay to ensure cleanup
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      // Re-add fresh stream track with preserved metadata if available
+      const trackToAdd = {
+        id: 'radio-stream-' + Date.now(), // Unique ID for fresh track
+        url: STREAM_URL,
+        title: currentTrack?.title || showTitle || 'éist',
+        artist: currentTrack?.artist || (showArtist ? `${showArtist} · éist` : 'éist'),
+        artwork: currentTrack?.artwork || (showArtworkUrl || require('../assets/images/eist-square.png')),
+        isLiveStream: true,
+        duration: 0,
+      }
+      
+      await TrackPlayer.add(trackToAdd)
+      
+      console.log('Clean reset completed with metadata preserved')
+    } catch (err) {
+      console.error('Clean reset failed:', err)
+      throw err
     }
   }
 
-  const startStateSync = () => {
-    if (isWeb || stateCheckInterval.current) return
-    // Only start state sync if we're actually playing and app is active
-    if (isPlayingRef.current && AppState.currentState === 'active') {
-      stateCheckInterval.current = setInterval(syncPlayerState, 10000) // Reduced from 2s to 10s
-    }
-  }
+  // Function to ensure track exists in queue for metadata display
+  const ensureTrackForDisplay = async () => {
+    if (isWeb) return
 
-  const stopStateSync = () => {
-    if (stateCheckInterval.current) {
-      clearInterval(stateCheckInterval.current)
-      stateCheckInterval.current = null
-    }
-  }
-
-  // Update state sync based on playing status
-  useEffect(() => {
-    if (isPlaying) {
-      startStateSync()
-    } else {
-      stopStateSync()
-    }
-  }, [isPlaying])
-
-  // Helper function to check if the stream track exists
-  const hasStreamTrack = async (): Promise<boolean> => {
     try {
       const queue = await TrackPlayer.getQueue()
-      return queue && queue.length > 0
-    } catch {
-      return false
+      if (!queue || queue.length === 0) {
+        // Add a track for display purposes (stopped state)
+        await TrackPlayer.add({
+          id: 'radio-display-' + Date.now(),
+          url: STREAM_URL,
+          title: showTitle || 'éist',
+          artist: showArtist ? `${showArtist} · éist` : 'éist',
+          artwork: showArtworkUrl || require('../assets/images/eist-square.png'),
+          isLiveStream: true,
+          duration: 0,
+        })
+      }
+    } catch (err) {
+      console.error('Failed to ensure track for display:', err)
     }
-  }
-
-  // Helper function to add the stream track
-  const addStreamTrack = async () => {
-    await TrackPlayer.add({
-      id: 'radio-stream',
-      url: STREAM_URL,
-      title: ' ',
-      artist: 'éist',
-      isLiveStream: true,
-      duration: 0,
-    })
   }
 
   const setupPlayer = async () => {
-    if (hasInitialized.current) {
-      // Double-check player state and track
-      try {
-        const state = await TrackPlayer.getState();
-        const hasTrack = await hasStreamTrack();
-        if (state && hasTrack) {
-          setIsPlayerReady(true);
-          return;
-        }
-      } catch (err) {
-        hasInitialized.current = false;
-      }
+    if (hasInitialized.current && isPlayerReady) {
+      return
     }
-
-    if (hasInitialized.current) {
-      // If still marked as initialized, don't try to set up again
-      return;
-    }
-
-    hasInitialized.current = true;
 
     if (isWeb) {
-      setIsPlayerReady(true);
-      return;
+      setIsPlayerReady(true)
+      return
     }
 
     try {
-      await TrackPlayer.setupPlayer();
+      console.log('Setting up player...')
+      
+      if (!hasInitialized.current) {
+        await TrackPlayer.setupPlayer()
+        hasInitialized.current = true
+      }
+      
       await TrackPlayer.updateOptions({
         alwaysPauseOnInterruption: false,
         stoppingAppPausesPlayback: false,
@@ -235,56 +202,40 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         capabilities: [Capability.Play, Capability.Stop],
         compactCapabilities: [Capability.Play, Capability.Stop],
         notificationCapabilities: [Capability.Play, Capability.Stop],
-      });
-      await addStreamTrack();
-      setIsPlayerReady(true);
-      await syncPlayerState();
+      })
+      
+      setIsPlayerReady(true)
+      console.log('Player setup completed')
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message.toLowerCase() : '';
+      const errorMsg = err instanceof Error ? err.message.toLowerCase() : ''
       if (errorMsg.includes('already been initialized')) {
-        // Just update options and ensure track is present
-        try {
-          await TrackPlayer.updateOptions({
-            alwaysPauseOnInterruption: false,
-            stoppingAppPausesPlayback: true,
-            android: {
-              appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification,
-              alwaysPauseOnInterruption: false,
-            },
-            capabilities: [Capability.Play, Capability.Stop],
-            compactCapabilities: [Capability.Play, Capability.Stop],
-            notificationCapabilities: [Capability.Play, Capability.Stop],
-          });
-          const hasTrack = await hasStreamTrack();
-          if (!hasTrack) {
-            await addStreamTrack();
-          }
-          setIsPlayerReady(true);
-          await syncPlayerState();
-          return;
-        } catch (setupErr) {
-          console.error('Failed to complete setup after already initialized error:', setupErr);
-        }
+        hasInitialized.current = true
+        setIsPlayerReady(true)
+        return
       }
-      // For other errors, reset the initialization flag so we can try again
-      hasInitialized.current = false;
-      setIsPlayerReady(false);
+      
+      console.error('Player setup failed:', err)
+      hasInitialized.current = false
+      setIsPlayerReady(false)
+      throw err
     }
   }
 
   const recoverFromAudioSessionConflict = async () => {
-    if (isRecovering.current) return;
-    isRecovering.current = true;
+    if (isRecovering.current) return
+    isRecovering.current = true
+    
     if (recoveryAttempts.current >= maxRecoveryAttempts) {
-      console.error('Max recovery attempts reached. Giving up.');
-      setIsPlaying(false);
-      setIsBusy(false);
-      setIsPlayerReady(false);
-      hasInitialized.current = false;
-      isRecovering.current = false;
-      return;
+      console.error('Max recovery attempts reached. Giving up.')
+      setIsPlaying(false)
+      setIsBusy(false)
+      setIsPlayerReady(false)
+      hasInitialized.current = false
+      isRecovering.current = false
+      return
     }
-    recoveryAttempts.current++;
+    
+    recoveryAttempts.current++
     setIsPlaying(false)
     setIsBusy(false)
     setIsPlayerReady(false)
@@ -293,121 +244,85 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       audioRef.current?.pause()
       audioRef.current = null
       setIsPlayerReady(true)
-      isRecovering.current = false;
+      isRecovering.current = false
       return
     }
 
     try {
-      // First, check if the player is actually in a bad state
-      try {
-        const state = await TrackPlayer.getState()
-        const hasTrack = await hasStreamTrack()
-
-        // If player is in a good state and has the track, we might not need recovery
-        if (state && hasTrack) {
-          setIsPlayerReady(true)
-          recoveryAttempts.current = 0;
-          isRecovering.current = false;
-          return
-        }
-      } catch (checkErr) {
-        // Player state check failed, proceeding with recovery
-      }
-
-      // Reset the initialization flag first
+      console.log('Recovering from audio session conflict...')
+      
+      // Reset initialization flag
       hasInitialized.current = false
-
-      // Reset the track player service state
-      // Note: Service will be reinitialized automatically on next access
-
-      // Stop and reset the player
-      await TrackPlayer.stop().catch(() => { })
-      await TrackPlayer.reset().catch(() => { })
-
-      // Wait a bit for the reset to complete
-      await new Promise((r) => setTimeout(r, 1000))
-
-      // Try to setup the player again
+      
+      // Perform clean reset
+      await cleanResetPlayer()
+      
+      // Wait for cleanup
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Reinitialize player
       await setupPlayer()
-
-      // If we were playing before the conflict, try to resume
-      if (wasPlayingBeforeBackground.current || wasPlayingBeforeCarConnection.current) {
-        setTimeout(async () => {
-          try {
-            await play()
-            recoveryAttempts.current = 0;
-            isRecovering.current = false;
-          } catch (err) {
-            console.error('Failed to resume playback after recovery:', err)
-            isRecovering.current = false;
-          }
-        }, 500)
-      } else {
-        recoveryAttempts.current = 0;
-        isRecovering.current = false;
-      }
+      
+      recoveryAttempts.current = 0
+      isRecovering.current = false
+      
+      console.log('Audio session recovery completed')
     } catch (err) {
       console.error('Recovery failed:', err)
       setIsPlaying(false)
       setIsBusy(false)
       setIsPlayerReady(false)
-      // Reset initialization flag on recovery failure
       hasInitialized.current = false
-      isRecovering.current = false;
-    }
-  }
-
-  const isPlayerInvalidState = async (): Promise<boolean> => {
-    if (isWeb) return false
-    try {
-      const state = await TrackPlayer.getState()
-      const queue = await TrackPlayer.getQueue()
-
-      // Check if player is in a valid state
-      const validStates = [State.Playing, State.Paused, State.Stopped, State.Ready, State.Buffering]
-      const isValidState = validStates.includes(state)
-      const hasQueue = queue && queue.length > 0
-
-      return !isValidState || !hasQueue
-    } catch {
-      return true
+      isRecovering.current = false
     }
   }
 
   // Fetch the latest show metadata from the radiocult API and update state/metadata
   const fetchAndUpdateShowMetadata = async () => {
     try {
-      // Example API endpoint for current show metadata
-      const response = await fetch('https://api.radiocult.fm/api/station/eist/schedule/live');
-      if (!response.ok) throw new Error('Failed to fetch show metadata');
-      const data = await response.json();
-      // Adjust these property names based on actual API response
-      const title = data?.title || 'éist';
-      const artist = data?.artist || '';
-      const artworkUrl = data?.artworkUrl || undefined;
-      setShowTitle(title);
-      setShowArtist(artist);
-      setShowArtworkUrl(artworkUrl);
-      await updateMetadata(title, artist, artworkUrl);
+      const response = await fetch('https://api.radiocult.fm/api/station/eist/schedule/live')
+      if (!response.ok) throw new Error('Failed to fetch show metadata')
+      
+      const data = await response.json()
+      const title = data?.title || 'éist'
+      const artist = data?.artist || ''
+      const artworkUrl = data?.artworkUrl || undefined
+      
+      setShowTitle(title)
+      setShowArtist(artist)
+      setShowArtworkUrl(artworkUrl)
+      
+      await updateMetadata(title, artist, artworkUrl)
     } catch (err) {
-      console.error('Failed to fetch or update show metadata:', err);
+      console.error('Failed to fetch or update show metadata:', err)
       // Fallback to previous state/metadata
-      await updateMetadata(showTitle, showArtist, showArtworkUrl);
+      await updateMetadata(showTitle, showArtist, showArtworkUrl)
     }
-  };
+  }
 
   const play = async () => {
+    if (isBusy) return
     setIsBusy(true)
 
     if (isWeb) {
-      if (!audioRef.current) {
-        audioRef.current = new Audio(STREAM_URL)
-        audioRef.current.crossOrigin = 'anonymous'
+      // Clean reset for web
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.src = ''
+        audioRef.current.load()
       }
+      
+      // Create fresh audio element
+      audioRef.current = new Audio(STREAM_URL)
+      audioRef.current.crossOrigin = 'anonymous'
+      
       try {
         await audioRef.current.play()
         setIsPlaying(true)
         await storeLastPlayedState(true)
+        
+        // Fetch fresh metadata after starting stream
+        await fetchAndUpdateShowMetadata()
       } catch (err) {
         console.error('Web audio play failed:', err)
       } finally {
@@ -416,42 +331,37 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
-    // Ensure player is ready before attempting to play
-    if (!isPlayerReady) {
-      console.log('Player not ready, setting up before play')
-      await setupPlayer()
+    try {
+      console.log('Starting fresh live stream with clean reset...')
+      
+      // Ensure player is ready
       if (!isPlayerReady) {
-        console.log('Setup failed, attempting recovery')
-        await recoverFromAudioSessionConflict()
+        await setupPlayer()
         if (!isPlayerReady) {
-          setIsBusy(false)
-          return
+          await recoverFromAudioSessionConflict()
+          if (!isPlayerReady) {
+            setIsBusy(false)
+            return
+          }
         }
       }
-    }
-
-    try {
-      console.log('Starting live stream...')
+      
+      // Always perform clean reset before playing
+      await cleanResetPlayer()
+      
+      // Fetch fresh metadata before starting playbook
+      await fetchAndUpdateShowMetadata()
+      
+      // Start playback with fresh stream
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
-
-      // Fetch and update the latest show metadata after playback starts
-      await fetchAndUpdateShowMetadata();
-
-      // Wait a short time, then check if actually playing
-      setTimeout(async () => {
-        const state = await TrackPlayer.getState();
-        if (state !== State.Playing) {
-          console.log('Player did not start, attempting recovery and replay');
-          await recoverFromAudioSessionConflict();
-          await play();
-        }
-      }, 1500);
-      console.log('Live stream started successfully')
+      
+      console.log('Fresh live stream started successfully')
     } catch (err) {
       console.error('Play failed:', err)
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
+      
       if (
         msg.includes('audio session') ||
         msg.includes('interrupted') ||
@@ -460,9 +370,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       ) {
         console.log('Audio session issue detected, attempting recovery')
         await recoverFromAudioSessionConflict()
+        
         // Try playing again after recovery
         try {
           console.log('Retrying live stream after recovery...')
+          await cleanResetPlayer()
+          await fetchAndUpdateShowMetadata()
           await TrackPlayer.play()
           setIsPlaying(true)
           await storeLastPlayedState(true)
@@ -473,11 +386,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     } finally {
       setIsBusy(false)
-      runImmediate(syncPlayerState)
     }
   }
 
   const stop = async () => {
+    if (isBusy) return
     setIsBusy(true)
 
     if (isWeb) {
@@ -494,12 +407,18 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('Stopping live stream...')
-      // Stop playback, don't reset
+      console.log('Stopping live stream but preserving metadata display...')
+      
+      // Stop playback but preserve metadata for lock screen/CarPlay
       await TrackPlayer.stop()
-
+      
+      // Ensure we have a track in queue for metadata display (stopped state)
+      await ensureTrackForDisplay()
+      
       setIsPlaying(false)
       await storeLastPlayedState(false)
+      
+      console.log('Live stream stopped with metadata preserved for display')
     } catch (err) {
       console.error('Stop failed:', err)
       // Force stop even if there's an error
@@ -507,7 +426,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await storeLastPlayedState(false)
     } finally {
       setIsBusy(false)
-      runImmediate(syncPlayerState)
     }
   }
 
@@ -518,12 +436,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       console.log('Stopping live stream')
       await stop()
     } else {
-      console.log('Starting live stream')
-      // If player is not ready, try to recover first
-      if (!isPlayerReady) {
-        console.log('Player not ready, attempting recovery before play')
-        await recoverFromAudioSessionConflict()
-      }
+      console.log('Starting fresh live stream')
       await play()
     }
   }
@@ -533,52 +446,45 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     artist: string,
     artworkUrl?: string
   ) => {
-    if (!isPlayerReady || isWeb) return;
+    if (!isPlayerReady || isWeb) return
 
     try {
-      // Check if the track exists before updating metadata
-      let queue = await TrackPlayer.getQueue();
+      const queue = await TrackPlayer.getQueue()
       if (!queue || queue.length === 0) {
-        await addStreamTrack();
-        queue = await TrackPlayer.getQueue();
-        if (!queue || queue.length === 0) {
-          console.log('Stream track not found, skipping metadata update');
-          return;
-        }
+        console.log('No track in queue, skipping metadata update')
+        return
       }
 
-      // Use the actual track ID instead of index 0
-      const trackId = queue[0]?.id;
+      const trackId = queue[0]?.id
       if (!trackId) {
-        console.log('No valid track ID found in queue:', queue);
-        return;
+        console.log('No valid track ID found in queue')
+        return
       }
 
-      const isDeadAir = title.trim().length === 0;
-      const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`;
+      const isDeadAir = title.trim().length === 0
+      const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
 
       if (isDeadAir) {
         await TrackPlayer.updateMetadataForTrack(trackId, {
           title,
           artist: '',
           artwork: require('../assets/images/eist_offline.png'),
-        });
+        })
       } else if (artworkUrl) {
         await TrackPlayer.updateMetadataForTrack(trackId, {
           title,
           artist: metadataArtist,
           artwork: artworkUrl,
-        });
+        })
       } else {
         await TrackPlayer.updateMetadataForTrack(trackId, {
           title,
           artist: metadataArtist,
           artwork: require('../assets/images/eist-square.png'),
-        });
+        })
       }
     } catch (err) {
-      console.error('Metadata update failed:', err);
-      // Don't throw the error, just log and continue
+      console.error('Metadata update failed:', err)
     }
   }
 
@@ -590,14 +496,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         Event.PlaybackState,
         async ({ state }) => {
           const playing = state === State.Playing
-          lastKnownState.current = state
           setIsPlaying(playing)
 
-          // When audio session becomes ready and we were playing before car connection
-          if (state === State.Ready && wasPlayingBeforeCarConnection.current) {
-            console.log('Audio session ready, resuming playback from car connection')
-            wasPlayingBeforeCarConnection.current = false
-            await play()
+          // Ensure metadata display is maintained when stopped
+          if (state === State.Stopped) {
+            await ensureTrackForDisplay()
           }
 
           if (
@@ -609,80 +512,48 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           }
         }
       )
+      
       const onError = TrackPlayer.addEventListener(Event.PlaybackError, async (error) => {
         console.log('Playback error:', error)
-        // Check if this might be a CarPlay/Android Auto disconnect or audio session interruption
+        
         if (error.message?.includes('interrupted') ||
-          error.message?.includes('session') ||
-          error.message?.includes('carplay') ||
-          error.message?.includes('android auto') ||
-          error.message?.includes('bluetooth')) {
-          console.log('Possible audio session interruption detected, stopping playback')
-          // Remember that we were playing before the interruption
-          wasPlayingBeforeCarConnection.current = isPlayingRef.current
+            error.message?.includes('session') ||
+            error.message?.includes('carplay') ||
+            error.message?.includes('android auto') ||
+            error.message?.includes('bluetooth')) {
+          console.log('Audio session interruption detected, stopping playback')
           wasPlayingBeforeBackground.current = isPlayingRef.current
           await stop()
         } else {
           setIsPlaying(false)
           setIsBusy(false)
-          runImmediate(syncPlayerState)
         }
       })
+      
       const onQueueEnded = TrackPlayer.addEventListener(
         Event.PlaybackQueueEnded,
         () => {
           setIsPlaying(false)
           setIsBusy(false)
-          runImmediate(syncPlayerState)
         }
       )
-      const onRemoteStop = TrackPlayer.addEventListener(
-        Event.RemoteStop,
-        stop
-      )
-      const onRemotePlay = TrackPlayer.addEventListener(
-        Event.RemotePlay,
-        async () => {
-          console.log('Remote Play event received (CarPlay/Android Auto)')
-          // If we were playing before car connection, resume automatically
-          if (wasPlayingBeforeCarConnection.current) {
-            console.log('Resuming playback that was active before car connection')
-            wasPlayingBeforeCarConnection.current = false
-            await play()
-          } else {
-            // Normal play request from car interface
-            await play()
-          }
-        }
-      )
+      
+      const onRemoteStop = TrackPlayer.addEventListener(Event.RemoteStop, stop)
+      const onRemotePlay = TrackPlayer.addEventListener(Event.RemotePlay, play)
 
       const onAppState = AppState.addEventListener('change', async (next) => {
         if (next === 'active') {
-          // Only start state sync if we're playing
-          if (isPlayingRef.current) {
-            startStateSync()
-          }
-          await syncPlayerState()
-
           // Check if we should resume playback after returning from background
           setTimeout(async () => {
             if (wasPlayingBeforeBackground.current && !isPlayingRef.current) {
-              console.log('App became active, resuming playback that was active before background')
+              console.log('App became active, resuming playback with fresh stream')
               wasPlayingBeforeBackground.current = false
-              await play()
-            } else if (wasPlayingBeforeCarConnection.current && !isPlayingRef.current) {
-              console.log('App became active, resuming playback that was active before car connection')
-              wasPlayingBeforeCarConnection.current = false
-              await play()
-            } else if (!isPlayingRef.current && (await isPlayerInvalidState())) {
-              await recoverFromAudioSessionConflict()
+              await play() // This will do a clean reset and start fresh
             }
-          }, 1500)
+          }, 1000)
         } else if (next === 'background' || next === 'inactive') {
           // Remember if we were playing before going to background
           wasPlayingBeforeBackground.current = isPlayingRef.current
-          // Stop polling when app goes to background to save battery
-          stopStateSync()
         }
       })
 
@@ -693,14 +564,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         onRemoteStop.remove()
         onRemotePlay.remove()
         onAppState.remove()
-        stopStateSync()
       }
-    }
-  }, [])
-
-  useEffect(() => {
-    return () => {
-      stopStateSync()
     }
   }, [])
 
@@ -717,7 +581,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         updateMetadata,
         recoverAudioSession: recoverFromAudioSessionConflict,
         forcePlayerReset: recoverFromAudioSessionConflict,
-        // Expose current show metadata in context
         showTitle,
         showArtist,
         showArtworkUrl,

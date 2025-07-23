@@ -1,5 +1,8 @@
 // trackPlayerService.js
-import TrackPlayer, { Event } from 'react-native-track-player';
+
+import TrackPlayer, { Event, State } from 'react-native-track-player';
+
+const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
 
 // Storage keys for remembering last played state
 const LAST_PLAYED_KEY = 'eist_last_played_timestamp'
@@ -43,105 +46,151 @@ const shouldAutoPlayOnCarPlay = async () => {
   return lastState.wasPlaying && lastState.timestamp > twentyFourHoursAgo
 }
 
+// Clean reset function for fresh stream (matches context implementation)
+const cleanResetAndPlay = async () => {
+  try {
+    console.log('Service: Performing clean reset and play...')
+
+    // Stop current playback
+    await TrackPlayer.stop().catch(() => { })
+
+    // Get current queue to preserve metadata
+    const currentQueue = await TrackPlayer.getQueue().catch(() => [])
+    const currentTrack = currentQueue[0]
+
+    // Reset queue to clear any buffered data
+    await TrackPlayer.reset().catch(() => { })
+
+    // Small delay to ensure cleanup
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Re-add fresh stream track with preserved or default metadata
+    const trackToAdd = {
+      id: 'radio-stream-' + Date.now(),
+      url: STREAM_URL,
+      title: currentTrack?.title || 'éist',
+      artist: currentTrack?.artist || 'éist',
+      artwork: currentTrack?.artwork || require('./assets/images/eist-square.png'),
+      isLiveStream: true,
+      duration: 0,
+    }
+
+    await TrackPlayer.add(trackToAdd)
+
+    // Start fresh playback
+    await TrackPlayer.play()
+    await storeLastPlayedState(true)
+
+    console.log('Service: Clean reset and play completed')
+  } catch (err) {
+    console.error('Service: Clean reset and play failed:', err)
+  }
+}
+
+// Ensure track exists for metadata display when stopped
+const ensureTrackForDisplay = async () => {
+  try {
+    const queue = await TrackPlayer.getQueue()
+    if (!queue || queue.length === 0) {
+      await TrackPlayer.add({
+        id: 'radio-display-' + Date.now(),
+        url: STREAM_URL,
+        title: 'éist',
+        artist: 'éist',
+        artwork: require('./assets/images/eist-square.png'),
+        isLiveStream: true,
+        duration: 0,
+      })
+    }
+  } catch (err) {
+    console.error('Service: Failed to ensure track for display:', err)
+  }
+}
+
 const playbackService = async () => {
-  // Handle CarPlay connection and autoplay
+  // Handle remote play from CarPlay, Control Center, lock screen
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
-    console.log('Remote Play event received (CarPlay/Control Center)');
+    console.log('Service: Remote Play event received (CarPlay/Control Center)')
     try {
-      // Check if we should autoplay based on last played state
-      const shouldAutoPlay = await shouldAutoPlayOnCarPlay()
-      if (shouldAutoPlay) {
-        console.log('CarPlay autoplay: App was last played within 24 hours, starting playback')
-      }
-
-      // For CarPlay compatibility, ensure we're starting from a clean state
-      const state = await TrackPlayer.getState();
-      if (state !== 'playing') {
-        await TrackPlayer.play();
-        // Store that we're now playing
-        await storeLastPlayedState(true)
-      }
+      // Always perform clean reset and start fresh stream
+      await cleanResetAndPlay()
     } catch (error) {
-      console.error('Error in remote play:', error);
+      console.error('Service: Error in remote play:', error)
     }
-  });
+  })
 
+  // Handle remote stop from CarPlay, Control Center, lock screen
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
-    console.log('Remote Stop event received');
+    console.log('Service: Remote Stop event received')
     try {
-      await TrackPlayer.stop();
-      // Store that we stopped playing
+      await TrackPlayer.stop()
+      await ensureTrackForDisplay() // Keep metadata visible
       await storeLastPlayedState(false)
     } catch (error) {
-      console.error('Error in remote stop:', error);
+      console.error('Service: Error in remote stop:', error)
     }
-  });
+  })
 
+  // Handle remote pause - treat as stop for live radio
   TrackPlayer.addEventListener(Event.RemotePause, async () => {
-    console.log('Remote Pause event received - treating as stop for radio');
+    console.log('Service: Remote Pause event received - treating as stop for radio')
     try {
-      await TrackPlayer.stop();
-      // Store that we stopped playing
+      await TrackPlayer.stop()
+      await ensureTrackForDisplay() // Keep metadata visible
       await storeLastPlayedState(false)
     } catch (error) {
-      console.error('Error in remote pause:', error);
+      console.error('Service: Error in remote pause:', error)
     }
-  });
+  })
 
-  // Listen for when the stream is ready
-  TrackPlayer.addEventListener(Event.PlaybackTrackChanged, () => {
-    console.log('Track changed - controls should be enabled');
-  });
-
-  // Handle playback state changes for CarPlay and audio session recovery
+  // Handle playback state changes
   TrackPlayer.addEventListener(Event.PlaybackState, async ({ state }) => {
-    console.log('Playback state changed:', state);
+    console.log('Service: Playback state changed:', state)
 
-    // If playback becomes ready, check for various recovery scenarios
-    if (state === 'ready') {
+    // Ensure metadata display is maintained when stopped
+    if (state === State.Stopped) {
+      await ensureTrackForDisplay()
+    }
+
+    // Handle CarPlay auto-resume when audio session becomes ready
+    if (state === State.Ready) {
       try {
         const shouldAutoPlay = await shouldAutoPlayOnCarPlay()
         if (shouldAutoPlay) {
-          console.log('Playback ready, checking for CarPlay autoplay')
-          // Small delay to ensure CarPlay is fully connected
+          console.log('Service: Audio ready, checking for CarPlay auto-resume')
+          // Small delay to ensure CarPlay connection is stable
           setTimeout(async () => {
             try {
               const currentState = await TrackPlayer.getState()
-              if (currentState === 'ready') {
-                console.log('Auto-playing on CarPlay connection')
-                await TrackPlayer.play()
-                await storeLastPlayedState(true)
+              if (currentState === State.Ready) {
+                console.log('Service: Auto-resuming on CarPlay connection')
+                await cleanResetAndPlay()
               }
             } catch (error) {
-              console.error('Error during CarPlay autoplay:', error)
+              console.error('Service: Error during CarPlay auto-resume:', error)
             }
           }, 1000)
         }
       } catch (error) {
-        console.error('Error checking CarPlay autoplay:', error)
+        console.error('Service: Error checking CarPlay auto-resume:', error)
       }
     }
-
-    // Handle audio session recovery when state becomes ready
-    if (state === 'ready') {
-      console.log('Audio session ready, checking for recovery scenarios')
-    }
-  });
+  })
 
   // Handle playback errors and audio session interruptions
   TrackPlayer.addEventListener(Event.PlaybackError, async (error) => {
-    console.error('Playback error:', error);
+    console.error('Service: Playback error:', error)
 
-    // Check if this is an audio session interruption
+    // For audio session interruptions, just store the playing state
+    // Recovery will be handled by the context when the app becomes active
     if (error.message?.includes('interrupted') ||
       error.message?.includes('session') ||
       error.message?.includes('audio') ||
       error.message?.includes('conflict')) {
-      console.log('Audio session interruption detected, storing state for recovery')
-      // Store that we were playing before the interruption
-      await storeLastPlayedState(true)
+      console.log('Service: Audio session interruption detected')
+      await storeLastPlayedState(true) // Remember we were playing
     }
-  });
-};
+  })
+}
 
-export default playbackService;
+export default playbackService
