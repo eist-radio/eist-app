@@ -46,11 +46,6 @@ export function useNetworkConnectivity() {
       );
 
       if (hasNetworkChanged) {
-        console.log('Network connectivity changed:', {
-          from: previousNetworkState.current,
-          to: newState,
-        });
-        
         previousNetworkState.current = newState;
         setNetworkState(newState);
       }
