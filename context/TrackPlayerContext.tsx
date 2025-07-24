@@ -3,10 +3,11 @@
 import React, {
   createContext,
   ReactNode,
+  useCallback,
   useContext,
   useEffect,
   useRef,
-  useState,
+  useState
 } from 'react'
 import { AppState, Platform } from 'react-native'
 import TrackPlayer, {
@@ -15,6 +16,7 @@ import TrackPlayer, {
   Event,
   State,
 } from 'react-native-track-player'
+import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity'
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
 
@@ -66,10 +68,17 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const maxRecoveryAttempts = 3;
   const recoveryAttempts = useRef(0);
   const isRecovering = useRef(false);
+  
+  // Network connectivity tracking
+  const networkState = useNetworkConnectivity()
+  const wasPlayingBeforeNetworkChange = useRef(false)
+  const previousNetworkState = useRef(networkState)
 
   useEffect(() => {
     isPlayingRef.current = isPlaying
   }, [isPlaying])
+
+
 
   // Helper functions for storing/retrieving last played state
   const storeLastPlayedState = async (wasPlaying: boolean) => {
@@ -300,7 +309,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const play = async () => {
+  const play = useCallback(async () => {
     if (isBusy) return
     setIsBusy(true)
 
@@ -387,9 +396,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsBusy(false)
     }
-  }
+  }, [isBusy, isPlayerReady, isWeb])
 
-  const stop = async () => {
+  const stop = useCallback(async () => {
     if (isBusy) return
     setIsBusy(true)
 
@@ -427,7 +436,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsBusy(false)
     }
-  }
+  }, [isBusy, isWeb])
 
   const togglePlayStop = async () => {
     if (isBusy) return
@@ -487,6 +496,62 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       console.error('Metadata update failed:', err)
     }
   }
+
+  // Handle network connectivity changes
+  useEffect(() => {
+    // Skip if this is the initial load
+    if (!previousNetworkState.current) {
+      previousNetworkState.current = networkState
+      return
+    }
+
+    const previous = previousNetworkState.current
+    const current = networkState
+
+    // Check if there's a significant network change
+    const hasNetworkChanged = 
+      previous.isConnected !== current.isConnected ||
+      previous.type !== current.type ||
+      previous.isInternetReachable !== current.isInternetReachable
+
+    if (hasNetworkChanged) {
+      console.log('Network change detected:', {
+        from: previous,
+        to: current,
+        wasPlaying: isPlayingRef.current
+      })
+
+      // If we were playing and network changed, remember it
+      if (isPlayingRef.current) {
+        wasPlayingBeforeNetworkChange.current = true
+        console.log('Was playing before network change, will attempt recovery')
+      }
+
+      // If we regained connectivity and were playing before, attempt recovery
+      if (current.isConnected && current.isInternetReachable && wasPlayingBeforeNetworkChange.current) {
+        console.log('Network restored, attempting to recover playback')
+        
+        // Small delay to ensure network is stable
+        setTimeout(async () => {
+          if (wasPlayingBeforeNetworkChange.current && !isPlayingRef.current) {
+            console.log('Recovering playback after network restoration')
+            wasPlayingBeforeNetworkChange.current = false
+            await play() // This will do a clean reset and start fresh
+          }
+        }, 2000) // 2 second delay to ensure network stability
+      }
+
+      // If we lost connectivity while playing, stop playback
+      if (!current.isConnected || !current.isInternetReachable) {
+        if (isPlayingRef.current) {
+          console.log('Network lost, stopping playback')
+          stop()
+        }
+      }
+
+      previousNetworkState.current = current
+    }
+  }, [networkState, play, stop])
 
   useEffect(() => {
     setupPlayer()
