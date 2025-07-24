@@ -515,26 +515,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       previous.isInternetReachable !== current.isInternetReachable
 
     if (hasNetworkChanged) {
-      console.log('Network change detected:', {
-        from: previous,
-        to: current,
-        wasPlaying: isPlayingRef.current
-      })
-
       // If we were playing and network changed, remember it
       if (isPlayingRef.current) {
         wasPlayingBeforeNetworkChange.current = true
-        console.log('Was playing before network change, will attempt recovery')
       }
 
       // If we regained connectivity and were playing before, attempt recovery
       if (current.isConnected && current.isInternetReachable && wasPlayingBeforeNetworkChange.current) {
-        console.log('Network restored, attempting to recover playback')
-        
         // Small delay to ensure network is stable
         setTimeout(async () => {
           if (wasPlayingBeforeNetworkChange.current && !isPlayingRef.current) {
-            console.log('Recovering playback after network restoration')
             wasPlayingBeforeNetworkChange.current = false
             await play() // This will do a clean reset and start fresh
           }
@@ -544,7 +534,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // If we lost connectivity while playing, stop playback
       if (!current.isConnected || !current.isInternetReachable) {
         if (isPlayingRef.current) {
-          console.log('Network lost, stopping playback')
           stop()
         }
       }
