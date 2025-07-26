@@ -532,11 +532,10 @@ const styles = StyleSheet.create({
   showCellContent: {
     flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   playIcon: {
     marginRight: 6,
-    alignSelf: 'flex-start',
   },
 
   cellText: {
