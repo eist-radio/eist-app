@@ -97,7 +97,7 @@ export default function RootLayout() {
                   <Stack screenOptions={{ headerShown: false }} />
                   <StatusBar style="auto" />
                 </ThemeProvider>
-              </TrackPlayerProvider>
+                              </TrackPlayerProvider>
             </Suspense>
           </QueryClientProvider>
         </Animated.View>

@@ -39,6 +39,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "splash": {
+      "image": "./assets/images/eist.png",
       "backgroundColor": "#4733FF",
       "dark": {
         "backgroundColor": "#4733FF"
@@ -51,6 +52,7 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/images/eist.png",
           "backgroundColor": "#4733FF",
           "dark": {
             "backgroundColor": "#4733FF"

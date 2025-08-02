@@ -31,7 +31,7 @@ import { useTimezoneChange } from '../../hooks/useTimezoneChange'
 
 const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
   const animatedValue = React.useRef(new Animated.Value(0)).current
-  
+
   React.useEffect(() => {
     Animated.timing(animatedValue, {
       toValue: visible ? 1 : 0,
@@ -39,12 +39,12 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
       useNativeDriver: true,
     }).start()
   }, [visible, animatedValue])
-  
+
   return (
     <Animated.View
       style={[
         styles.backToTopButton,
-        { 
+        {
           opacity: animatedValue,
           transform: [{
             scale: animatedValue.interpolate({
@@ -60,10 +60,10 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
         activeOpacity={0.8}
         style={styles.backToTopTouchable}
       >
-        <Ionicons 
-          name="chevron-up" 
-          size={32} 
-          color="#AFFC41" 
+        <Ionicons
+          name="chevron-up"
+          size={32}
+          color="#AFFC41"
           style={styles.chevronIcon}
         />
       </TouchableOpacity>
@@ -76,8 +76,8 @@ const styles = StyleSheet.create({
   imageContainer: { width: '100%', position: 'relative', overflow: 'hidden' },
   fullWidthImage: { width: '100%', height: '100%' },
   logoContainer: { position: 'absolute', top: 36, right: 18 },
-  logoBackground: { 
-    borderRadius: 37, 
+  logoBackground: {
+    borderRadius: 37,
     padding: 8,
   },
   loadingContainer: {
@@ -243,12 +243,12 @@ export default function ListenScreen() {
 
   const getArtistDetails = useCallback(async (id: string | null) => {
     if (!id) return { name: '', image: null }
-    
+
     // Check cache first
     if (artistCache[id]) {
       return artistCache[id]
     }
-    
+
     try {
       const res = await fetch(`${apiUrl}/artists/${id}`, {
         headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
@@ -261,7 +261,7 @@ export default function ListenScreen() {
         name: artist.name || '',
         image: imageUrl ? { uri: imageUrl } : null,
       }
-      
+
       // Cache the result
       setArtistCache(prev => ({ ...prev, [id]: artistData }))
       return artistData
@@ -332,7 +332,7 @@ export default function ListenScreen() {
         const newShowTitle = content.title || ''
         const newCurrentShowId = content.id || null
         const newArtistId = content.artistIds?.[0] ?? null
-        
+
         // Prepare description
         let desc = parseDescription(content.description?.content || [])
         if (content.media?.type === 'playlist' && metadata?.title) {
@@ -342,24 +342,24 @@ export default function ListenScreen() {
         setShowTitle(newShowTitle)
         setCurrentShowId(newCurrentShowId)
         setShowDescription(desc)
-        
+
         // Clear next show info when station is live
         clearNextShowInfo()
-        
+
         // Only fetch artist details if artist ID changed
         if (newArtistId !== artistId) {
           setArtistId(newArtistId)
           setIsContentLoading(true)
           setImageReady(false)
-          
+
           const { name, image } = await getArtistDetails(newArtistId)
-          
+
           // Update artist-related state
           setArtistName(name)
-          
+
           if (image?.uri) {
             const imageLoaded = await preloadImage(image.uri)
-            
+
             if (imageLoaded) {
               setRemoteImageUrl(image.uri)
               setImageFailed(false)
@@ -374,7 +374,7 @@ export default function ListenScreen() {
             setImageFailed(false)
             await updateMetadata(newShowTitle || 'éist', name, undefined)
           }
-          
+
           setImageReady(true)
           setIsContentLoading(false)
         } else {
@@ -441,9 +441,9 @@ export default function ListenScreen() {
       const newShowTitle = content.title || ''
       const newCurrentShowId = content.id || null
       const newArtistId = content.artistIds?.[0] ?? null
-      
+
       const { name, image } = await getArtistDetails(newArtistId)
-      
+
       // Prepare description
       let desc = parseDescription(content.description?.content || [])
       if (content.media?.type === 'playlist' && metadata?.title) {
@@ -456,14 +456,14 @@ export default function ListenScreen() {
       setArtistId(newArtistId)
       setArtistName(name)
       setShowDescription(desc)
-      
+
       // Clear next show info when station is live
       clearNextShowInfo()
-      
+
       // Handle image
       if (image?.uri) {
         const imageLoaded = await preloadImage(image.uri)
-        
+
         if (imageLoaded) {
           setRemoteImageUrl(image.uri)
           setImageFailed(false)
@@ -478,7 +478,7 @@ export default function ListenScreen() {
         setImageFailed(false)
         await updateMetadata(newShowTitle || 'éist', name, undefined)
       }
-      
+
       // Mark image as ready and loading as finished
       setImageReady(true)
       setIsContentLoading(false)
@@ -494,12 +494,12 @@ export default function ListenScreen() {
     const nextRefresh = new Date(now)
     nextRefresh.setMinutes(1, 0, 0) // Set to 1 minute past the hour
     nextRefresh.setSeconds(0, 0)
-    
+
     // If we're already past 1 minute, move to next hour
     if (now.getMinutes() >= 1) {
       nextRefresh.setHours(nextRefresh.getHours() + 1)
     }
-    
+
     return nextRefresh.getTime() - now.getTime()
   }
 
@@ -513,11 +513,11 @@ export default function ListenScreen() {
     }
 
     const timeUntilRefresh = getTimeUntilNextRefresh()
-    
+
     carRefreshIntervalRef.current = setTimeout(() => {
       // Refresh metadata
       fetchLiveScheduleOnly()
-      
+
       // Schedule next refresh (every hour)
       carRefreshIntervalRef.current = setInterval(() => {
         if (isCarConnected && isPlaying) {
@@ -564,7 +564,7 @@ export default function ListenScreen() {
   // Schedule car refresh when car connectivity or playing state changes
   useEffect(() => {
     scheduleCarRefresh()
-    
+
     return () => {
       if (carRefreshIntervalRef.current) {
         clearTimeout(carRefreshIntervalRef.current)
@@ -616,11 +616,11 @@ export default function ListenScreen() {
     if (broadcastStatus !== 'schedule') {
       return placeholderOfflineImage
     }
-    
+
     if (imageFailed || !remoteImageUrl) {
       return placeholderArtistImage
     }
-    
+
     return { uri: remoteImageUrl }
   }
 
@@ -642,11 +642,11 @@ export default function ListenScreen() {
     const scrollY = event.nativeEvent.contentOffset.y
     const contentHeight = event.nativeEvent.contentSize.height
     const layoutHeight = event.nativeEvent.layoutMeasurement.height
-    
+
     // Check if content is scrollable
     const scrollable = contentHeight > layoutHeight
     setIsScrollable(scrollable)
-    
+
     // Show back button when scrolled past 100px AND content is scrollable
     setShowBackToTop(scrollable && scrollY > 100)
   }
@@ -733,29 +733,29 @@ export default function ListenScreen() {
             {(() => {
               return broadcastStatus !== 'schedule' && nextShowId
             })() && (
-              <TouchableOpacity
-                onPress={() => router.push(`/show/${nextShowId}`)}
-                style={styles.nextRow}
-              >
-                <Ionicons
-                  name="calendar-clear-outline"
-                  size={20}
-                  color={colors.text}
-                  style={styles.nextIcon}
-                />
-                <Text style={[styles.nextUp, { color: colors.text }]}>
-                  <Text style={{ fontWeight: '400' }}>Next: </Text>
-                  <FormattedShowTitle
-                    title={nextShowTitle}
-                    color={colors.text}
+                <TouchableOpacity
+                  onPress={() => router.push(`/show/${nextShowId}`)}
+                  style={styles.nextRow}
+                >
+                  <Ionicons
+                    name="calendar-clear-outline"
                     size={20}
-                    style={{ fontWeight: '700' }}
-                    asContent={true}
+                    color={colors.text}
+                    style={styles.nextIcon}
                   />
-                  <Text style={{ fontWeight: '400' }}> at {nextShowTime}</Text>
-                </Text>
-              </TouchableOpacity>
-            )}
+                  <Text style={[styles.nextUp, { color: colors.text }]}>
+                    <Text style={{ fontWeight: '400' }}>Next: </Text>
+                    <FormattedShowTitle
+                      title={nextShowTitle}
+                      color={colors.text}
+                      size={20}
+                      style={{ fontWeight: '700' }}
+                      asContent={true}
+                    />
+                    <Text style={{ fontWeight: '400' }}> at {nextShowTime}</Text>
+                  </Text>
+                </TouchableOpacity>
+              )}
 
             {currentShowId ? (
               <TouchableOpacity
