@@ -51,7 +51,13 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
     }
     
     return (
-      <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>
+      <Text 
+        style={[{ color, fontSize: size }, style]} 
+        numberOfLines={numberOfLines}
+        ellipsizeMode="tail"
+        breakStrategy="simple"
+        allowFontScaling={false}
+      >
         {title}{' '}
         <Ionicons 
           name="repeat" 
@@ -109,7 +115,13 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
       }
       
       return (
-        <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>
+        <Text 
+          style={[{ color, fontSize: size }, style]} 
+          numberOfLines={numberOfLines}
+          ellipsizeMode="tail"
+          breakStrategy="simple"
+          allowFontScaling={false}
+        >
           {parts[0]}
           <Ionicons 
             name="repeat" 
@@ -136,5 +148,15 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
   if (asContent) {
     return <>{title}</>;
   }
-  return <Text style={[{ color, fontSize: size }, style]} numberOfLines={numberOfLines}>{title}</Text>;
+  return (
+    <Text 
+      style={[{ color, fontSize: size }, style]} 
+      numberOfLines={numberOfLines}
+      ellipsizeMode="tail"
+      breakStrategy="simple"
+      allowFontScaling={false}
+    >
+      {title}
+    </Text>
+  );
 }; 

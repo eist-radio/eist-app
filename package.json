@@ -6,7 +6,8 @@
           "react-native-track-player",
           "@fortawesome/fontawesome-svg-core",
           "@fortawesome/free-brands-svg-icons"
-        ]
+        ],
+        "listUnknownPackages": false
       }
     }
   },
@@ -26,14 +27,15 @@
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-brands-svg-icons": "^6.7.2",
     "@fortawesome/react-native-fontawesome": "^0.3.2",
-    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/netinfo": "^11.4.1",
     "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.6",
     "@tanstack/react-query": "^5.77.2",
+    "@vmsilva/react-native-track-player": "^4.1.6",
     "expo": "53.0.20",
-    "expo-audio": "~0.4.8",
+    "expo-audio": "^0.4.8",
     "expo-blur": "~14.1.5",
     "expo-clipboard": "~7.1.5",
     "expo-constants": "~17.1.6",
@@ -46,7 +48,6 @@
     "expo-linking": "~7.1.7",
     "expo-router": "~5.1.4",
     "expo-sharing": "^13.1.5",
-    "expo-splash-screen": "~0.30.10",
     "expo-status-bar": "~2.2.3",
     "expo-symbols": "~0.4.5",
     "expo-system-ui": "~5.0.10",
@@ -61,7 +62,6 @@
     "react-native-screens": "~4.11.1",
     "react-native-share": "^12.0.11",
     "react-native-svg": "15.11.2",
-    "react-native-track-player": "^4.1.1",
     "react-native-view-shot": "^4.0.3",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5"

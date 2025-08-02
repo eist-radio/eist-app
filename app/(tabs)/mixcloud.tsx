@@ -9,6 +9,7 @@ import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, StyleShee
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
 
 const mixcloudLogo = require('../../assets/images/mc-logo-default.png')
+const logoImage = require('../../assets/images/eist-logo-header.png')
 
 const ShowItem = ({ show, onPress }: { show: MixcloudShow; onPress: () => void }) => {
   const { colors } = useTheme()
@@ -182,11 +183,31 @@ export default function MixcloudScreen() {
     <SwipeNavigator>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.header}>
-          <Image
-            source={mixcloudLogo}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <TouchableOpacity 
+            style={styles.eistLogoContainer}
+            activeOpacity={0.7}
+            onPress={() => Linking.openURL('https://eist.radio/support')}
+            accessibilityRole="link"
+          >
+            <View style={styles.eistLogoBackground}>
+              <Image
+                source={logoImage}
+                style={{ width: 54, height: 54 }} // 5% smaller than 57
+                resizeMode="contain"
+              />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => Linking.openURL('https://www.mixcloud.com/eistcork/')}
+            accessibilityRole="link"
+          >
+            <Image
+              source={mixcloudLogo}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.content}>
@@ -240,6 +261,17 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginTop: 48,
+    position: 'relative',
+  },
+  eistLogoContainer: { 
+    position: 'absolute', 
+    top: -20, 
+    right: 18,
+    zIndex: 1,
+  },
+  eistLogoBackground: {
+    borderRadius: 24, // Smaller radius for smaller logo
+    padding: 5, // Smaller padding for smaller logo
   },
   content: {
     flex: 1,

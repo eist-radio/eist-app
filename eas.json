@@ -14,9 +14,18 @@
       }
     },
     "production": {
+      "autoIncrement": "true",
       "distribution": "store",
       "env": {
         "API_KEY": "@API_KEY"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "releaseStatus": "draft"
       }
     }
   }
