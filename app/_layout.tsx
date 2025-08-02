@@ -5,22 +5,18 @@ import { ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Image,
-    StyleSheet,
-    View,
+  ActivityIndicator,
+  Animated,
+  Image,
+  StyleSheet,
+  View,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TrackPlayerProvider } from '../context/TrackPlayerContext';
 import { EistDarkTheme, EistLightTheme } from '../themes';
-
-// Tell the native splash to stay visible until we explicitly hide it
-SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
@@ -47,17 +43,16 @@ export default function RootLayout() {
       await new Promise((resolve) => setTimeout(resolve, 900));
 
       setIsAppReady(true);
-      await SplashScreen.hideAsync();
 
       Animated.parallel([
         Animated.timing(appOpacity, {
           toValue: 1,
-          duration: 3200,
+          duration: 500,
           useNativeDriver: true,
         }),
         Animated.timing(splashOpacity, {
           toValue: 0,
-          duration: 2800,
+          duration: 3200,
           useNativeDriver: true,
         }),
       ]).start(() => {
@@ -85,20 +80,20 @@ export default function RootLayout() {
           ]}
         >
           <QueryClientProvider client={queryClient}>
-            <Suspense
-              fallback={
-                <View style={styles.loader}>
-                  <ActivityIndicator size="large" />
-                </View>
-              }
-            >
-              <TrackPlayerProvider>
+            <TrackPlayerProvider>
+              <Suspense
+                fallback={
+                  <View style={styles.loader}>
+                    <ActivityIndicator size="large" />
+                  </View>
+                }
+              >
                 <ThemeProvider value={theme}>
                   <Stack screenOptions={{ headerShown: false }} />
                   <StatusBar style="auto" />
                 </ThemeProvider>
-              </TrackPlayerProvider>
-            </Suspense>
+              </Suspense>
+            </TrackPlayerProvider>
           </QueryClientProvider>
         </Animated.View>
 

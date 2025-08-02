@@ -8,19 +8,23 @@ import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  AppState,
-  RefreshControl,
-  SectionList,
-  StyleSheet,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Animated,
+    AppState,
+    Image,
+    Linking,
+    RefreshControl,
+    SectionList,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiKey } from '../../config';
 import { useTrackPlayer } from '../../context/TrackPlayerContext';
 import { useTimezoneChange } from '../../hooks/useTimezoneChange';
+
+const logoImage = require('../../assets/images/eist-logo-header.png')
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
@@ -394,6 +398,20 @@ export default function ScheduleScreen() {
           <SelectableThemedText style={[styles.title, { color: colors.primary }]}>
             Schedule
           </SelectableThemedText>
+          <TouchableOpacity 
+            style={styles.logoContainer}
+            activeOpacity={0.7}
+            onPress={() => Linking.openURL('https://eist.radio/support')}
+            accessibilityRole="link"
+          >
+            <View style={styles.logoBackground}>
+              <Image
+                source={logoImage}
+                style={{ width: 57, height: 57 }} // 30% smaller than 81.4
+                resizeMode="contain"
+              />
+            </View>
+          </TouchableOpacity>
         </View>
 
         <SectionList
@@ -464,7 +482,7 @@ export default function ScheduleScreen() {
                         color={colors.primary}
                         size={18}
                         inline={true}
-                        noWrap={true}
+                        numberOfLines={undefined}
                         style={[
                           styles.cellText,
                           {
@@ -533,6 +551,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
+    flexWrap: 'wrap',
+    flexShrink: 1,
   },
   playIcon: {
     marginRight: 6,
@@ -542,10 +562,23 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     textAlign: 'left',
+    flexShrink: 1,
   },
+
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  logoContainer: { 
+    position: 'absolute', 
+    top: -30, 
+    right: 5 
+  },
+  logoBackground: {
+    borderRadius: 26, // Smaller radius for smaller logo
+    padding: 6, // Smaller padding for smaller logo
   },
   backToTopButton: {
     position: 'absolute',

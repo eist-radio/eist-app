@@ -6,6 +6,7 @@ import React, { useState } from 'react'
 import { Alert, Dimensions, Image, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 
 const { width: screenWidth } = Dimensions.get('window');
+const logoImage = require('../../assets/images/eist-logo-header.png')
 
 export default function SoundCloudScreen() {
   const { colors } = useTheme()
@@ -49,6 +50,20 @@ export default function SoundCloudScreen() {
             style={[styles.fullWidthImage, { opacity: 0.3 }]}
             resizeMode="cover"
           />
+          <TouchableOpacity
+            style={styles.eistLogoContainer}
+            activeOpacity={0.7}
+            onPress={() => Linking.openURL('https://eist.radio/support')}
+            accessibilityRole="link"
+          >
+            <View style={styles.eistLogoBackground}>
+              <Image
+                source={logoImage}
+                style={{ width: 57, height: 57 }} // 30% smaller than 81.4
+                resizeMode="contain"
+              />
+            </View>
+          </TouchableOpacity>
           <View style={styles.logoContainer}>
             <FontAwesomeIcon
               icon={faSoundcloud}
@@ -92,6 +107,16 @@ const styles = StyleSheet.create({
     height: screenWidth,
     position: 'relative',
     overflow: 'hidden',
+  },
+  eistLogoContainer: { 
+    position: 'absolute', 
+    top: 26, 
+    right: 18,
+    zIndex: 1,
+  },
+  eistLogoBackground: {
+    borderRadius: 26, // Smaller radius for smaller logo
+    padding: 6, // Smaller padding for smaller logo
   },
   fullWidthImage: {
     width: '100%',

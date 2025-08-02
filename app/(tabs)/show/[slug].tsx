@@ -627,7 +627,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginHorizontal: 2,
     marginVertical: 2,
-    marginRight: 6,
+    marginRight: 4,
   },
   timeText: {
     fontSize: 16,
