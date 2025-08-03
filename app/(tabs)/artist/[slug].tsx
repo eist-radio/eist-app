@@ -331,13 +331,7 @@ export default function ArtistScreen() {
 
   return (
     <SwipeNavigator>
-      <ScrollView
-        ref={scrollViewRef}
-        style={[styles.screen, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.content}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      >
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <View style={styles.avatarContainer}>
           {imageReady ? (
             <Image
@@ -370,57 +364,65 @@ export default function ArtistScreen() {
           )}
         </View>
 
-        <View style={styles.titleRow}>
-          <Ionicons
-            name="headset-outline"
-            size={36}
-            color={colors.primary}
-            style={styles.icon}
-          />
-          <ThemedText
-            type="subtitle"
-            style={[styles.header, { color: colors.primary }]}
-            numberOfLines={2}
-            ellipsizeMode="tail"
-          >
-            {artist.name || 'Unnamed Artist'}
-          </ThemedText>
-        </View>
-
-        <View style={styles.textContainer}>
-          {paragraphs.map((p, i) => (
-            <SelectableText
-              key={i}
-              text={p}
-              style={[styles.bodyText, { color: colors.text }]}
-              linkStyle={{ color: colors.primary }}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.contentContainer}
+          contentContainerStyle={styles.content}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
+          <View style={styles.titleRow}>
+            <Ionicons
+              name="headset-outline"
+              size={36}
+              color={colors.primary}
+              style={styles.icon}
             />
-          ))}
+            <ThemedText
+              type="subtitle"
+              style={[styles.header, { color: colors.primary }]}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {artist.name || 'Unnamed Artist'}
+            </ThemedText>
+          </View>
 
-          {entries.length > 0 && (
-            <View style={styles.linkRow}>
-              {entries.map(([label, url], idx) => (
-                <React.Fragment key={label}>
-                  <TouchableOpacity onPress={() => openLink(url)}>
-                    <Text style={[styles.linkText, { color: colors.primary }]}>
-                      {label}
-                    </Text>
-                  </TouchableOpacity>
-                  {idx < entries.length - 1 && (
-                    <Text style={[styles.separator, { color: colors.text }]}>
-                      {' / '}
-                    </Text>
-                  )}
-                </React.Fragment>
-              ))}
-            </View>
-          )}
-        </View>
-      </ScrollView>
-              <BackToTopButton
+          <View style={styles.textContainer}>
+            {paragraphs.map((p, i) => (
+              <SelectableText
+                key={i}
+                text={p}
+                style={[styles.bodyText, { color: colors.text }]}
+                linkStyle={{ color: colors.primary }}
+              />
+            ))}
+
+            {entries.length > 0 && (
+              <View style={styles.linkRow}>
+                {entries.map(([label, url], idx) => (
+                  <React.Fragment key={label}>
+                    <TouchableOpacity onPress={() => openLink(url)}>
+                      <Text style={[styles.linkText, { color: colors.primary }]}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                    {idx < entries.length - 1 && (
+                      <Text style={[styles.separator, { color: colors.text }]}>
+                        {' / '}
+                      </Text>
+                    )}
+                  </React.Fragment>
+                ))}
+              </View>
+            )}
+          </View>
+        </ScrollView>
+        <BackToTopButton
           onPress={scrollToTop}
           visible={showBackToTop && isScrollable}
         />
+      </View>
     </SwipeNavigator>
   );
 }
@@ -433,6 +435,9 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'flex-start',
     paddingBottom: 24,
+  },
+  contentContainer: {
+    flex: 1,
   },
   avatarContainer: {
     width: screenWidth,

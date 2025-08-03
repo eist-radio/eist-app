@@ -8,16 +8,16 @@ import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    AppState,
-    Image,
-    Linking,
-    RefreshControl,
-    SectionList,
-    StyleSheet,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Animated,
+  AppState,
+  Image,
+  Linking,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { apiKey } from '../../config';
@@ -197,6 +197,76 @@ export default function ScheduleScreen() {
       animated: true 
     });
   };
+
+  const renderSectionHeader = React.useCallback(({ section: { title } }: { section: { title: string } }) => (
+    <>
+      <SelectableThemedText style={[styles.sectionHeader, { color: colors.primary }]}>
+        {title}
+      </SelectableThemedText>
+      <View style={styles.headerRow}>
+        <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
+          Time
+        </SelectableThemedText>
+        <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
+          Show
+        </SelectableThemedText>
+      </View>
+    </>
+  ), [colors.primary]);
+
+  const renderItem = React.useCallback(({ item }: { item: any }) => {
+    const isCurrent = item.id === currentShowId;
+    const CellWrapper = isCurrent ? Animated.View : View;
+
+    return (
+      <CellWrapper style={isCurrent ? { opacity: fadeAnim } : undefined}>
+        <View style={styles.row}>
+          <SelectableThemedText
+            style={[
+              styles.cell,
+              {
+                color: colors.text,
+                fontWeight: isCurrent ? '700' : '400',
+                fontStyle: isCurrent ? 'italic' : 'normal',
+              },
+            ]}
+          >
+            {item.time}
+          </SelectableThemedText>
+
+          <Link
+            href={`/show/${encodeURIComponent(item.id)}`}
+            style={{ flex: 1 }}
+          >
+            <View style={styles.showCellContent}>
+              {isCurrent && (
+                <Ionicons
+                  name="arrow-forward-outline"
+                  size={18}
+                  color={colors.primary}
+                  style={styles.playIcon}
+                />
+              )}
+              <FormattedShowTitle
+                title={item.title}
+                color={colors.primary}
+                size={18}
+                inline={true}
+                numberOfLines={undefined}
+                style={[
+                  styles.cellText,
+                  {
+                    fontWeight: isCurrent ? '700' : '600',
+                    fontStyle: isCurrent ? 'italic' : 'normal',
+                  },
+                ]}
+              />
+            </View>
+          </Link>
+        </View>
+      </CellWrapper>
+    );
+  }, [currentShowId, colors.text, colors.primary, fadeAnim]);
 
   useEffect(() => {
     (async () => {
@@ -421,6 +491,10 @@ export default function ScheduleScreen() {
           stickySectionHeadersEnabled={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={10}
+          windowSize={10}
+          initialNumToRender={10}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}
@@ -429,74 +503,8 @@ export default function ScheduleScreen() {
               colors={[colors.primary]}
             />
           }
-          renderSectionHeader={({ section: { title } }) => (
-            <>
-              <SelectableThemedText style={[styles.sectionHeader, { color: colors.primary }]}>
-                {title}
-              </SelectableThemedText>
-              <View style={styles.headerRow}>
-                <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
-                  Time
-                </SelectableThemedText>
-                <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
-                  Show
-                </SelectableThemedText>
-              </View>
-            </>
-          )}
-          renderItem={({ item }) => {
-            const isCurrent = item.id === currentShowId;
-            const CellWrapper = isCurrent ? Animated.View : View;
-
-            return (
-              <CellWrapper style={isCurrent ? { opacity: fadeAnim } : undefined}>
-                <View style={styles.row}>
-                  <SelectableThemedText
-                    style={[
-                      styles.cell,
-                      {
-                        color: colors.text,
-                        fontWeight: isCurrent ? '700' : '400',
-                        fontStyle: isCurrent ? 'italic' : 'normal',
-                      },
-                    ]}
-                  >
-                    {item.time}
-                  </SelectableThemedText>
-
-                  <Link
-                    href={`/show/${encodeURIComponent(item.id)}`}
-                    style={{ flex: 1 }}
-                  >
-                    <View style={styles.showCellContent}>
-                      {isCurrent && (
-                        <Ionicons
-                          name="arrow-forward-outline"
-                          size={18}
-                          color={colors.primary}
-                          style={styles.playIcon}
-                        />
-                      )}
-                      <FormattedShowTitle
-                        title={item.title}
-                        color={colors.primary}
-                        size={18}
-                        inline={true}
-                        numberOfLines={undefined}
-                        style={[
-                          styles.cellText,
-                          {
-                            fontWeight: isCurrent ? '700' : '600',
-                            fontStyle: isCurrent ? 'italic' : 'normal',
-                          },
-                        ]}
-                      />
-                    </View>
-                  </Link>
-                </View>
-              </CellWrapper>
-            );
-          }}
+          renderSectionHeader={renderSectionHeader}
+          renderItem={renderItem}
           contentContainerStyle={styles.list}
         />
         <BackToTopButton
@@ -573,8 +581,8 @@ const styles = StyleSheet.create({
   },
   logoContainer: { 
     position: 'absolute', 
-    top: -30, 
-    right: 5 
+    top: -26, 
+    right: 5,
   },
   logoBackground: {
     borderRadius: 26, // Smaller radius for smaller logo

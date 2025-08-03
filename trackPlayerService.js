@@ -58,7 +58,7 @@ const shouldAutoPlayOnCarPlay = async () => {
     return lastState.wasPlaying && lastState.timestamp > twentyFourHoursAgo
 }
 
-// Clean reset function for fresh stream (matches context implementation)
+// Clean reset function for fresh stream
 const cleanResetAndPlay = async () => {
     // Skip on web platform
     if (Platform.OS === 'web') {
@@ -170,7 +170,7 @@ const playbackService = async () => {
         }
     })
 
-    // Handle remote pause - treat as stop for live radio
+    // Handle remote pause
     TrackPlayer.addEventListener(Event.RemotePause, async () => {
         console.log('Service: Remote Pause event received - treating as stop for radio')
         try {

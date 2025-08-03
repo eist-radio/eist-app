@@ -109,9 +109,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  eistLogoContainer: { 
-    position: 'absolute', 
-    top: 26, 
+  eistLogoContainer: {
+    position: 'absolute',
+    top: 48,
     right: 18,
     zIndex: 1,
   },
