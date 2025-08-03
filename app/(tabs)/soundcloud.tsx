@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   },
   eistLogoContainer: { 
     position: 'absolute', 
-    top: 26, 
+    top: 48,
     right: 18,
     zIndex: 1,
   },

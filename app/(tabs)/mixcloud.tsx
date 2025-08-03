@@ -192,7 +192,7 @@ export default function MixcloudScreen() {
             <View style={styles.eistLogoBackground}>
               <Image
                 source={logoImage}
-                style={{ width: 54, height: 54 }} // 5% smaller than 57
+                style={{ width: 57, height: 57 }}
                 resizeMode="contain"
               />
             </View>
@@ -257,6 +257,7 @@ export default function MixcloudScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: 16,
   },
   header: {
     alignItems: 'center',
@@ -265,13 +266,13 @@ const styles = StyleSheet.create({
   },
   eistLogoContainer: { 
     position: 'absolute', 
-    top: -20, 
+    top: -15, 
     right: 18,
     zIndex: 1,
   },
   eistLogoBackground: {
-    borderRadius: 24, // Smaller radius for smaller logo
-    padding: 5, // Smaller padding for smaller logo
+    borderRadius: 26, // Smaller radius for smaller logo
+    padding: 6, // Smaller padding for smaller logo
   },
   content: {
     flex: 1,

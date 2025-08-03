@@ -64,7 +64,7 @@ eas build --platform ios --profile development
 Then, start the dev server:
 
 ```cmd
-npx expo start --tunnel
+npx expo start --tunnel --clear
 ```
 
 Once complete, install the Dev build via QR code.

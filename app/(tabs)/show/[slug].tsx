@@ -11,18 +11,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Dimensions,
-  Image,
-  Linking,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Dimensions,
+    Image,
+    Linking,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { FormattedShowTitle } from '../../../components/FormattedShowTitle';
@@ -448,13 +448,7 @@ export default function ShowScreen() {
 
   return (
     <SwipeNavigator>
-      <ScrollView
-        ref={shareViewRef}
-        style={[styles.screen, { backgroundColor: colors.background }]}
-        contentContainerStyle={styles.content}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      >
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <View 
           ref={shareContentRef} 
           style={styles.shareableContent}
@@ -499,7 +493,15 @@ export default function ShowScreen() {
               </View>
             </TouchableOpacity>
           </View>
+        </View>
 
+        <ScrollView
+          ref={shareViewRef}
+          style={styles.contentContainer}
+          contentContainerStyle={styles.content}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+        >
           {/* All content - inside shareable content */}
           <View style={styles.shareableTitle}>
             <View style={[
@@ -576,12 +578,12 @@ export default function ShowScreen() {
               ))}
             </View>
           </View>
-        </View>
-      </ScrollView>
-              <BackToTopButton
+        </ScrollView>
+        <BackToTopButton
           onPress={scrollToTop}
           visible={showBackToTop && isScrollable}
         />
+      </View>
     </SwipeNavigator>
   );
 }
@@ -598,6 +600,9 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'flex-start',
     paddingBottom: 24,
+  },
+  contentContainer: {
+    flex: 1,
   },
   bannerContainer: {
     width: screenWidth,
