@@ -544,14 +544,14 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       
 
-      // Always use string URLs for artwork in metadata updates
-      let artworkToUse = artworkUrl || require('../assets/images/eist_online.png')
+      // Always use eist-square.png as fallback for artwork in metadata updates
+      let artworkToUse = artworkUrl || require('../assets/images/eist-square.png')
 
       if (isDeadAir) {
         const metadata = {
           title,
           artist: '',
-          artwork: require('../assets/images/eist_offline.png'),
+          artwork: require('../assets/images/eist-square.png'),
         }
         
         await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
@@ -562,7 +562,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           artwork: artworkToUse,
         }
         
-                await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
+        await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
       }
     } catch (err) {
       console.error('Metadata update failed:', err)
