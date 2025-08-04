@@ -227,30 +227,23 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       // More defensive capability checking
       const capabilities = []
-      const notificationCapabilities = []
 
       // Check if Capability exists and has the expected properties
       if (Capability && typeof Capability === 'object') {
         // Only add capabilities that are actually numbers
         if (typeof Capability.Play === 'number') {
           capabilities.push(Capability.Play)
-          notificationCapabilities.push(Capability.Play)
         }
         if (typeof Capability.Pause === 'number') {
           capabilities.push(Capability.Pause)
-          notificationCapabilities.push(Capability.Pause)
         }
         if (typeof Capability.Stop === 'number') {
           capabilities.push(Capability.Stop)
-          notificationCapabilities.push(Capability.Stop)
         }
       }
 
       // Double-check that all values are numbers
       const safeCapabilities = capabilities.filter((v) =>
-        typeof v === 'number' && !isNaN(v) && isFinite(v)
-      )
-      const safeNotificationCapabilities = notificationCapabilities.filter((v) =>
         typeof v === 'number' && !isNaN(v) && isFinite(v)
       )
 
@@ -261,14 +254,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         },
         stopWithApp: false,
         alwaysPausable: true,
+        notificationCapabilities: [],
+        compactCapabilities: [
+          Capability?.Play,
+          Capability?.Pause,
+          Capability?.Stop,
+        ].filter((cap) => typeof cap === 'number' && !isNaN(cap) && isFinite(cap)),
       }
 
-      // Only add capabilities if we have valid ones
       if (safeCapabilities.length > 0) {
         updateOptions.capabilities = safeCapabilities
-      }
-      if (safeNotificationCapabilities.length > 0) {
-        updateOptions.notificationCapabilities = safeNotificationCapabilities
       }
 
       await TrackPlayer.updateOptions(updateOptions)

@@ -195,6 +195,26 @@ const playbackService = async () => {
         }
     })
 
+    // Handle remote play/pause toggle (for compact capabilities)
+    TrackPlayer.addEventListener(Event.RemotePlayPause, async () => {
+        console.log('Service: Remote PlayPause event received')
+        try {
+            const state = await TrackPlayer.getPlaybackState();
+            if (state.state === State.Playing) {
+                console.log('Service: Currently playing, pausing...')
+                await TrackPlayer.stop()
+                await ensureTrackForDisplay() // Keep metadata visible
+                await storeLastPlayedState(false)
+            } else {
+                console.log('Service: Currently stopped/paused, playing...')
+                await cleanResetAndPlay()
+            }
+        } catch (error) {
+            console.error('Service: Error in remote play/pause:', error)
+            // Don't let errors propagate - just log them
+        }
+    })
+
     // Handle playback state changes
     TrackPlayer.addEventListener(Event.PlaybackState, async ({ state }) => {
         console.log('Service: Playback state changed:', state)
