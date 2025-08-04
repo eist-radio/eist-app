@@ -11,8 +11,10 @@ import {
   ActivityIndicator,
   Animated,
   AppState,
+  Dimensions,
   Image,
   Linking,
+  Platform,
   RefreshControl,
   SectionList,
   StyleSheet,
@@ -105,6 +107,8 @@ export default function ScheduleScreen() {
   const { isPlaying } = useTrackPlayer();
   const currentTimezone = useTimezoneChange();
   const insets = useSafeAreaInsets();
+  const screenWidth = Dimensions.get('window').width;
+  const maxTitleWidth = screenWidth * 0.45;
 
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -252,9 +256,10 @@ export default function ScheduleScreen() {
                 color={colors.primary}
                 size={18}
                 inline={true}
-                numberOfLines={undefined}
+                numberOfLines={3}
                 style={[
                   styles.cellText,
+                  Platform.OS === 'android' && { maxWidth: maxTitleWidth },
                   {
                     fontWeight: isCurrent ? '700' : '600',
                     fontStyle: isCurrent ? 'italic' : 'normal',
