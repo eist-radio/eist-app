@@ -261,19 +261,6 @@ export default function MixcloudScreen() {
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={handleRefresh}
-            disabled={isLoading}
-            activeOpacity={0.7}
-          >
-            <Ionicons 
-              name="refresh" 
-              size={24} 
-              color={colors.text} 
-            />
-          </TouchableOpacity>
-          
-          <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => Linking.openURL('https://www.mixcloud.com/eistcork/')}
             accessibilityRole="link"
@@ -483,18 +470,6 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  refreshButton: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    zIndex: 1,
   },
 
 })
