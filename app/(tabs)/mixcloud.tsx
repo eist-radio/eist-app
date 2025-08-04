@@ -7,6 +7,8 @@ import { useTheme } from '@react-navigation/native'
 import React, { useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
+import { useNetworkConnectivity } from '../../hooks/useNetworkConnectivity'
+import { openMixcloudShow } from '../../utils/urlDetection'
 
 const mixcloudLogo = require('../../assets/images/mc-logo-default.png')
 const logoImage = require('../../assets/images/eist-logo-header.png')
@@ -109,13 +111,15 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
 
 export default function MixcloudScreen() {
   const { colors } = useTheme()
+  const networkState = useNetworkConnectivity()
   const { 
     data, 
     isLoading, 
     error, 
     fetchNextPage, 
     hasNextPage, 
-    isFetchingNextPage 
+    isFetchingNextPage,
+    refetch
   } = useMixcloudShows()
 
   // Flatten all pages into a single array
@@ -128,17 +132,53 @@ export default function MixcloudScreen() {
 
   const openShow = async (show: MixcloudShow) => {
     try {
-      const canOpen = await Linking.canOpenURL(show.url)
-      if (canOpen) {
-        await Linking.openURL(show.url)
-      } else {
+      // Validate URL format
+      if (!show.url || !show.url.startsWith('http')) {
         Alert.alert(
-          'Cannot Open Show',
-          'Unable to open this show. Please make sure you have an internet connection.',
+          'Invalid URL',
+          'This show has an invalid URL format.',
           [{ text: 'OK' }]
         )
+        return
       }
-    } catch {
+
+      // Check network connectivity first
+      if (!networkState.isConnected) {
+        Alert.alert(
+          'No Internet Connection',
+          'Please check your internet connection and try again.',
+          [{ text: 'OK' }]
+        )
+        return
+      }
+
+      // Use the utility function to open the show
+      const success = await openMixcloudShow(show.url)
+      
+      if (!success) {
+        Alert.alert(
+          'Cannot Open Show',
+          'Unable to open this show. The Mixcloud app may not be installed or the URL format is not supported.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Copy URL', 
+              onPress: async () => {
+                try {
+                  const Clipboard = await import('expo-clipboard')
+                  await Clipboard.default.setStringAsync(show.url)
+                  Alert.alert('URL Copied', 'The show URL has been copied to your clipboard.')
+                } catch (clipboardError) {
+                  console.error('Failed to copy URL:', clipboardError)
+                  Alert.alert('Error', 'Failed to copy URL to clipboard.')
+                }
+              }
+            }
+          ]
+        )
+      }
+    } catch (error) {
+      console.error('Error opening show:', error)
       Alert.alert(
         'Error',
         'Failed to open show. Please try again later.',
@@ -170,6 +210,28 @@ export default function MixcloudScreen() {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true })
   }
 
+  const handleRefresh = async () => {
+    if (!networkState.isConnected) {
+      Alert.alert(
+        'No Internet Connection',
+        'Please check your internet connection and try again.',
+        [{ text: 'OK' }]
+      )
+      return
+    }
+    
+    try {
+      await refetch()
+    } catch (error) {
+      console.error('Failed to refresh shows:', error)
+      Alert.alert(
+        'Refresh Failed',
+        'Unable to refresh shows. Please try again later.',
+        [{ text: 'OK' }]
+      )
+    }
+  }
+
   const renderShowItem = ({ item }: { item: MixcloudShow }) => (
     <ShowItem show={item} onPress={() => openShow(item)} />
   )
@@ -197,6 +259,20 @@ export default function MixcloudScreen() {
               />
             </View>
           </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={handleRefresh}
+            disabled={isLoading}
+            activeOpacity={0.7}
+          >
+            <Ionicons 
+              name="refresh" 
+              size={24} 
+              color={colors.text} 
+            />
+          </TouchableOpacity>
+          
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={() => Linking.openURL('https://www.mixcloud.com/eistcork/')}
@@ -221,8 +297,21 @@ export default function MixcloudScreen() {
           ) : error ? (
             <View style={styles.errorContainer}>
               <ThemedText type="default" style={[styles.errorText, { color: colors.text }]}>
-                Unable to load shows. Please try again later.
+                {!networkState.isConnected 
+                  ? 'No internet connection. Please check your network settings and try again.'
+                  : 'Unable to load shows. Please try again later.'
+                }
               </ThemedText>
+              {!networkState.isConnected && (
+                <TouchableOpacity
+                  style={[styles.retryButton, { borderColor: colors.primary }]}
+                  onPress={() => window.location.reload()}
+                >
+                  <ThemedText type="default" style={[styles.retryButtonText, { color: colors.primary }]}>
+                    Retry
+                  </ThemedText>
+                </TouchableOpacity>
+              )}
             </View>
           ) : allShows.length > 0 ? (
             <FlatList
@@ -382,6 +471,30 @@ const styles = StyleSheet.create({
   },
   chevronIcon: {
     // Empty style for now, can be used for future styling
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  retryButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  refreshButton: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    zIndex: 1,
   },
 
 })
