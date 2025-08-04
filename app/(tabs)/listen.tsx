@@ -277,6 +277,8 @@ export default function ListenScreen() {
       setArtistCache(prev => ({ ...prev, [id]: artistData }))
       return artistData
     } catch (err) {
+      console.error('Error fetching artist details:', err)
+      // Don't let errors propagate - just log them and return fallback
       return { name: '', image: null }
     }
   }, [artistCache])
@@ -292,7 +294,12 @@ export default function ListenScreen() {
     // Don't clear next show info - it should be preserved when station is off air
     setIsContentLoading(false)
     setImageReady(true) // Offline images are always "ready"
-    await updateMetadata('éist · off air', '', undefined)
+    try {
+      await updateMetadata('éist · off air', '', undefined)
+    } catch (error) {
+      console.error('Error updating metadata in clearNowPlayingState:', error)
+      // Don't let errors propagate - just log them
+    }
   }, [updateMetadata])
 
   const clearNextShowInfo = useCallback(() => {
@@ -336,6 +343,8 @@ export default function ListenScreen() {
             setNextShowTime(formatTime(nextEvent.startDateUtc))
           }
         } catch (nextErr) {
+          console.error('Error fetching next show information in fetchLiveScheduleOnly:', nextErr)
+          // Don't let errors propagate - just log them
         }
         setIsContentLoading(false)
       } else {
@@ -444,6 +453,8 @@ export default function ListenScreen() {
             setNextShowTime(formatTime(nextEvent.startDateUtc))
           }
         } catch (nextErr) {
+          console.error('Error fetching next show information:', nextErr)
+          // Don't let errors propagate - just log them
         }
         return
       }
@@ -564,6 +575,7 @@ export default function ListenScreen() {
         })
       } catch (error) {
         console.log('Car detection setup error:', error)
+        // Don't let errors propagate - just log them
       }
     }
 
@@ -603,6 +615,7 @@ export default function ListenScreen() {
   useEffect(() => {
     setupPlayer().catch(error => {
       console.error('Failed to setup player:', error)
+      // Don't let errors propagate - just log them
     })
   }, [setupPlayer])
 
@@ -648,6 +661,8 @@ export default function ListenScreen() {
     try {
       await fetchNowPlayingWithArtist()
     } catch (error) {
+      console.error('Error in handleRefresh:', error)
+      // Don't let errors propagate - just log them
     } finally {
       setIsRefreshing(false)
     }

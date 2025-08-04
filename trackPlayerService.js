@@ -28,6 +28,7 @@ const storeLastPlayedState = async (wasPlaying) => {
         await AsyncStorage.default.setItem(WAS_PLAYING_KEY, wasPlaying.toString())
     } catch (error) {
         console.error('Failed to store last played state:', error)
+        // Don't let errors propagate - just log them
     }
 }
 
@@ -45,17 +46,23 @@ const getLastPlayedState = async () => {
         }
     } catch (error) {
         console.error('Failed to get last played state:', error)
+        // Don't let errors propagate - just log them
     }
     return null
 }
 
 const shouldAutoPlayOnCarPlay = async () => {
-    const lastState = await getLastPlayedState()
-    if (!lastState) return false
+    try {
+        const lastState = await getLastPlayedState()
+        if (!lastState) return false
 
-    // Check if the app was playing within the last 24 hours
-    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000)
-    return lastState.wasPlaying && lastState.timestamp > twentyFourHoursAgo
+        // Check if the app was playing within the last 24 hours
+        const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000)
+        return lastState.wasPlaying && lastState.timestamp > twentyFourHoursAgo
+    } catch (error) {
+        console.error('Error checking auto-play state:', error)
+        return false
+    }
 }
 
 // Clean reset function for fresh stream
@@ -96,7 +103,8 @@ const cleanResetAndPlay = async () => {
             await TrackPlayer.add(trackToAdd)
         } catch (addError) {
             console.error('TrackPlayer.add (service) failed:', addError)
-            throw addError
+            // Don't throw the error, just log it to prevent crashes
+            return
         }
 
         // Start fresh playback
@@ -133,11 +141,12 @@ const ensureTrackForDisplay = async () => {
                 await TrackPlayer.add(trackToAdd)
             } catch (addError) {
                 console.error('TrackPlayer.add (service ensureTrackForDisplay) failed:', addError)
-                throw addError
+                // Don't throw the error, just log it to prevent crashes
             }
         }
     } catch (err) {
         console.error('Service: Failed to ensure track for display:', err)
+        // Don't let errors propagate - just log them
     }
 }
 
@@ -155,6 +164,7 @@ const playbackService = async () => {
             await cleanResetAndPlay()
         } catch (error) {
             console.error('Service: Error in remote play:', error)
+            // Don't let errors propagate - just log them
         }
     })
 
@@ -167,6 +177,7 @@ const playbackService = async () => {
             await storeLastPlayedState(false)
         } catch (error) {
             console.error('Service: Error in remote stop:', error)
+            // Don't let errors propagate - just log them
         }
     })
 
@@ -179,6 +190,8 @@ const playbackService = async () => {
             await storeLastPlayedState(false)
         } catch (error) {
             console.error('Service: Error in remote pause:', error)
+            // Don't let errors propagate - just log them
+            // This prevents any potential navigation issues
         }
     })
 
@@ -210,11 +223,13 @@ const playbackService = async () => {
                             }
                         } catch (error) {
                             console.error('Service: Error during CarPlay auto-resume:', error)
+                            // Don't let errors propagate - just log them
                         }
                     }, 1000)
                 }
             } catch (error) {
                 console.error('Service: Error checking CarPlay auto-resume:', error)
+                // Don't let errors propagate - just log them
             }
         }
     })
@@ -230,7 +245,12 @@ const playbackService = async () => {
             error.message?.includes('audio') ||
             error.message?.includes('conflict')) {
             console.log('Service: Audio session interruption detected')
-            await storeLastPlayedState(true) // Remember we were playing
+            try {
+                await storeLastPlayedState(true) // Remember we were playing
+            } catch (storeError) {
+                console.error('Service: Error storing last played state:', storeError)
+                // Don't let errors propagate - just log them
+            }
         }
     })
 }
