@@ -496,7 +496,7 @@ export default function ScheduleScreen() {
           stickySectionHeadersEnabled={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          removeClippedSubviews={true}
+          removeClippedSubviews={Platform.OS === 'android'}
           maxToRenderPerBatch={10}
           windowSize={10}
           initialNumToRender={10}
@@ -564,8 +564,10 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    flexWrap: 'wrap',
-    flexShrink: 1,
+    ...(Platform.OS === 'android' && {
+      flexWrap: 'wrap',
+      flexShrink: 1,
+    }),
   },
   playIcon: {
     marginRight: 6,
@@ -575,7 +577,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     textAlign: 'left',
-    flexShrink: 1,
+    ...(Platform.OS === 'android' && {
+      flexShrink: 1,
+    }),
   },
 
   titleContainer: {
@@ -586,7 +590,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: { 
     position: 'absolute', 
-    top: -26, 
+    top: Platform.OS === 'ios' ? -28 : -38, 
     right: 5,
   },
   logoBackground: {

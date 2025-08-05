@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   imageContainer: {
-    width: screenWidth,
+    width: '100%',
     height: screenWidth,
     position: 'relative',
     overflow: 'hidden',
