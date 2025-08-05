@@ -36,6 +36,38 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ],
       // Additional audio permissions
       NSAppleMusicUsageDescription: "This app plays audio content and may access your music library for metadata display.",
+      // URL schemes for external apps
+      CFBundleURLTypes: [
+        {
+          CFBundleURLName: "mixcloud",
+          CFBundleURLSchemes: ["mixcloud"]
+        },
+        {
+          CFBundleURLName: "https",
+          CFBundleURLSchemes: ["https"]
+        },
+        {
+          CFBundleURLName: "http",
+          CFBundleURLSchemes: ["http"]
+        }
+      ],
+      // LSApplicationQueriesSchemes for checking if Mixcloud app is installed
+      LSApplicationQueriesSchemes: [
+        "mixcloud",
+        "https",
+        "http"
+      ],
+      // Additional URL handling permissions
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: true,
+        NSExceptionDomains: {
+          "mixcloud.com": {
+            NSExceptionAllowsInsecureHTTPLoads: true,
+            NSExceptionMinimumTLSVersion: "1.0",
+            NSExceptionRequiresForwardSecrecy: false
+          }
+        }
+      }
     },
   },
   android: {
