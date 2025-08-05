@@ -63,11 +63,13 @@ const fetchMixcloudShows = async (pageParam?: string): Promise<{
     
     const shows = data.data.map((show) => {
       const showUrl = show.url
+      console.log('Original show URL:', showUrl)
       
       // Validate and clean the URL
       let cleanUrl = showUrl
       if (showUrl && !showUrl.startsWith('http')) {
         cleanUrl = `https://www.mixcloud.com${showUrl}`
+        console.log('Cleaned URL:', cleanUrl)
       }
       
       return {

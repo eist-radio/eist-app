@@ -132,8 +132,11 @@ export default function MixcloudScreen() {
 
   const openShow = async (show: MixcloudShow) => {
     try {
+      console.log('Opening show:', show.title, 'URL:', show.url)
+      
       // Validate URL format
       if (!show.url || !show.url.startsWith('http')) {
+        console.error('Invalid URL format:', show.url)
         Alert.alert(
           'Invalid URL',
           'This show has an invalid URL format.',
@@ -156,6 +159,18 @@ export default function MixcloudScreen() {
       const success = await openMixcloudShow(show.url)
       
       if (!success) {
+        // Try direct Linking as fallback
+        console.log('Utility function failed, trying direct Linking...')
+        try {
+          const canOpen = await Linking.canOpenURL(show.url)
+          if (canOpen) {
+            await Linking.openURL(show.url)
+            return
+          }
+        } catch (directError) {
+          console.error('Direct Linking also failed:', directError)
+        }
+        
         Alert.alert(
           'Cannot Open Show',
           'Unable to open this show. The Mixcloud app may not be installed or the URL format is not supported.',
@@ -299,6 +314,27 @@ export default function MixcloudScreen() {
                   </ThemedText>
                 </TouchableOpacity>
               )}
+              {/* Debug test button */}
+              <TouchableOpacity
+                style={[styles.retryButton, { borderColor: colors.primary, marginTop: 16 }]}
+                onPress={async () => {
+                  console.log('Testing URL opening...')
+                  const testUrl = 'https://www.mixcloud.com/eistcork/'
+                  try {
+                    const canOpen = await Linking.canOpenURL(testUrl)
+                    console.log('Can open test URL:', canOpen)
+                    if (canOpen) {
+                      await Linking.openURL(testUrl)
+                    }
+                  } catch (error) {
+                    console.error('Test URL opening failed:', error)
+                  }
+                }}
+              >
+                <ThemedText type="default" style={[styles.retryButtonText, { color: colors.primary }]}>
+                  Test URL Opening
+                </ThemedText>
+              </TouchableOpacity>
             </View>
           ) : allShows.length > 0 ? (
             <FlatList

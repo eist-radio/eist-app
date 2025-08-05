@@ -89,40 +89,87 @@ export const getMixcloudAppUrl = (webUrl: string): string => {
   try {
     const url = new URL(webUrl)
     const path = url.pathname
-    return `mixcloud://${path}`
+    
+    // Remove leading slash if present
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path
+    
+    // Ensure we have a valid path
+    if (!cleanPath) {
+      console.warn('Invalid path for Mixcloud app URL:', path)
+      return webUrl
+    }
+    
+    const appUrl = `mixcloud://${cleanPath}`
+    console.log('Converted web URL to app URL:', webUrl, '->', appUrl)
+    return appUrl
   } catch (error) {
+    console.error('Error converting URL to app format:', error)
     return webUrl
   }
 }
 
 export const openMixcloudShow = async (webUrl: string): Promise<boolean> => {
   try {
+    console.log('Attempting to open Mixcloud show:', webUrl)
+    
+    // Validate the URL first
+    if (!webUrl || typeof webUrl !== 'string') {
+      console.error('Invalid URL provided:', webUrl)
+      return false
+    }
+    
     // First try to open in the Mixcloud app
     const appUrl = getMixcloudAppUrl(webUrl)
-    const canOpenApp = await Linking.canOpenURL(appUrl)
+    console.log('Generated app URL:', appUrl)
     
-    if (canOpenApp) {
-      await Linking.openURL(appUrl)
-      return true
+    try {
+      const canOpenApp = await Linking.canOpenURL(appUrl)
+      console.log('Can open app URL:', canOpenApp)
+      
+      if (canOpenApp) {
+        console.log('Opening in Mixcloud app...')
+        await Linking.openURL(appUrl)
+        return true
+      }
+    } catch (appError) {
+      console.error('Error checking/opening app URL:', appError)
     }
     
     // Fallback to web URL
-    const canOpenWeb = await Linking.canOpenURL(webUrl)
-    if (canOpenWeb) {
-      await Linking.openURL(webUrl)
-      return true
+    try {
+      const canOpenWeb = await Linking.canOpenURL(webUrl)
+      console.log('Can open web URL:', canOpenWeb)
+      
+      if (canOpenWeb) {
+        console.log('Opening in web browser...')
+        await Linking.openURL(webUrl)
+        return true
+      }
+    } catch (webError) {
+      console.error('Error checking/opening web URL:', webError)
     }
     
     // Try mobile web version
     const mobileUrl = webUrl.replace('https://www.mixcloud.com', 'https://m.mixcloud.com')
-    const canOpenMobile = await Linking.canOpenURL(mobileUrl)
-    if (canOpenMobile) {
-      await Linking.openURL(mobileUrl)
-      return true
+    console.log('Trying mobile URL:', mobileUrl)
+    
+    try {
+      const canOpenMobile = await Linking.canOpenURL(mobileUrl)
+      console.log('Can open mobile URL:', canOpenMobile)
+      
+      if (canOpenMobile) {
+        console.log('Opening in mobile web browser...')
+        await Linking.openURL(mobileUrl)
+        return true
+      }
+    } catch (mobileError) {
+      console.error('Error checking/opening mobile URL:', mobileError)
     }
     
+    console.log('All URL opening attempts failed')
     return false
   } catch (error) {
+    console.error('Error in openMixcloudShow:', error)
     return false
   }
 } 
