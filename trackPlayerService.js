@@ -98,26 +98,24 @@ const cleanResetAndPlay = async () => {
             isLiveStream: true,
         }
 
-        console.log('TrackPlayer.add (service) - trackToAdd:', JSON.stringify(trackToAdd, null, 2));
+        console.log('Service: Adding track to queue:', JSON.stringify(trackToAdd, null, 2))
+        
         try {
             await TrackPlayer.add(trackToAdd)
+            await TrackPlayer.play()
+            await storeLastPlayedState(true)
+            console.log('Service: Stream started successfully')
         } catch (addError) {
-            console.error('TrackPlayer.add (service) failed:', addError)
-            // Don't throw the error, just log it to prevent crashes
-            return
+            console.error('Service: TrackPlayer.add or play failed:', addError)
+            // Don't let errors propagate - just log them
         }
-
-        // Start fresh playback
-        await TrackPlayer.play()
-        await storeLastPlayedState(true)
-
-        console.log('Service: Clean reset and play completed')
-    } catch (err) {
-        console.error('Service: Clean reset and play failed:', err)
+    } catch (error) {
+        console.error('Service: Clean reset and play failed:', error)
+        // Don't let errors propagate - just log them
     }
 }
 
-// Ensure track exists for metadata display when stopped
+// Function to ensure track exists in queue for metadata display
 const ensureTrackForDisplay = async () => {
     // Skip on web platform
     if (Platform.OS === 'web') {
@@ -127,8 +125,9 @@ const ensureTrackForDisplay = async () => {
     try {
         const queue = await TrackPlayer.getQueue()
         if (!queue || queue.length === 0) {
+            // Add a track for display purposes (stopped state)
             const trackToAdd = {
-                id: 'radio-stream-' + Date.now(),
+                id: 'radio-display-' + Date.now(),
                 url: STREAM_URL,
                 title: 'éist',
                 artist: 'éist',
@@ -136,16 +135,16 @@ const ensureTrackForDisplay = async () => {
                 isLiveStream: true,
             }
             
-            console.log('TrackPlayer.add (service ensureTrackForDisplay) - trackToAdd:', JSON.stringify(trackToAdd, null, 2));
+            console.log('Service: TrackPlayer.add (ensureTrackForDisplay) - trackToAdd:', JSON.stringify(trackToAdd, null, 2));
             try {
                 await TrackPlayer.add(trackToAdd)
             } catch (addError) {
-                console.error('TrackPlayer.add (service ensureTrackForDisplay) failed:', addError)
-                // Don't throw the error, just log it to prevent crashes
+                console.error('Service: TrackPlayer.add failed in ensureTrackForDisplay:', addError)
+                // Don't let errors propagate - just log them
             }
         }
     } catch (err) {
-        console.error('Service: Failed to ensure track for display:', err)
+        console.error('Service: Ensure track for display failed:', err)
         // Don't let errors propagate - just log them
     }
 }
@@ -218,61 +217,93 @@ const playbackService = async () => {
     // Handle playback state changes
     TrackPlayer.addEventListener(Event.PlaybackState, async ({ state }) => {
         console.log('Service: Playback state changed:', state)
-        
-        // Update our internal state tracking
-        currentPlaybackState = state;
+        currentPlaybackState = state
 
         // Ensure metadata display is maintained when stopped
         if (state === State.Stopped) {
-            await ensureTrackForDisplay()
-        }
-
-        // Handle CarPlay auto-resume when audio session becomes ready
-        if (state === State.Ready) {
             try {
-                const shouldAutoPlay = await shouldAutoPlayOnCarPlay()
-                if (shouldAutoPlay) {
-                    console.log('Service: Audio ready, checking for CarPlay auto-resume')
-                    // Small delay to ensure CarPlay connection is stable
-                    setTimeout(async () => {
-                        try {
-                            // Use our tracked state instead of calling getState()
-                            if (currentPlaybackState === State.Ready) {
-                                console.log('Service: Auto-resuming on CarPlay connection')
-                                await cleanResetAndPlay()
-                            }
-                        } catch (error) {
-                            console.error('Service: Error during CarPlay auto-resume:', error)
-                            // Don't let errors propagate - just log them
-                        }
-                    }, 1000)
-                }
+                await ensureTrackForDisplay()
             } catch (error) {
-                console.error('Service: Error checking CarPlay auto-resume:', error)
+                console.error('Service: Error ensuring track for display:', error)
                 // Don't let errors propagate - just log them
             }
         }
     })
 
-    // Handle playback errors and audio session interruptions
+    // Handle playback errors
     TrackPlayer.addEventListener(Event.PlaybackError, async (error) => {
         console.error('Service: Playback error:', error)
 
-        // For audio session interruptions, just store the playing state
-        // Recovery will be handled by the context when the app becomes active
+        // Handle audio session interruptions
         if (error.message?.includes('interrupted') ||
             error.message?.includes('session') ||
-            error.message?.includes('audio') ||
-            error.message?.includes('conflict')) {
+            error.message?.includes('carplay') ||
+            error.message?.includes('android auto') ||
+            error.message?.includes('bluetooth')) {
             console.log('Service: Audio session interruption detected')
             try {
-                await storeLastPlayedState(true) // Remember we were playing
-            } catch (storeError) {
-                console.error('Service: Error storing last played state:', storeError)
+                await TrackPlayer.stop()
+                await ensureTrackForDisplay()
+                await storeLastPlayedState(false)
+            } catch (stopError) {
+                console.error('Service: Error stopping playback after interruption:', stopError)
                 // Don't let errors propagate - just log them
             }
         }
     })
+
+    // Handle queue ended
+    TrackPlayer.addEventListener(Event.PlaybackQueueEnded, async () => {
+        console.log('Service: Playback queue ended')
+        try {
+            await ensureTrackForDisplay()
+            await storeLastPlayedState(false)
+        } catch (error) {
+            console.error('Service: Error handling queue ended:', error)
+            // Don't let errors propagate - just log them
+        }
+    })
+
+    // Handle remote next (skip to next track)
+    TrackPlayer.addEventListener(Event.RemoteNext, async () => {
+        console.log('Service: Remote Next event received - restarting stream for radio')
+        try {
+            await cleanResetAndPlay()
+        } catch (error) {
+            console.error('Service: Error in remote next:', error)
+            // Don't let errors propagate - just log them
+        }
+    })
+
+    // Handle remote previous (skip to previous track)
+    TrackPlayer.addEventListener(Event.RemotePrevious, async () => {
+        console.log('Service: Remote Previous event received - restarting stream for radio')
+        try {
+            await cleanResetAndPlay()
+        } catch (error) {
+            console.error('Service: Error in remote previous:', error)
+            // Don't let errors propagate - just log them
+        }
+    })
+
+    // Handle remote seek
+    TrackPlayer.addEventListener(Event.RemoteSeek, async ({ position }) => {
+        console.log('Service: Remote Seek event received - position:', position)
+        // For live radio, seeking doesn't make sense, so we ignore it
+        // But we could restart the stream if needed
+    })
+
+    // Handle remote jump forward
+    TrackPlayer.addEventListener(Event.RemoteJumpForward, async ({ interval }) => {
+        console.log('Service: Remote Jump Forward event received - interval:', interval)
+        // For live radio, jumping forward doesn't make sense, so we ignore it
+    })
+
+    // Handle remote jump backward
+    TrackPlayer.addEventListener(Event.RemoteJumpBackward, async ({ interval }) => {
+        console.log('Service: Remote Jump Backward event received - interval:', interval)
+        // For live radio, jumping backward doesn't make sense, so we ignore it
+    })
 }
 
-export default playbackService
+export default playbackService;

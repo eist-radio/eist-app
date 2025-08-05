@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
     ActivityIndicator,
+    Alert,
     Animated,
     AppState,
     Dimensions,
@@ -21,7 +22,7 @@ import {
     StyleSheet,
     Text,
     TouchableOpacity,
-    View
+    View,
 } from 'react-native'
 import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
@@ -161,6 +162,8 @@ export default function ListenScreen() {
     togglePlayStop,
     setupPlayer,
     updateMetadata,
+    isBusy,
+    isPlayerReady,
   } = useTrackPlayer()
   const { width } = Dimensions.get('window')
   const router = useRouter()
@@ -186,6 +189,7 @@ export default function ListenScreen() {
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [isScrollable, setIsScrollable] = useState(false)
   const scrollViewRef = useRef<ScrollView>(null)
+
 
   const formatTime = (isoString: string): string => {
     const date = new Date(isoString)
@@ -635,6 +639,24 @@ export default function ListenScreen() {
     }
   }, [fetchLiveScheduleOnly, isPlaying])
 
+  const handlePlayButtonPress = useCallback(async () => {
+    console.log('Play button pressed')
+    console.log('Current state:', { isPlaying, isBusy, isPlayerReady })
+    
+    try {
+      await togglePlayStop()
+      console.log('Toggle completed successfully')
+    } catch (error) {
+      console.error('Error in play button press:', error)
+      // Show user-friendly error message
+      Alert.alert(
+        'Playback Error',
+        'Unable to start playback. Please try again.',
+        [{ text: 'OK' }]
+      )
+    }
+  }, [togglePlayStop, isPlaying, isBusy, isPlayerReady])
+
   const iconName = isPlaying
     ? 'stop-circle-outline'
     : 'play-circle-outline'
@@ -725,8 +747,18 @@ export default function ListenScreen() {
 
         <View style={styles.bottom}>
           <View style={styles.controlContainer}>
-            <TouchableOpacity onPress={togglePlayStop} style={styles.playButton}>
-              <Ionicons name={iconName} size={56} color={colors.primary} />
+            <TouchableOpacity 
+              onPress={handlePlayButtonPress} 
+              style={styles.playButton}
+              disabled={isBusy}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}
+            >
+              <Ionicons 
+                name={iconName} 
+                size={56} 
+                color={isBusy ? colors.text + '40' : colors.primary} 
+              />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -744,6 +776,8 @@ export default function ListenScreen() {
               </ThemedText>
             </TouchableOpacity>
           </View>
+
+
 
           <ScrollView
             ref={scrollViewRef}

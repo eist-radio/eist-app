@@ -25,6 +25,26 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       ],
       NSMicrophoneUsageDescription: "This app streams audio and does not record you, but a library we use requires an infoPlist entry to work.",
       ITSAppUsesNonExemptEncryption: false,
-    }
+      // iOS audio session configuration
+      AVAudioSessionCategory: "playback",
+      AVAudioSessionMode: "default",
+      AVAudioSessionOptions: [
+        "allowBluetooth",
+        "allowBluetoothA2DP",
+        "allowAirPlay",
+        "defaultToSpeaker"
+      ],
+      // Additional audio permissions
+      NSAppleMusicUsageDescription: "This app plays audio content and may access your music library for metadata display.",
+    },
+  },
+  android: {
+    ...config.android,
+    permissions: [
+      "android.permission.INTERNET",
+      "android.permission.WAKE_LOCK",
+      "android.permission.FOREGROUND_SERVICE",
+      "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+    ],
   }
 });

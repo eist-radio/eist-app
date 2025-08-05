@@ -87,8 +87,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     isPlayingRef.current = isPlaying
   }, [isPlaying])
 
-
-
   // Helper functions for storing/retrieving last played state
   const storeLastPlayedState = async (wasPlaying: boolean) => {
     if (isWeb) return
@@ -136,7 +134,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      
+      console.log('Performing clean reset...')
 
       // Stop current playback but don't reset queue yet
       await TrackPlayer.stop().catch(() => { })
@@ -161,6 +159,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         isLiveStream: true,
       }
 
+      console.log('Adding track to queue:', JSON.stringify(trackToAdd, null, 2))
       
       try {
         await TrackPlayer.add(trackToAdd)
@@ -170,7 +169,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      
+      console.log('Clean reset completed')
     } catch (err) {
       console.error('Clean reset failed:', err)
       throw err
@@ -198,12 +197,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         try {
           await TrackPlayer.add(trackToAdd)
         } catch (addError) {
-          console.error('TrackPlayer.add (ensureTrackForDisplay) failed:', addError)
-          // Don't throw the error, just log it to prevent crashes
+          console.error('TrackPlayer.add failed in ensureTrackForDisplay:', addError)
+          // Don't let errors propagate - just log them
         }
       }
     } catch (err) {
-      console.error('Failed to ensure track for display:', err)
+      console.error('Ensure track for display failed:', err)
+      // Don't let errors propagate - just log them
     }
   }
 
@@ -225,20 +225,30 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         hasInitialized.current = true
       }
 
-      // More defensive capability checking
+      // iOS-specific capability configuration
       const capabilities = []
+      const compactCapabilities = []
 
       // Check if Capability exists and has the expected properties
       if (Capability && typeof Capability === 'object') {
-        // Only add capabilities that are actually numbers
+        // Add basic capabilities
         if (typeof Capability.Play === 'number') {
           capabilities.push(Capability.Play)
+          compactCapabilities.push(Capability.Play)
         }
         if (typeof Capability.Pause === 'number') {
           capabilities.push(Capability.Pause)
+          compactCapabilities.push(Capability.Pause)
         }
         if (typeof Capability.Stop === 'number') {
           capabilities.push(Capability.Stop)
+          compactCapabilities.push(Capability.Stop)
+        }
+        if (typeof Capability.SkipToNext === 'number') {
+          capabilities.push(Capability.SkipToNext)
+        }
+        if (typeof Capability.SkipToPrevious === 'number') {
+          capabilities.push(Capability.SkipToPrevious)
         }
       }
 
@@ -246,26 +256,34 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const safeCapabilities = capabilities.filter((v) =>
         typeof v === 'number' && !isNaN(v) && isFinite(v)
       )
+      const safeCompactCapabilities = compactCapabilities.filter((v) =>
+        typeof v === 'number' && !isNaN(v) && isFinite(v)
+      )
 
-      // Only set up options if we have valid capabilities
+      // iOS-specific options
       const updateOptions: any = {
         android: {
           appKilledPlaybackBehavior: AppKilledPlaybackBehavior?.StopPlaybackAndRemoveNotification,
         },
+        ios: {
+          // iOS-specific audio session configuration
+          backgroundMode: 'audio',
+          capabilities: safeCapabilities,
+          notificationCapabilities: safeCapabilities,
+          compactCapabilities: safeCompactCapabilities,
+        },
         stopWithApp: false,
         alwaysPausable: true,
-        notificationCapabilities: [],
-        compactCapabilities: [
-          Capability?.Play,
-          Capability?.Pause,
-          Capability?.Stop,
-        ].filter((cap) => typeof cap === 'number' && !isNaN(cap) && isFinite(cap)),
+        notificationCapabilities: safeCapabilities,
+        compactCapabilities: safeCompactCapabilities,
       }
 
+      // Add capabilities to root level for backward compatibility
       if (safeCapabilities.length > 0) {
         updateOptions.capabilities = safeCapabilities
       }
 
+      console.log('Updating player options:', JSON.stringify(updateOptions, null, 2))
       await TrackPlayer.updateOptions(updateOptions)
 
       setIsPlayerReady(true)
@@ -370,7 +388,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const play = useCallback(async () => {
-    if (isBusy) return
+    if (isBusy) {
+      console.log('Play blocked: player is busy')
+      return
+    }
     setIsBusy(true)
 
     if (isWeb) {
@@ -401,14 +422,17 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      
+      console.log('Starting playback...')
 
       // Ensure player is ready
       if (!isPlayerReady) {
+        console.log('Player not ready, setting up...')
         await setupPlayer()
         if (!isPlayerReady) {
+          console.log('Player setup failed, attempting recovery...')
           await recoverFromAudioSessionConflict()
           if (!isPlayerReady) {
+            console.log('Player recovery failed, aborting play')
             setIsBusy(false)
             return
           }
@@ -418,45 +442,53 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Always perform clean reset before playing
       await cleanResetPlayer()
 
-      // Fetch fresh metadata before starting playbook
+      // Fetch fresh metadata before starting playback
       await fetchAndUpdateShowMetadata()
 
       // Start playback with fresh stream
+      console.log('Calling TrackPlayer.play()...')
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
 
-      console.log('Stream started')
+      console.log('Stream started successfully')
     } catch (err) {
       console.error('Play failed:', err)
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
+      // More specific error handling for iOS
       if (
         msg.includes('audio session') ||
         msg.includes('interrupted') ||
         msg.includes('invalid state') ||
-        msg.includes('not ready')
+        msg.includes('not ready') ||
+        msg.includes('permission') ||
+        msg.includes('unauthorized')
       ) {
+        console.log('Audio session issue detected, attempting recovery...')
         
         await recoverFromAudioSessionConflict()
 
         // Try playing again after recovery
         try {
-          
+          console.log('Retrying playback after recovery...')
           await cleanResetPlayer()
           await fetchAndUpdateShowMetadata()
           await TrackPlayer.play()
           setIsPlaying(true)
           await storeLastPlayedState(true)
-          console.log('Stream started')
+          console.log('Stream started after recovery')
         } catch (retryErr) {
           console.error('Play failed after recovery:', retryErr)
+          setIsPlaying(false)
         }
+      } else {
+        setIsPlaying(false)
       }
     } finally {
       setIsBusy(false)
     }
-  }, [isBusy, isPlayerReady, isWeb])
+  }, [isBusy, isPlayerReady, isWeb, setupPlayer, recoverFromAudioSessionConflict, cleanResetPlayer, fetchAndUpdateShowMetadata])
 
   const stop = useCallback(async () => {
     if (isBusy) return
@@ -476,7 +508,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      
+      console.log('Stopping playback...')
 
       // Stop playback but preserve metadata for lock screen/CarPlay
       await TrackPlayer.stop()
@@ -496,10 +528,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsBusy(false)
     }
-  }, [isBusy, isWeb])
+  }, [isBusy, isWeb, ensureTrackForDisplay])
 
   const togglePlayStop = async () => {
-    if (isBusy) return
+    if (isBusy) {
+      console.log('Toggle blocked: player is busy')
+      return
+    }
 
     if (isPlaying) {
       try {
@@ -528,7 +563,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     try {
       const queue = await TrackPlayer.getQueue()
       if (!queue || queue.length === 0) {
-        
+        console.log('No queue available for metadata update')
         return
       }
 
@@ -537,7 +572,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const isDeadAir = title.trim().length === 0
       const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
 
-      
+      console.log('Updating metadata:', { title, artist: metadataArtist, artworkUrl })
 
       // Always use eist-square.png as fallback for artwork in metadata updates
       let artworkToUse = artworkUrl || require('../assets/images/eist-square.png')
@@ -628,6 +663,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         Event.PlaybackState,
         async ({ state }: any) => {
           const playing = state === State.Playing
+          console.log('Playback state changed:', state, 'isPlaying:', playing)
           setIsPlaying(playing)
 
           // Ensure metadata display is maintained when stopped
@@ -651,7 +687,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       )
 
       const onError = TrackPlayer.addEventListener(Event.PlaybackError, async (error: any) => {
-        
+        console.error('Playback error:', error)
 
         if (error.message?.includes('interrupted') ||
           error.message?.includes('session') ||
@@ -675,12 +711,14 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const onQueueEnded = TrackPlayer.addEventListener(
         Event.PlaybackQueueEnded,
         () => {
+          console.log('Playback queue ended')
           setIsPlaying(false)
           setIsBusy(false)
         }
       )
 
       const onRemoteStop = TrackPlayer.addEventListener(Event.RemoteStop, async () => {
+        console.log('Remote stop event received')
         try {
           await stop()
         } catch (error) {
@@ -689,6 +727,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       })
       const onRemotePause = TrackPlayer.addEventListener(Event.RemotePause, async () => {
+        console.log('Remote pause event received')
         try {
           await stop()
         } catch (error) {
@@ -697,6 +736,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       })
       const onRemotePlay = TrackPlayer.addEventListener(Event.RemotePlay, async () => {
+        console.log('Remote play event received')
         try {
           await play()
         } catch (error) {
