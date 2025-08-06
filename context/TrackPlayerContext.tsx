@@ -1,13 +1,13 @@
 // context/TrackPlayerContext.tsx
 
 import {
-    createContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState
 } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
@@ -16,7 +16,7 @@ import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 let TrackPlayer: any, AppKilledPlaybackBehavior: any, Capability: any, Event: any, State: any;
 if (Platform.OS !== 'web') {
   try {
-    const trackPlayerModule = require('@vmsilva/react-native-track-player');
+    const trackPlayerModule = require('react-native-track-player');
     TrackPlayer = trackPlayerModule.default;
     AppKilledPlaybackBehavior = trackPlayerModule.AppKilledPlaybackBehavior;
     Capability = trackPlayerModule.Capability;
@@ -225,42 +225,24 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         hasInitialized.current = true
       }
 
-      // iOS-specific capability configuration
-      const capabilities = []
-      const compactCapabilities = []
+      // Capabilities configuration - Using Capability enum as per best practices
+      const capabilities = [
+        Capability.Play,
+        Capability.Pause, 
+        Capability.Stop,
+        Capability.SeekTo,
+        Capability.SkipToNext,
+        Capability.SkipToPrevious,
+      ]
+      
+      const compactCapabilities = [
+        Capability.Play, 
+        Capability.Pause, 
+        Capability.SkipToNext, 
+        Capability.SkipToPrevious
+      ]
 
-      // Check if Capability exists and has the expected properties
-      if (Capability && typeof Capability === 'object') {
-        // Add basic capabilities
-        if (typeof Capability.Play === 'number') {
-          capabilities.push(Capability.Play)
-          compactCapabilities.push(Capability.Play)
-        }
-        if (typeof Capability.Pause === 'number') {
-          capabilities.push(Capability.Pause)
-          compactCapabilities.push(Capability.Pause)
-        }
-        if (typeof Capability.Stop === 'number') {
-          capabilities.push(Capability.Stop)
-          compactCapabilities.push(Capability.Stop)
-        }
-        if (typeof Capability.SkipToNext === 'number') {
-          capabilities.push(Capability.SkipToNext)
-        }
-        if (typeof Capability.SkipToPrevious === 'number') {
-          capabilities.push(Capability.SkipToPrevious)
-        }
-      }
-
-      // Double-check that all values are numbers
-      const safeCapabilities = capabilities.filter((v) =>
-        typeof v === 'number' && !isNaN(v) && isFinite(v)
-      )
-      const safeCompactCapabilities = compactCapabilities.filter((v) =>
-        typeof v === 'number' && !isNaN(v) && isFinite(v)
-      )
-
-      // iOS-specific options
+      // Options setup - Following best practices
       const updateOptions: any = {
         android: {
           appKilledPlaybackBehavior: AppKilledPlaybackBehavior?.StopPlaybackAndRemoveNotification,
@@ -268,20 +250,20 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         ios: {
           // iOS-specific audio session configuration
           backgroundMode: 'audio',
-          capabilities: safeCapabilities,
-          notificationCapabilities: safeCapabilities,
-          compactCapabilities: safeCompactCapabilities,
+          capabilities: capabilities,
+          notificationCapabilities: capabilities,
+          compactCapabilities: compactCapabilities,
         },
         stopWithApp: false,
         alwaysPausable: true,
-        notificationCapabilities: safeCapabilities,
-        compactCapabilities: safeCompactCapabilities,
+        notificationCapabilities: capabilities,
+        compactCapabilities: compactCapabilities,
+        // Progress update interval
+        progressUpdateEventInterval: 1,
       }
 
       // Add capabilities to root level for backward compatibility
-      if (safeCapabilities.length > 0) {
-        updateOptions.capabilities = safeCapabilities
-      }
+      updateOptions.capabilities = capabilities
 
       console.log('Updating player options:', JSON.stringify(updateOptions, null, 2))
       await TrackPlayer.updateOptions(updateOptions)

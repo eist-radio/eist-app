@@ -6,7 +6,7 @@ import 'react-native-gesture-handler';
 let TrackPlayer;
 if (Platform.OS !== 'web') {
   try {
-    TrackPlayer = require('@vmsilva/react-native-track-player').default;
+    TrackPlayer = require('react-native-track-player').default;
   } catch (error) {
     console.warn('TrackPlayer not available:', error);
   }
