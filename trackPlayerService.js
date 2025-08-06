@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 // Only import TrackPlayer on mobile platforms
 let TrackPlayer, Event, State;
 if (Platform.OS !== 'web') {
-  const trackPlayerModule = require('@vmsilva/react-native-track-player');
+  const trackPlayerModule = require('react-native-track-player');
   TrackPlayer = trackPlayerModule.default;
   Event = trackPlayerModule.Event;
   State = trackPlayerModule.State;
@@ -191,26 +191,6 @@ const playbackService = async () => {
             console.error('Service: Error in remote pause:', error)
             // Don't let errors propagate - just log them
             // This prevents any potential navigation issues
-        }
-    })
-
-    // Handle remote play/pause toggle (for compact capabilities)
-    TrackPlayer.addEventListener(Event.RemotePlayPause, async () => {
-        console.log('Service: Remote PlayPause event received')
-        try {
-            const state = await TrackPlayer.getPlaybackState();
-            if (state.state === State.Playing) {
-                console.log('Service: Currently playing, pausing...')
-                await TrackPlayer.stop()
-                await ensureTrackForDisplay() // Keep metadata visible
-                await storeLastPlayedState(false)
-            } else {
-                console.log('Service: Currently stopped/paused, playing...')
-                await cleanResetAndPlay()
-            }
-        } catch (error) {
-            console.error('Service: Error in remote play/pause:', error)
-            // Don't let errors propagate - just log them
         }
     })
 

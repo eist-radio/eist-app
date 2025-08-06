@@ -14,7 +14,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   "plugins": [
     "expo-audio",
     "expo-router",
-    "expo-web-browser"
+    "expo-web-browser",
+    "expo-font",
+    "expo-video"
   ],
   ios: {
     ...config.ios,
@@ -78,5 +80,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "android.permission.FOREGROUND_SERVICE",
       "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
     ],
+  },
+  // Disable new architecture for problematic packages
+  experiments: {
+    tsconfigPaths: true,
   }
 });

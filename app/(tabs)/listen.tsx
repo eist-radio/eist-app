@@ -33,7 +33,7 @@ import { useTimezoneChange } from '../../hooks/useTimezoneChange'
 let TrackPlayer: any, Event: any;
 if (Platform.OS !== 'web') {
   try {
-    const trackPlayerModule = require('@vmsilva/react-native-track-player');
+    const trackPlayerModule = require('react-native-track-player');
     TrackPlayer = trackPlayerModule.default;
     Event = trackPlayerModule.Event;
   } catch (error) {
