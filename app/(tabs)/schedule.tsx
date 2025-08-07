@@ -1,5 +1,3 @@
-// app/(tabs)/schedule.tsx
-
 import { SelectableThemedText } from '@/components/SelectableThemedText';
 import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { Ionicons } from '@expo/vector-icons';
@@ -107,7 +105,9 @@ export default function ScheduleScreen() {
   const currentTimezone = useTimezoneChange();
   const insets = useSafeAreaInsets();
   const screenWidth = Dimensions.get('window').width;
-  const maxTitleWidth = screenWidth * 0.45;
+  const containerPadding = 32; // 16px on each side
+  const availableWidth = screenWidth - containerPadding;
+  const maxTitleWidth = availableWidth * 0.6;
 
   const [sections, setSections] = useState<SectionData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,7 +145,6 @@ export default function ScheduleScreen() {
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      // Refresh both schedule data and live show data
       await Promise.all([
         fetchScheduleData(),
         (async () => {
@@ -185,11 +184,8 @@ export default function ScheduleScreen() {
     const contentHeight = event.nativeEvent.contentSize.height;
     const layoutHeight = event.nativeEvent.layoutMeasurement.height;
 
-    // Check if content is scrollable
     const scrollable = contentHeight > layoutHeight;
     setIsScrollable(scrollable);
-
-    // Show back button when scrolled past 100px AND content is scrollable
     setShowBackToTop(scrollable && scrollY > 100);
   };
 
@@ -202,19 +198,9 @@ export default function ScheduleScreen() {
   };
 
   const renderSectionHeader = React.useCallback(({ section }: { section: any }) => (
-    <>
-      <SelectableThemedText style={[styles.sectionHeader, { color: colors.primary }]}>
-        {section.title}
-      </SelectableThemedText>
-      <View style={styles.headerRow}>
-        <SelectableThemedText style={[styles.headerCellTime, { color: colors.primary }]}>
-          Time
-        </SelectableThemedText>
-        <SelectableThemedText style={[styles.headerCellShow, { color: colors.primary }]}>
-          Show
-        </SelectableThemedText>
-      </View>
-    </>
+    <SelectableThemedText style={[styles.sectionHeader, { color: colors.primary }]}>
+      {section.title}
+    </SelectableThemedText>
   ), [colors.primary]);
 
   const renderItem = React.useCallback(({ item }: { item: any }) => {
@@ -239,7 +225,7 @@ export default function ScheduleScreen() {
 
           <Link
             href={`/show/${encodeURIComponent(item.id)}`}
-            style={{ flex: 1.3 }}
+            style={{ flex: 1, minWidth: 0 }}
           >
             <View style={styles.showCellContent}>
               {isCurrent && (
@@ -256,13 +242,13 @@ export default function ScheduleScreen() {
                 size={18}
                 style={[
                   styles.cellText,
-                  { 
-                    maxWidth: maxTitleWidth,
+                  {
                     fontWeight: isCurrent ? '700' : '600',
                     fontStyle: isCurrent ? 'italic' : 'normal',
+                    maxWidth: maxTitleWidth,
                   },
                 ]}
-                numberOfLines={4}
+                numberOfLines={undefined}
               />
             </View>
           </Link>
@@ -303,16 +289,13 @@ export default function ScheduleScreen() {
 
         if (!isMounted) return;
 
-        // Use a functional update to access the latest value
         setCurrentShowId((prevId) => {
           if (prevId !== newId) {
-            // Show changed - refresh schedule data and animate
             Animated.timing(fadeAnim, {
               toValue: 0,
               duration: 300,
               useNativeDriver: true,
             }).start(() => {
-              // Refresh schedule data when show changes
               fetchScheduleData().catch(err => {
                 console.warn('Failed to refresh schedule on show change:', err);
               });
@@ -348,7 +331,6 @@ export default function ScheduleScreen() {
     fetchLiveShow();
     startPolling();
 
-    // Listen for app state changes
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active' && isPlaying) {
         startPolling();
@@ -420,7 +402,6 @@ export default function ScheduleScreen() {
             timeZone: currentTimezone,
           });
 
-          // Helper function to remove :00 from times
           const formatTime = (timeStr: string) => {
             return timeStr.replace(':00', '');
           };
@@ -430,7 +411,6 @@ export default function ScheduleScreen() {
 
           let timeLabel: string;
           if (startParts.length === 2 && endParts.length === 2) {
-            // Always show format: "11:00 – 12:00 PM" (no AM on start time), but remove :00 when minutes are 00
             const formattedStart = formatTime(startParts[0]);
             const formattedEnd = formatTime(endStr);
             timeLabel = `${formattedStart}–${formattedEnd}`;
@@ -489,7 +469,7 @@ export default function ScheduleScreen() {
             <View style={styles.logoBackground}>
               <Image
                 source={logoImage}
-                style={{ width: 57, height: 57 }} // 30% smaller than 81.4
+                style={{ width: 57, height: 57 }}
                 resizeMode="contain"
               />
             </View>
@@ -545,65 +525,42 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-  headerRow: {
-    flexDirection: 'row',
-    paddingVertical: 4,
-  },
-  headerCell: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '500',
-    textAlign: 'left',
-  },
-  headerCellTime: {
-    flex: 0.7,
-    fontSize: 18,
-    fontWeight: '500',
-    textAlign: 'left',
-  },
-  headerCellShow: {
-    flex: 1.3,
-    fontSize: 18,
-    fontWeight: '500',
-    textAlign: 'left',
-  },
   list: {
     paddingBottom: 16,
   },
   row: {
     flexDirection: 'row',
     paddingVertical: 6,
+    alignItems: 'flex-start',
   },
   cell: {
-    flex: 0.3,
+    flex: 1,
     fontSize: 18,
     textAlign: 'left',
   },
   cellTime: {
-    flex: 0.7, // 20% smaller than default flex: 1
+    flex: 0.6,
     fontSize: 18,
     textAlign: 'left',
   },
   showCellContent: {
     flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'flex-start',
-    flexWrap: 'nowrap',
-    flexShrink: 1,
-    minWidth: '100%',
   },
   playIcon: {
     marginRight: 6,
+    marginTop: 2,
   },
-
   cellText: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: 18,
     textAlign: 'left',
-    flexShrink: 1,
-    minWidth: '100%',
   },
-
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -616,8 +573,8 @@ const styles = StyleSheet.create({
     right: 5,
   },
   logoBackground: {
-    borderRadius: 26, // Smaller radius for smaller logo
-    padding: 6, // Smaller padding for smaller logo
+    borderRadius: 26,
+    padding: 6,
   },
   backToTopButton: {
     position: 'absolute',
@@ -635,8 +592,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  chevronIcon: {
-    // No specific style needed, icon handles its own color
-  },
-
+  chevronIcon: {},
 });
