@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
 import React, { useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
 import { useNetworkConnectivity } from '../../hooks/useNetworkConnectivity'
 import { openMixcloudShow } from '../../utils/urlDetection'
@@ -29,6 +29,8 @@ const ShowItem = ({ show, onPress }: { show: MixcloudShow; onPress: () => void }
     <TouchableOpacity
       style={[styles.showItem, { borderBottomColor: colors.border }]}
       onPress={onPress}
+      activeOpacity={0.7}
+      delayPressIn={0}
     >
       {show.thumbnailUrl ? (
         <Image
@@ -132,7 +134,11 @@ export default function MixcloudScreen() {
 
   const openShow = async (show: MixcloudShow) => {
     try {
-      console.log('Opening show:', show.title, 'URL:', show.url)
+      console.log('=== OPENING SHOW ===')
+      console.log('Show title:', show.title)
+      console.log('Show URL:', show.url)
+      console.log('Platform:', Platform.OS)
+      console.log('Network connected:', networkState.isConnected)
       
       // Validate URL format
       if (!show.url || !show.url.startsWith('http')) {
@@ -163,6 +169,7 @@ export default function MixcloudScreen() {
         console.log('Utility function failed, trying direct Linking...')
         try {
           const canOpen = await Linking.canOpenURL(show.url)
+          console.log('Direct Linking can open URL:', canOpen)
           if (canOpen) {
             await Linking.openURL(show.url)
             return

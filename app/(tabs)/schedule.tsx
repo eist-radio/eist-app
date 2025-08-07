@@ -45,9 +45,9 @@ type RawScheduleItem = {
   artistIds?: string[];
   isRecurring: boolean;
   media:
-    | { type: 'mix'; trackId?: string }
-    | { type: 'playlist'; playlistId: string }
-    | { type: 'live' };
+  | { type: 'mix'; trackId?: string }
+  | { type: 'playlist'; playlistId: string }
+  | { type: 'live' };
 };
 
 type SectionData = {
@@ -62,7 +62,7 @@ type SectionData = {
 
 const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
   const animatedValue = React.useRef(new Animated.Value(0)).current
-  
+
   React.useEffect(() => {
     Animated.timing(animatedValue, {
       toValue: visible ? 1 : 0,
@@ -70,12 +70,12 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
       useNativeDriver: true,
     }).start()
   }, [visible, animatedValue])
-  
+
   return (
     <Animated.View
       style={[
         styles.backToTopButton,
-        { 
+        {
           opacity: animatedValue,
           transform: [{
             scale: animatedValue.interpolate({
@@ -91,10 +91,10 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
         activeOpacity={0.8}
         style={styles.backToTopTouchable}
       >
-        <Ionicons 
-          name="chevron-up" 
-          size={32} 
-          color="#AFFC41" 
+        <Ionicons
+          name="chevron-up"
+          size={32}
+          color="#AFFC41"
           style={styles.chevronIcon}
         />
       </TouchableOpacity>
@@ -185,20 +185,20 @@ export default function ScheduleScreen() {
     const scrollY = event.nativeEvent.contentOffset.y;
     const contentHeight = event.nativeEvent.contentSize.height;
     const layoutHeight = event.nativeEvent.layoutMeasurement.height;
-    
+
     // Check if content is scrollable
     const scrollable = contentHeight > layoutHeight;
     setIsScrollable(scrollable);
-    
+
     // Show back button when scrolled past 100px AND content is scrollable
     setShowBackToTop(scrollable && scrollY > 100);
   };
 
   const scrollToTop = () => {
-    sectionListRef.current?.scrollToLocation({ 
-      sectionIndex: 0, 
-      itemIndex: 0, 
-      animated: true 
+    sectionListRef.current?.scrollToLocation({
+      sectionIndex: 0,
+      itemIndex: 0,
+      animated: true
     });
   };
 
@@ -318,7 +318,7 @@ export default function ScheduleScreen() {
               fetchScheduleData().catch(err => {
                 console.warn('Failed to refresh schedule on show change:', err);
               });
-              
+
               Animated.timing(fadeAnim, {
                 toValue: 1,
                 duration: 300,
@@ -473,7 +473,7 @@ export default function ScheduleScreen() {
           <SelectableThemedText style={[styles.title, { color: colors.primary }]}>
             Schedule
           </SelectableThemedText>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.logoContainer}
             activeOpacity={0.7}
             onPress={() => Linking.openURL('https://eist.radio/support')}
@@ -496,7 +496,7 @@ export default function ScheduleScreen() {
           stickySectionHeadersEnabled={false}
           onScroll={handleScroll}
           scrollEventThrottle={16}
-          removeClippedSubviews={Platform.OS === 'android'}
+          removeClippedSubviews={true}
           maxToRenderPerBatch={10}
           windowSize={10}
           initialNumToRender={10}
@@ -564,10 +564,8 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    ...(Platform.OS === 'android' && {
-      flexWrap: 'wrap',
-      flexShrink: 1,
-    }),
+    flexWrap: 'wrap',
+    flexShrink: 1,
   },
   playIcon: {
     marginRight: 6,
@@ -577,9 +575,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     textAlign: 'left',
-    ...(Platform.OS === 'android' && {
-      flexShrink: 1,
-    }),
+    flexShrink: 1,
   },
 
   titleContainer: {
@@ -588,9 +584,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  logoContainer: { 
-    position: 'absolute', 
-    top: Platform.OS === 'ios' ? -28 : -38, 
+  logoContainer: {
+    position: 'absolute',
+    top: -26,
     right: 5,
   },
   logoBackground: {
