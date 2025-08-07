@@ -37,10 +37,10 @@ eas credentials --platform ios                    # Manage iOS credentials
 - **Expo Router** for file-based navigation
 - **TypeScript** with strict mode enabled
 - **React Query (@tanstack/react-query)** for data fetching
-- **React Native Track Player** (@vmsilva/react-native-track-player) for audio streaming
+- **React Native Track Player** (@doublesymmetry/react-native-track-player) for audio streaming
 
 ### Key Dependencies
-- **Audio**: @vmsilva/react-native-track-player, expo-audio
+- **Audio**: @doublesymmetry/react-native-track-player, expo-audio
 - **Navigation**: @react-navigation/native, @react-navigation/bottom-tabs, expo-router
 - **Network**: @react-native-community/netinfo
 - **Storage**: @react-native-async-storage/async-storage
