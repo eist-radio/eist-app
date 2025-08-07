@@ -13,128 +13,111 @@ interface FormattedShowTitleProps {
   asContent?: boolean;
 }
 
-export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({ 
-  title, 
-  color = '#000', 
+export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
+  title,
+  color = '#000',
   size = 16,
   style,
   inline = false,
-  numberOfLines = 3,
+  numberOfLines,
   noWrap = false,
-  asContent = false
+  asContent = false,
 }) => {
-  // Platform-specific icon sizing adjustments for better alignment
   const iconSize = Platform.OS === 'ios' ? size * 0.9 : size;
-  
-  // Case 1: If title is exactly "éist arís", add repeat icon at the end
+
+  // apply line constraints only when needed
+  const lines = noWrap ? 1 : numberOfLines;
+  const lineProps =
+    lines != null ? { numberOfLines: lines as number, ellipsizeMode: 'tail' as const } : {};
+
+  // Case 1: exactly "éist arís"
   if (title === 'éist arís') {
     if (asContent) {
       return (
         <>
           {title}{' '}
-          <Ionicons 
-            name="repeat" 
-            size={iconSize} 
-            color={color} 
-            style={{ 
-              // Platform-specific adjustments for better alignment
-              ...(Platform.OS === 'ios' && {
-                marginTop: -1,
-              }),
-              ...(Platform.OS === 'android' && {
-                marginTop: 0,
-              }),
-            }} 
+          <Ionicons
+            name="repeat"
+            size={iconSize}
+            color={color}
+            style={{
+              ...(Platform.OS === 'ios' && { marginTop: -1 }),
+              ...(Platform.OS === 'android' && { marginTop: 0 }),
+            }}
           />
         </>
       );
     }
-    
-          return (
-        <Text 
-          style={[{ color, fontSize: size }, style]} 
-          numberOfLines={numberOfLines}
-          {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
-          allowFontScaling={false}
-        >
-          {title}{' '}
-          <Ionicons 
-            name="repeat" 
-            size={iconSize} 
-            color={color} 
-            style={{ 
-              // Platform-specific adjustments for better alignment
-              ...(Platform.OS === 'ios' && {
-                marginTop: -1,
-              }),
-              ...(Platform.OS === 'android' && {
-                marginTop: 0,
-              }),
-            }} 
-          />
-        </Text>
-      );
+
+    return (
+      <Text
+        style={[{ color, fontSize: size }, style]}
+        {...lineProps}
+        {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
+        allowFontScaling={false}
+      >
+        {title}{' '}
+        <Ionicons
+          name="repeat"
+          size={iconSize}
+          color={color}
+          style={{
+            ...(Platform.OS === 'ios' && { marginTop: -1 }),
+            ...(Platform.OS === 'android' && { marginTop: 0 }),
+          }}
+        />
+      </Text>
+    );
   }
 
-  // Case 2: If title contains "(eist aris)" or "(éist arís)" in parentheses, replace with repeat icon
-  // Handle both accent variations: e/é and i/í
+  // Case 2: replace "(eist aris)" variants with repeat icon
   const patterns = [
-    /\(eist aris\)/gi,  // (eist aris) - no fadas
-    /\(éist arís\)/gi,  // (éist arís) - with fadas
-    /\(éist aris\)/gi,  // (éist aris) - e with accent, i without
-    /\(eist arís\)/gi   // (eist arís) - e without accent, i with
+    /\(eist aris\)/gi,
+    /\(éist arís\)/gi,
+    /\(éist aris\)/gi,
+    /\(eist arís\)/gi,
   ];
 
   for (const pattern of patterns) {
     if (pattern.test(title)) {
       const parts = title.split(pattern);
-      
+
       if (asContent) {
         return (
           <>
             {parts[0]}
-            <Ionicons 
-              name="repeat" 
-              size={iconSize} 
-              color={color} 
-              style={{ 
+            <Ionicons
+              name="repeat"
+              size={iconSize}
+              color={color}
+              style={{
                 marginHorizontal: 2,
-                // Platform-specific adjustments for better alignment
-                ...(Platform.OS === 'ios' && {
-                  marginTop: -1,
-                }),
-                ...(Platform.OS === 'android' && {
-                  marginTop: 0,
-                }),
-              }} 
+                ...(Platform.OS === 'ios' && { marginTop: -1 }),
+                ...(Platform.OS === 'android' && { marginTop: 0 }),
+              }}
             />
             {parts[1]}
           </>
         );
       }
-      
+
       return (
-        <Text 
-          style={[{ color, fontSize: size }, style]} 
-          numberOfLines={numberOfLines}
+        <Text
+          style={[{ color, fontSize: size }, style]}
+          {...lineProps}
           {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
           allowFontScaling={false}
         >
           {parts[0]}
-          <Ionicons 
-            name="repeat" 
-            size={iconSize} 
-            color={color} 
-            style={{ 
+          <Ionicons
+            name="repeat"
+            size={iconSize}
+            color={color}
+            style={{
               marginHorizontal: 2,
-              // Platform-specific adjustments for better alignment
-              ...(Platform.OS === 'ios' && {
-                marginTop: -1,
-              }),
-              ...(Platform.OS === 'android' && {
-                marginTop: 0,
-              }),
-            }} 
+              ...(Platform.OS === 'ios' && { marginTop: -1 }),
+              ...(Platform.OS === 'android' && { marginTop: 0 }),
+            }}
           />
           {parts[1]}
         </Text>
@@ -142,18 +125,18 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
     }
   }
 
-  // Default case: return title as is
+  // Default
   if (asContent) {
     return <>{title}</>;
   }
   return (
-    <Text 
-      style={[{ color, fontSize: size }, style]} 
-      numberOfLines={numberOfLines}
+    <Text
+      style={[{ color, fontSize: size }, style]}
+      {...lineProps}
       {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
       allowFontScaling={false}
     >
       {title}
     </Text>
   );
-}; 
+};

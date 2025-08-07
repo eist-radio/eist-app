@@ -443,48 +443,6 @@ export default function ShowScreen() {
   return (
     <SwipeNavigator>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <View 
-          ref={shareContentRef} 
-          style={styles.shareableContent}
-          collapsable={false}
-        >
-          <View style={styles.bannerContainer}>
-            {imageReady ? (
-              <Image
-                key={`${hostId}-${preloadedImageUrl || 'fallback'}`}
-                source={getBannerImage()}
-                style={styles.bannerImage}
-                resizeMode="cover"
-                onError={(error) => {
-                  setImageFailed(true);
-                  setPreloadedImageUrl(null);
-                }}
-              />
-            ) : (
-              <View style={[styles.bannerImage, { backgroundColor: colors.card }]} />
-            )}
-            {isImageLoading && (
-              <View style={styles.loadingOverlay}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
-            )}
-            <TouchableOpacity
-              style={styles.logoContainer}
-              activeOpacity={0.7}
-              onPress={() => Linking.openURL('https://eist.radio/support')}
-              accessibilityRole="link"
-            >
-              <View style={styles.logoBackground}>
-                <Image
-                  source={logoImage}
-                  style={{ width: 81.4, height: 81.4 }}
-                  resizeMode="contain"
-                />
-              </View>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         <ScrollView
           ref={shareViewRef}
           style={styles.contentContainer}
@@ -492,83 +450,125 @@ export default function ShowScreen() {
           onScroll={handleScroll}
           scrollEventThrottle={16}
         >
-          {/* All content - inside shareable content */}
-          <View style={styles.shareableTitle}>
-            <View style={[
-              styles.titleRow, 
-              hideShareButton && { justifyContent: 'flex-start' }
-            ]}>
-              <FormattedShowTitle
-                title={event.title}
-                color={colors.primary}
-                size={28}
-                style={styles.header}
-              />
-              {!hideShareButton && (
-                <TouchableOpacity 
-                  onPress={shareShow} 
-                  style={styles.shareButtonInline}
-                  disabled={isSharing}
-                  accessibilityLabel="Share show"
-                  accessibilityHint="Share this show information as an image"
-                  accessibilityRole="button"
-                >
-                  {isSharing ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons name="share-outline" size={28} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-
-          <View style={styles.shareableText}>
-            {host?.name && (
-              <View style={styles.hostRow}>
-                <TouchableOpacity
-                  onPress={() => hostId && router.push(`/artist/${hostId}`)}
-                  disabled={!hostId}
-                >
-                  <ThemedText
-                    type="default"
-                    style={[styles.hostText, { color: colors.primary }]}
-                    numberOfLines={3}
-                    ellipsizeMode="tail"
-                  >
-                    {host.name}
-                  </ThemedText>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <View style={styles.dateTimeRow}>
-              <ThemedText
-                type="default"
-                style={[styles.dateText, { color: colors.text }]}
-              >
-                {dateString}
-              </ThemedText>
-              <ThemedText
-                type="default"
-                style={[styles.timeText, { color: colors.text }]}
-              >
-                {timeString}
-              </ThemedText>
-            </View>
-
-            <View style={styles.textContainer}>
-              {paragraphs.map((p, i) => (
-                <SelectableText
-                  key={i}
-                  text={p}
-                  style={[styles.bodyText, { color: colors.text }]}
-                  linkStyle={{ color: colors.primary }}
+          <View 
+            ref={shareContentRef} 
+            style={styles.shareableContent}
+            collapsable={false}
+          >
+            <View style={styles.bannerContainer}>
+              {imageReady ? (
+                <Image
+                  key={`${hostId}-${preloadedImageUrl || 'fallback'}`}
+                  source={getBannerImage()}
+                  style={styles.bannerImage}
+                  resizeMode="cover"
+                  onError={(error) => {
+                    setImageFailed(true);
+                    setPreloadedImageUrl(null);
+                  }}
                 />
-              ))}
+              ) : (
+                <View style={[styles.bannerImage, { backgroundColor: colors.card }]} />
+              )}
+              {isImageLoading && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                </View>
+              )}
+              <TouchableOpacity
+                style={styles.logoContainer}
+                activeOpacity={0.7}
+                onPress={() => Linking.openURL('https://eist.radio/support')}
+                accessibilityRole="link"
+              >
+                <View style={styles.logoBackground}>
+                  <Image
+                    source={logoImage}
+                    style={{ width: 81.4, height: 81.4 }}
+                    resizeMode="contain"
+                  />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.shareableTitle}>
+              <View style={[
+                styles.titleRow, 
+                hideShareButton && { justifyContent: 'flex-start' }
+              ]}>
+                <FormattedShowTitle
+                  title={event.title}
+                  color={colors.primary}
+                  size={28}
+                  style={styles.header}
+                />
+                {!hideShareButton && (
+                  <TouchableOpacity 
+                    onPress={shareShow} 
+                    style={styles.shareButtonInline}
+                    disabled={isSharing}
+                    accessibilityLabel="Share show"
+                    accessibilityHint="Share this show information as an image"
+                    accessibilityRole="button"
+                  >
+                    {isSharing ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Ionicons name="share-outline" size={28} color={colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <View style={styles.shareableText}>
+              {host?.name && (
+                <View style={styles.hostRow}>
+                  <TouchableOpacity
+                    onPress={() => hostId && router.push(`/artist/${hostId}`)}
+                    disabled={!hostId}
+                  >
+                    <ThemedText
+                      type="default"
+                      style={[styles.hostText, { color: colors.primary }]}
+                      numberOfLines={3}
+                      ellipsizeMode="tail"
+                    >
+                      {host.name}
+                    </ThemedText>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              <View style={styles.dateTimeRow}>
+                <ThemedText
+                  type="default"
+                  style={[styles.dateText, { color: colors.text }]}
+                >
+                  {dateString}
+                </ThemedText>
+                <ThemedText
+                  type="default"
+                  style={[styles.timeText, { color: colors.text }]}
+                >
+                  {timeString}
+                </ThemedText>
+              </View>
+
+              <View style={styles.textContainer}>
+                {paragraphs.map((p, i) => (
+                  <SelectableText
+                    key={i}
+                    text={p}
+                    style={[styles.bodyText, { color: colors.text }]}
+                    linkStyle={{ color: colors.primary }}
+                  />
+                ))}
+              </View>
             </View>
           </View>
         </ScrollView>
+        
         <BackToTopButton
           onPress={scrollToTop}
           visible={showBackToTop && isScrollable}
