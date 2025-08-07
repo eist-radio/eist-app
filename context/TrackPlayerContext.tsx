@@ -95,7 +95,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await AsyncStorage.default.setItem(WAS_PLAYING_KEY, wasPlaying.toString())
     } catch (error) {
       console.error('Failed to store last played state:', error)
-      // Don't let errors propagate - just log them
     }
   }
 
@@ -114,7 +113,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (error) {
       console.error('Failed to get last played state:', error)
-      // Don't let errors propagate - just log them
     }
     return null
   }
@@ -154,7 +152,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         url: STREAM_URL,
         title: currentTrack?.title || showTitle || 'éist',
         artist: currentTrack?.artist || (showArtist ? `${showArtist} · éist` : 'éist'),
-        artwork: currentTrack?.artwork || (showArtworkUrl || require('../assets/images/eist-square.png')),
+        artwork: currentTrack?.artwork || showArtworkUrl || require('../assets/images/eist-logo.png'),
         isLiveStream: true,
       }
       
@@ -186,7 +184,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           url: STREAM_URL,
           title: showTitle || 'éist',
           artist: showArtist ? `${showArtist} · éist` : 'éist',
-          artwork: showArtworkUrl || require('../assets/images/eist-square.png'),
+          artwork: showArtworkUrl || require('../assets/images/eist-logo.png'),
           isLiveStream: true,
         }
 
@@ -194,12 +192,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           await TrackPlayer.add(trackToAdd)
         } catch (addError) {
           console.error('TrackPlayer.add failed in ensureTrackForDisplay:', addError)
-          // Don't let errors propagate - just log them
         }
       }
     } catch (err) {
       console.error('Ensure track for display failed:', err)
-      // Don't let errors propagate - just log them
     }
   }
 
@@ -213,8 +209,26 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
+    // Prevent multiple simultaneous setup attempts
+    if (isBusy) {
+      console.log('Setup blocked: player is busy')
+      return
+    }
+
     try {
       console.log('Setting up player...')
+
+      // Check if TrackPlayer is already initialized before calling setupTrackPlayer
+      try {
+        const state = await TrackPlayer.getPlaybackState()
+        console.log('TrackPlayer already initialized, skipping setup')
+        hasInitialized.current = true
+        setIsPlayerReady(true)
+        return
+      } catch (checkError) {
+        // TrackPlayer not initialized yet, proceed with setup
+        console.log('TrackPlayer not initialized, proceeding with setup')
+      }
 
       if (!hasInitialized.current) {
         // Use the best practice setup function
@@ -227,6 +241,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message.toLowerCase() : ''
       if (errorMsg.includes('already been initialized')) {
+        console.log('TrackPlayer already initialized, continuing...')
         hasInitialized.current = true
         setIsPlayerReady(true)
         return
@@ -318,7 +333,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         await updateMetadata(showTitle, showArtist, showArtworkUrl)
       } catch (fallbackErr) {
         console.error('Failed to update fallback metadata:', fallbackErr)
-        // Don't let errors propagate - just log them
       }
     }
   }
@@ -471,14 +485,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         await stop()
       } catch (error) {
         console.error('Error in togglePlayStop (stop):', error)
-        // Don't let errors propagate - just log them
       }
     } else {
       try {
         await play()
       } catch (error) {
         console.error('Error in togglePlayStop (play):', error)
-        // Don't let errors propagate - just log them
       }
     }
   }
@@ -501,14 +513,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const isDeadAir = title.trim().length === 0
       const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
 
-      // Always use eist-square.png as fallback for artwork in metadata updates
-      let artworkToUse = artworkUrl || require('../assets/images/eist-square.png')
+      // Use HTTP URL for artwork to ensure Android lock screen compatibility
+      // Fall back to eist-logo.png when no artist image available
+      let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
 
       if (isDeadAir) {
         const metadata = {
           title,
           artist: '',
-          artwork: require('../assets/images/eist-square.png'),
+          artwork: artworkToUse,
         }
         
         await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
@@ -523,7 +536,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (err) {
       console.error('Metadata update failed:', err)
-      // Don't let errors propagate - just log them
     }
   }
 
@@ -560,7 +572,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
               await play() // This will do a clean reset and start fresh
             } catch (playError) {
               console.error('Error resuming playback after network recovery:', playError)
-              // Don't let errors propagate - just log them
             }
           }
         }, 2000) // 2 second delay to ensure network stability
@@ -573,7 +584,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             stop()
           } catch (stopError) {
             console.error('Error stopping playback after network loss:', stopError)
-            // Don't let errors propagate - just log them
           }
         }
       }
@@ -598,7 +608,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
               await ensureTrackForDisplay()
             } catch (error) {
               console.error('Error ensuring track for display:', error)
-              // Don't let errors propagate - just log them
             }
           }
 
@@ -626,7 +635,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             await stop()
           } catch (stopError) {
             console.error('Error stopping playback after interruption:', stopError)
-            // Don't let errors propagate - just log them
           }
         } else {
           setIsPlaying(false)
@@ -643,33 +651,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       )
 
-      const onRemoteStop = TrackPlayer.addEventListener(Event.RemoteStop, async () => {
-        console.log('Remote stop event received')
-        try {
-          await stop()
-        } catch (error) {
-          console.error('Error in remote stop handler:', error)
-          // Don't let errors propagate - just log them
-        }
-      })
-      const onRemotePause = TrackPlayer.addEventListener(Event.RemotePause, async () => {
-        console.log('Remote pause event received')
-        try {
-          await stop()
-        } catch (error) {
-          console.error('Error in remote pause handler:', error)
-          // Don't let errors propagate - just log them
-        }
-      })
-      const onRemotePlay = TrackPlayer.addEventListener(Event.RemotePlay, async () => {
-        console.log('Remote play event received')
-        try {
-          await play()
-        } catch (error) {
-          console.error('Error in remote play handler:', error)
-          // Don't let errors propagate - just log them
-        }
-      })
 
       const onAppState = AppState.addEventListener('change', async (next) => {
         if (next === 'active') {
@@ -682,7 +663,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
                 await play() // This will do a clean reset and start fresh
               } catch (playError) {
                 console.error('Error resuming playback after app became active:', playError)
-                // Don't let errors propagate - just log them
               }
             }
           }, 1000)
@@ -696,9 +676,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         onState.remove()
         onError.remove()
         onQueueEnded.remove()
-        onRemoteStop.remove()
-        onRemotePause.remove()
-        onRemotePlay.remove()
         onAppState.remove()
       }
     }

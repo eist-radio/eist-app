@@ -5,10 +5,8 @@ import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
 import React, { useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
-import { useNetworkConnectivity } from '../../hooks/useNetworkConnectivity'
-import { openMixcloudShow } from '../../utils/urlDetection'
 
 const mixcloudLogo = require('../../assets/images/mc-logo-default.png')
 const logoImage = require('../../assets/images/eist-logo-header.png')
@@ -29,8 +27,6 @@ const ShowItem = ({ show, onPress }: { show: MixcloudShow; onPress: () => void }
     <TouchableOpacity
       style={[styles.showItem, { borderBottomColor: colors.border }]}
       onPress={onPress}
-      activeOpacity={0.7}
-      delayPressIn={0}
     >
       {show.thumbnailUrl ? (
         <Image
@@ -113,15 +109,13 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
 
 export default function MixcloudScreen() {
   const { colors } = useTheme()
-  const networkState = useNetworkConnectivity()
   const { 
     data, 
     isLoading, 
     error, 
     fetchNextPage, 
     hasNextPage, 
-    isFetchingNextPage,
-    refetch
+    isFetchingNextPage 
   } = useMixcloudShows()
 
   // Flatten all pages into a single array
@@ -129,25 +123,26 @@ export default function MixcloudScreen() {
   
   // Scroll state management
   const [showBackToTop, setShowBackToTop] = useState(false)
-  const [isScrollable, setIsScrollable] = useState(false)
   const flatListRef = useRef<FlatList>(null)
 
   const openShow = async (show: MixcloudShow) => {
     try {
-      // Check network connectivity first
-      if (!networkState.isConnected) {
+      const canOpen = await Linking.canOpenURL(show.url)
+      if (canOpen) {
+        await Linking.openURL(show.url)
+      } else {
         Alert.alert(
-          'No Internet Connection',
-          'Please check your internet connection and try again.',
+          'Cannot Open Show',
+          'Unable to open this show. Please make sure you have an internet connection.',
           [{ text: 'OK' }]
         )
-        return
       }
-
-      // Use the utility function to open the show
-      await openMixcloudShow(show.url)
-    } catch (error) {
-      console.error('Error opening show:', error)
+    } catch {
+      Alert.alert(
+        'Error',
+        'Failed to open show. Please try again later.',
+        [{ text: 'OK' }]
+      )
     }
   }
 
@@ -159,41 +154,12 @@ export default function MixcloudScreen() {
 
   const handleScroll = (event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y
-    const contentHeight = event.nativeEvent.contentSize.height
-    const layoutHeight = event.nativeEvent.layoutMeasurement.height
-    
-    // Check if content is scrollable
-    const scrollable = contentHeight > layoutHeight
-    setIsScrollable(scrollable)
-    
-    // Show back button when scrolled past 100px AND content is scrollable
-    setShowBackToTop(scrollable && scrollY > 100)
+    // Show back button when scrolled past 100px (adjust as needed)
+    setShowBackToTop(scrollY > 100)
   }
 
   const scrollToTop = () => {
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true })
-  }
-
-  const handleRefresh = async () => {
-    if (!networkState.isConnected) {
-      Alert.alert(
-        'No Internet Connection',
-        'Please check your internet connection and try again.',
-        [{ text: 'OK' }]
-      )
-      return
-    }
-    
-    try {
-      await refetch()
-    } catch (error) {
-      console.error('Failed to refresh shows:', error)
-      Alert.alert(
-        'Refresh Failed',
-        'Unable to refresh shows. Please try again later.',
-        [{ text: 'OK' }]
-      )
-    }
   }
 
   const renderShowItem = ({ item }: { item: MixcloudShow }) => (
@@ -208,33 +174,26 @@ export default function MixcloudScreen() {
   return (
     <SwipeNavigator>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.eistLogoContainer}
-            activeOpacity={0.7}
-            onPress={() => Linking.openURL('https://eist.radio/support')}
-            accessibilityRole="link"
-          >
-            <View style={styles.eistLogoBackground}>
-              <Image
-                source={logoImage}
-                style={{ width: 57, height: 57 }}
-                resizeMode="contain"
-              />
-            </View>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => Linking.openURL('https://www.mixcloud.com/eistcork/')}
-            accessibilityRole="link"
-          >
+        <TouchableOpacity
+          style={styles.eistLogoContainer}
+          activeOpacity={0.7}
+          onPress={() => Linking.openURL('https://eist.radio/support')}
+          accessibilityRole="link"
+        >
+          <View style={styles.eistLogoBackground}>
             <Image
-              source={mixcloudLogo}
-              style={styles.logo}
+              source={logoImage}
+              style={{ width: 57, height: 57 }}
               resizeMode="contain"
             />
-          </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+        <View style={styles.header}>
+          <Image
+            source={mixcloudLogo}
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
 
         <View style={styles.content}>
@@ -248,21 +207,8 @@ export default function MixcloudScreen() {
           ) : error ? (
             <View style={styles.errorContainer}>
               <ThemedText type="default" style={[styles.errorText, { color: colors.text }]}>
-                {!networkState.isConnected 
-                  ? 'No internet connection. Please check your network settings and try again.'
-                  : 'Unable to load shows. Please try again later.'
-                }
+                Unable to load shows. Please try again later.
               </ThemedText>
-              {!networkState.isConnected && (
-                <TouchableOpacity
-                  style={[styles.retryButton, { borderColor: colors.primary }]}
-                  onPress={() => window.location.reload()}
-                >
-                  <ThemedText type="default" style={[styles.retryButtonText, { color: colors.primary }]}>
-                    Retry
-                  </ThemedText>
-                </TouchableOpacity>
-              )}
             </View>
           ) : allShows.length > 0 ? (
             <FlatList
@@ -288,7 +234,7 @@ export default function MixcloudScreen() {
           )}
         </View>
         
-        <BackToTopButton onPress={scrollToTop} visible={showBackToTop && isScrollable} />
+        <BackToTopButton onPress={scrollToTop} visible={showBackToTop} />
       </View>
     </SwipeNavigator>
   )
@@ -297,22 +243,10 @@ export default function MixcloudScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 16,
   },
   header: {
     alignItems: 'center',
-    marginTop: 48,
-    position: 'relative',
-  },
-  eistLogoContainer: { 
-    position: 'absolute', 
-    top: -15, 
-    right: 18,
-    zIndex: 1,
-  },
-  eistLogoBackground: {
-    borderRadius: 26, // Smaller radius for smaller logo
-    padding: 6, // Smaller padding for smaller logo
+    marginTop: 64,
   },
   content: {
     flex: 1,
@@ -353,8 +287,8 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   showDate: {
-    fontSize: 16,
-    opacity: 0.8,
+    fontSize: 14,
+    opacity: 0.7,
     marginBottom: 2,
   },
   loadingContainer: {
@@ -400,7 +334,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   logo: {
-    width: 172,
+    width: 150,
     marginTop: 12,
     marginBottom: 8,
   },
@@ -423,17 +357,15 @@ const styles = StyleSheet.create({
   chevronIcon: {
     // Empty style for now, can be used for future styling
   },
-  retryButton: {
-    marginTop: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'transparent',
+  eistLogoContainer: { 
+    position: 'absolute', 
+    top: 48,
+    right: 18,
+    zIndex: 1,
   },
-  retryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  eistLogoBackground: {
+    borderRadius: 26,
+    padding: 6,
   },
 
 })

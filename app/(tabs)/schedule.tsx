@@ -264,7 +264,7 @@ export default function ScheduleScreen() {
                     fontStyle: isCurrent ? 'italic' : 'normal',
                   },
                 ]}
-                numberOfLines={3}
+                numberOfLines={4}
               />
             </View>
           </Link>
@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     flexWrap: 'nowrap',
     flexShrink: 1,
-    minWidth: '100%', // Ensure proper text wrapping on iOS
+    minWidth: '90%', // Ensure proper text wrapping on iOS
   },
   playIcon: {
     marginRight: 6,
@@ -577,7 +577,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'left',
     flexShrink: 1,
-    minWidth: '100%', // Ensure proper text wrapping on iOS
+    minWidth: '90%', // Ensure proper text wrapping on iOS
   },
 
   titleContainer: {

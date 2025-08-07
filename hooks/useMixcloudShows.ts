@@ -37,20 +37,7 @@ const fetchMixcloudShows = async (pageParam?: string): Promise<{
 }> => {
   try {
     const url = pageParam || 'https://api.mixcloud.com/eistcork/cloudcasts/'
-    
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
-    
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/json',
-        'User-Agent': 'EistApp/3.0.5'
-      }
-    })
-    
-    clearTimeout(timeoutId)
-    
+    const response = await fetch(url)
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
@@ -61,41 +48,23 @@ const fetchMixcloudShows = async (pageParam?: string): Promise<{
       throw new Error('Invalid response format from Mixcloud API')
     }
     
-    const shows = data.data.map((show) => {
-      const showUrl = show.url
-      // Validate and clean the URL
-      let cleanUrl = showUrl
-      if (showUrl && !showUrl.startsWith('http')) {
-        cleanUrl = `https://www.mixcloud.com${showUrl}`
-      }
-      
-      return {
-        id: show.key,
-        title: show.name,
-        description: show.biog || '',
-        playCount: show.play_count || 0,
-        createdAt: show.created_time,
-        url: cleanUrl,
-        tags: show.tags?.map((tag) => tag.name) || [],
-        thumbnailUrl: show.pictures?.medium_mobile || show.pictures?.thumbnail || show.pictures?.small || ''
-      }
-    })
+    const shows = data.data.map((show) => ({
+      id: show.key,
+      title: show.name,
+      description: show.biog || '',
+      playCount: show.play_count || 0,
+      createdAt: show.created_time,
+      url: show.url,
+      tags: show.tags?.map((tag) => tag.name) || [],
+      thumbnailUrl: show.pictures?.medium_mobile || show.pictures?.thumbnail || show.pictures?.small || ''
+    }))
 
     return {
       shows,
       nextCursor: data.paging?.next
     }
   } catch (error) {
-
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        throw new Error('Request timeout - please check your internet connection')
-      }
-      if (error.message.includes('Failed to fetch')) {
-        throw new Error('Network error - please check your internet connection')
-      }
-    }
-    
+    console.error('Failed to fetch Mixcloud shows:', error)
     throw error
   }
 }
@@ -107,10 +76,7 @@ export const useMixcloudShows = () => {
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 3,
+    retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    retryOnMount: true,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
   })
 } 

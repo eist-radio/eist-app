@@ -1,5 +1,5 @@
 // index.js
-import { Platform } from 'react-native';
+import { Platform, AppRegistry } from 'react-native';
 import 'react-native-gesture-handler';
 
 // Only import TrackPlayer on mobile platforms

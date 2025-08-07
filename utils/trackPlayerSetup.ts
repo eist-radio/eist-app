@@ -1,10 +1,10 @@
 // utils/trackPlayerSetup.ts
 
-import TrackPlayer, {
+import TrackPlayer, { 
+  Capability, 
+  IOSCategory, 
   AndroidAudioContentType,
-  AppKilledPlaybackBehavior,
-  Capability,
-  IOSCategory
+  AppKilledPlaybackBehavior 
 } from 'react-native-track-player';
 
 export const setupTrackPlayer = async () => {
@@ -30,13 +30,17 @@ export const setupTrackPlayer = async () => {
       // Capabilities - Use Capability enum, not strings
       capabilities: [
         Capability.Play,
+        Capability.Pause, 
         Capability.Stop
+        //Capability.SeekTo,
+        //Capability.SkipToNext,
+        //Capability.SkipToPrevious,
       ],
       
       // Compact capabilities
       compactCapabilities: [
         Capability.Play, 
-        Capability.Pause,
+        Capability.Pause, 
         Capability.SkipToNext, 
         Capability.SkipToPrevious
       ],
@@ -45,9 +49,9 @@ export const setupTrackPlayer = async () => {
       progressUpdateEventInterval: 1,
     });
 
-    console.log('✅ TrackPlayer setup successful');
+    console.log('TrackPlayer setup successful');
   } catch (error) {
-    console.error('❌ TrackPlayer setup error:', error);
+    console.error('TrackPlayer setup error:', error);
     throw error;
   }
-}; 
+};

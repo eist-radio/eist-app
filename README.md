@@ -46,7 +46,7 @@ Download the expo dev app on your device.
 Clear previous build instances:
 
 ```cmd
-npx expo start --tunnel
+npx expo start --tunnel --clear
 ```
 
 Use the development build, we are using native components so we can't use expo go.
