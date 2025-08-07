@@ -158,8 +158,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         artwork: currentTrack?.artwork || (showArtworkUrl || require('../assets/images/eist-square.png')),
         isLiveStream: true,
       }
-
-      console.log('Adding track to queue:', JSON.stringify(trackToAdd, null, 2))
       
       try {
         await TrackPlayer.add(trackToAdd)
@@ -192,8 +190,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           artwork: showArtworkUrl || require('../assets/images/eist-square.png'),
           isLiveStream: true,
         }
-        
-        console.log('TrackPlayer.add (ensureTrackForDisplay) - trackToAdd:', JSON.stringify(trackToAdd, null, 2));
+
         try {
           await TrackPlayer.add(trackToAdd)
         } catch (addError) {
@@ -264,10 +261,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       // Add capabilities to root level for backward compatibility
       updateOptions.capabilities = capabilities
-
-      console.log('Updating player options:', JSON.stringify(updateOptions, null, 2))
-      await TrackPlayer.updateOptions(updateOptions)
-
       setIsPlayerReady(true)
       console.log('Player setup completed')
     } catch (err) {
@@ -404,17 +397,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('Starting playback...')
-
       // Ensure player is ready
       if (!isPlayerReady) {
-        console.log('Player not ready, setting up...')
         await setupPlayer()
         if (!isPlayerReady) {
-          console.log('Player setup failed, attempting recovery...')
           await recoverFromAudioSessionConflict()
           if (!isPlayerReady) {
-            console.log('Player recovery failed, aborting play')
             setIsBusy(false)
             return
           }
@@ -428,7 +416,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await fetchAndUpdateShowMetadata()
 
       // Start playback with fresh stream
-      console.log('Calling TrackPlayer.play()...')
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
@@ -545,7 +532,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     try {
       const queue = await TrackPlayer.getQueue()
       if (!queue || queue.length === 0) {
-        console.log('No queue available for metadata update')
         return
       }
 
@@ -553,8 +539,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       const isDeadAir = title.trim().length === 0
       const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
-
-      console.log('Updating metadata:', { title, artist: metadataArtist, artworkUrl })
 
       // Always use eist-square.png as fallback for artwork in metadata updates
       let artworkToUse = artworkUrl || require('../assets/images/eist-square.png')
@@ -645,7 +629,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         Event.PlaybackState,
         async ({ state }: any) => {
           const playing = state === State.Playing
-          console.log('Playback state changed:', state, 'isPlaying:', playing)
           setIsPlaying(playing)
 
           // Ensure metadata display is maintained when stopped

@@ -134,23 +134,6 @@ export default function MixcloudScreen() {
 
   const openShow = async (show: MixcloudShow) => {
     try {
-      console.log('=== OPENING SHOW ===')
-      console.log('Show title:', show.title)
-      console.log('Show URL:', show.url)
-      console.log('Platform:', Platform.OS)
-      console.log('Network connected:', networkState.isConnected)
-      
-      // Validate URL format
-      if (!show.url || !show.url.startsWith('http')) {
-        console.error('Invalid URL format:', show.url)
-        Alert.alert(
-          'Invalid URL',
-          'This show has an invalid URL format.',
-          [{ text: 'OK' }]
-        )
-        return
-      }
-
       // Check network connectivity first
       if (!networkState.isConnected) {
         Alert.alert(
@@ -162,50 +145,9 @@ export default function MixcloudScreen() {
       }
 
       // Use the utility function to open the show
-      const success = await openMixcloudShow(show.url)
-      
-      if (!success) {
-        // Try direct Linking as fallback
-        console.log('Utility function failed, trying direct Linking...')
-        try {
-          const canOpen = await Linking.canOpenURL(show.url)
-          console.log('Direct Linking can open URL:', canOpen)
-          if (canOpen) {
-            await Linking.openURL(show.url)
-            return
-          }
-        } catch (directError) {
-          console.error('Direct Linking also failed:', directError)
-        }
-        
-        Alert.alert(
-          'Cannot Open Show',
-          'Unable to open this show. The Mixcloud app may not be installed or the URL format is not supported.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'Copy URL', 
-              onPress: async () => {
-                try {
-                  const Clipboard = await import('expo-clipboard')
-                  await Clipboard.default.setStringAsync(show.url)
-                  Alert.alert('URL Copied', 'The show URL has been copied to your clipboard.')
-                } catch (clipboardError) {
-                  console.error('Failed to copy URL:', clipboardError)
-                  Alert.alert('Error', 'Failed to copy URL to clipboard.')
-                }
-              }
-            }
-          ]
-        )
-      }
+      await openMixcloudShow(show.url)
     } catch (error) {
       console.error('Error opening show:', error)
-      Alert.alert(
-        'Error',
-        'Failed to open show. Please try again later.',
-        [{ text: 'OK' }]
-      )
     }
   }
 
@@ -321,27 +263,6 @@ export default function MixcloudScreen() {
                   </ThemedText>
                 </TouchableOpacity>
               )}
-              {/* Debug test button */}
-              <TouchableOpacity
-                style={[styles.retryButton, { borderColor: colors.primary, marginTop: 16 }]}
-                onPress={async () => {
-                  console.log('Testing URL opening...')
-                  const testUrl = 'https://www.mixcloud.com/eistcork/'
-                  try {
-                    const canOpen = await Linking.canOpenURL(testUrl)
-                    console.log('Can open test URL:', canOpen)
-                    if (canOpen) {
-                      await Linking.openURL(testUrl)
-                    }
-                  } catch (error) {
-                    console.error('Test URL opening failed:', error)
-                  }
-                }}
-              >
-                <ThemedText type="default" style={[styles.retryButtonText, { color: colors.primary }]}>
-                  Test URL Opening
-                </ThemedText>
-              </TouchableOpacity>
             </View>
           ) : allShows.length > 0 ? (
             <FlatList

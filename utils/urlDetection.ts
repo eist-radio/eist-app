@@ -89,46 +89,37 @@ export const getMixcloudAppUrl = (webUrl: string): string => {
   try {
     const url = new URL(webUrl)
     const path = url.pathname
-    
+
     // Remove leading slash if present
     const cleanPath = path.startsWith('/') ? path.slice(1) : path
-    
+
     // Ensure we have a valid path
     if (!cleanPath) {
       console.warn('Invalid path for Mixcloud app URL:', path)
       return webUrl
     }
-    
+
     const appUrl = `mixcloud://${cleanPath}`
-    console.log('Converted web URL to app URL:', webUrl, '->', appUrl)
     return appUrl
   } catch (error) {
-    console.error('Error converting URL to app format:', error)
     return webUrl
   }
 }
 
 export const openMixcloudShow = async (webUrl: string): Promise<boolean> => {
   try {
-    console.log('Attempting to open Mixcloud show:', webUrl)
-    console.log('Platform:', Platform.OS)
-    
     // Validate the URL first
     if (!webUrl || typeof webUrl !== 'string') {
-      console.error('Invalid URL provided:', webUrl)
       return false
     }
     
     // First try to open in the Mixcloud app
     const appUrl = getMixcloudAppUrl(webUrl)
-    console.log('Generated app URL:', appUrl)
-    
+
     try {
       const canOpenApp = await Linking.canOpenURL(appUrl)
-      console.log('Can open app URL:', canOpenApp)
-      
+
       if (canOpenApp) {
-        console.log('Opening in Mixcloud app...')
         await Linking.openURL(appUrl)
         return true
       }
@@ -139,27 +130,22 @@ export const openMixcloudShow = async (webUrl: string): Promise<boolean> => {
     // Fallback to web URL
     try {
       const canOpenWeb = await Linking.canOpenURL(webUrl)
-      console.log('Can open web URL:', canOpenWeb)
-      
+
       if (canOpenWeb) {
-        console.log('Opening in web browser...')
         await Linking.openURL(webUrl)
         return true
       }
     } catch (webError) {
       console.error('Error checking/opening web URL:', webError)
     }
-    
+
     // Try mobile web version
     const mobileUrl = webUrl.replace('https://www.mixcloud.com', 'https://m.mixcloud.com')
-    console.log('Trying mobile URL:', mobileUrl)
-    
+
     try {
       const canOpenMobile = await Linking.canOpenURL(mobileUrl)
-      console.log('Can open mobile URL:', canOpenMobile)
-      
+
       if (canOpenMobile) {
-        console.log('Opening in mobile web browser...')
         await Linking.openURL(mobileUrl)
         return true
       }
@@ -169,19 +155,15 @@ export const openMixcloudShow = async (webUrl: string): Promise<boolean> => {
     
     // iOS-specific fallback: try with different URL schemes
     if (Platform.OS === 'ios') {
-      console.log('Trying iOS-specific fallbacks...')
       
       // Try with https:// prefix if not present
       if (!webUrl.startsWith('https://') && !webUrl.startsWith('http://')) {
         const httpsUrl = `https://${webUrl}`
-        console.log('Trying with https prefix:', httpsUrl)
-        
+
         try {
           const canOpenHttps = await Linking.canOpenURL(httpsUrl)
-          console.log('Can open https URL:', canOpenHttps)
-          
+
           if (canOpenHttps) {
-            console.log('Opening with https prefix...')
             await Linking.openURL(httpsUrl)
             return true
           }
@@ -192,14 +174,11 @@ export const openMixcloudShow = async (webUrl: string): Promise<boolean> => {
       
       // Try opening in Safari specifically
       const safariUrl = webUrl.startsWith('http') ? webUrl : `https://${webUrl}`
-      console.log('Trying Safari URL:', safariUrl)
-      
+
       try {
         const canOpenSafari = await Linking.canOpenURL(safariUrl)
-        console.log('Can open Safari URL:', canOpenSafari)
-        
+
         if (canOpenSafari) {
-          console.log('Opening in Safari...')
           await Linking.openURL(safariUrl)
           return true
         }
@@ -207,8 +186,7 @@ export const openMixcloudShow = async (webUrl: string): Promise<boolean> => {
         console.error('Error with Safari URL:', safariError)
       }
     }
-    
-    console.log('All URL opening attempts failed')
+
     return false
   } catch (error) {
     console.error('Error in openMixcloudShow:', error)

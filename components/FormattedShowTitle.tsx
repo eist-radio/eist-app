@@ -19,7 +19,7 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
   size = 16,
   style,
   inline = false,
-  numberOfLines,
+  numberOfLines = 3,
   noWrap = false,
   asContent = false
 }) => {
@@ -50,31 +50,30 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
       );
     }
     
-    return (
-      <Text 
-        style={[{ color, fontSize: size }, style]} 
-        numberOfLines={numberOfLines}
-        ellipsizeMode="tail"
-        breakStrategy="simple"
-        allowFontScaling={false}
-      >
-        {title}{' '}
-        <Ionicons 
-          name="repeat" 
-          size={iconSize} 
-          color={color} 
-          style={{ 
-            // Platform-specific adjustments for better alignment
-            ...(Platform.OS === 'ios' && {
-              marginTop: -1,
-            }),
-            ...(Platform.OS === 'android' && {
-              marginTop: 0,
-            }),
-          }} 
-        />
-      </Text>
-    );
+          return (
+        <Text 
+          style={[{ color, fontSize: size }, style]} 
+          numberOfLines={numberOfLines}
+          {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
+          allowFontScaling={false}
+        >
+          {title}{' '}
+          <Ionicons 
+            name="repeat" 
+            size={iconSize} 
+            color={color} 
+            style={{ 
+              // Platform-specific adjustments for better alignment
+              ...(Platform.OS === 'ios' && {
+                marginTop: -1,
+              }),
+              ...(Platform.OS === 'android' && {
+                marginTop: 0,
+              }),
+            }} 
+          />
+        </Text>
+      );
   }
 
   // Case 2: If title contains "(eist aris)" or "(éist arís)" in parentheses, replace with repeat icon
@@ -118,8 +117,7 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
         <Text 
           style={[{ color, fontSize: size }, style]} 
           numberOfLines={numberOfLines}
-          ellipsizeMode="tail"
-          breakStrategy="simple"
+          {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
           allowFontScaling={false}
         >
           {parts[0]}
@@ -152,8 +150,7 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
     <Text 
       style={[{ color, fontSize: size }, style]} 
       numberOfLines={numberOfLines}
-      ellipsizeMode="tail"
-      breakStrategy="simple"
+      {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
       allowFontScaling={false}
     >
       {title}

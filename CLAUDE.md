@@ -101,9 +101,25 @@ app/
 - **Background Playback**: Continues playing when app is backgrounded
 - **CarPlay/Android Auto**: Full integration with vehicle systems
 - **Network Recovery**: Automatic reconnection on network changes
-- **Show Schedule**: Live and upcoming show information
+- **Show Schedule**: Live and upcoming show information with FormattedShowTitle component
 - **Social Integration**: Links to Discord, Instagram, SoundCloud, Mixcloud
 - **Cross-platform**: iOS, Android, and web support
+
+### UI Components
+
+#### FormattedShowTitle Component (`components/FormattedShowTitle.tsx`)
+- **Purpose**: Handles special formatting for show titles containing "éist arís" text
+- **Functionality**: 
+  - Replaces "éist arís" text with repeat icons (Ionicons "repeat")
+  - Handles multiple variations: "éist arís", "eist aris", "(éist arís)", "(eist aris)"
+  - Platform-specific icon alignment adjustments for iOS/Android
+  - Supports both inline (`asContent={true}`) and standalone text rendering
+- **Usage Locations**:
+  - Listen page: For "Next up" show titles and current show titles
+  - Schedule page: For all show titles in the schedule list
+  - Show detail pages: For show title display
+- **Text Wrapping**: No ellipsizeMode - titles wrap naturally over multiple lines within their container constraints
+- **Props**: `title`, `color`, `size`, `style`, `numberOfLines`, `asContent`, etc.
 
 ## Important Implementation Notes
 
@@ -121,6 +137,12 @@ app/
 - All audio operations have comprehensive try/catch blocks
 - Errors are logged but don't propagate to prevent app crashes
 - Graceful degradation for unsupported platforms (web audio fallbacks)
+
+### Mixcloud Integration
+- **Simplified URL Opening**: The Mixcloud page uses a streamlined approach for opening show URLs
+- **Network Connectivity Check**: Only verifies internet connection before attempting to open URLs
+- **Utility Function**: Uses `openMixcloudShow()` utility function for URL handling
+- **No Complex Error Dialogs**: Relies on the utility function for error handling, minimal user-facing alerts
 
 ### Build Considerations
 - Uses EAS Build for production builds

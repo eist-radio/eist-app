@@ -578,7 +578,6 @@ export default function ListenScreen() {
           setIsCarConnected(true)
         })
       } catch (error) {
-        console.log('Car detection setup error:', error)
         // Don't let errors propagate - just log them
       }
     }
@@ -640,12 +639,9 @@ export default function ListenScreen() {
   }, [fetchLiveScheduleOnly, isPlaying])
 
   const handlePlayButtonPress = useCallback(async () => {
-    console.log('Play button pressed')
-    console.log('Current state:', { isPlaying, isBusy, isPlayerReady })
     
     try {
       await togglePlayStop()
-      console.log('Toggle completed successfully')
     } catch (error) {
       console.error('Error in play button press:', error)
       // Show user-friendly error message

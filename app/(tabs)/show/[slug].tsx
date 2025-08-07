@@ -219,16 +219,13 @@ export default function ShowScreen() {
         try {
           const img = new (global as any).Image()
           img.onload = () => {
-            console.log('Image preloaded successfully (web):', uri)
             resolve(true)
           }
           img.onerror = (error: any) => {
-            console.log('Image preload failed (web):', error)
             resolve(false)
           }
           img.src = uri
         } catch (error) {
-          console.log('Web image preload not supported:', error)
           resolve(true) // Fallback: assume image will load fine
         }
       } else {
@@ -236,15 +233,12 @@ export default function ShowScreen() {
         if (typeof Image.prefetch === 'function') {
           Image.prefetch(uri)
             .then(() => {
-              console.log('Image preloaded successfully:', uri)
               resolve(true)
             })
             .catch((error) => {
-              console.log('Image preload failed:', error)
               resolve(false)
             })
         } else {
-          console.log('Image.prefetch not available, skipping preload')
           resolve(true)
         }
       }
@@ -462,12 +456,8 @@ export default function ShowScreen() {
                 style={styles.bannerImage}
                 resizeMode="cover"
                 onError={(error) => {
-                  console.log('Image load error:', error.nativeEvent.error);
                   setImageFailed(true);
                   setPreloadedImageUrl(null);
-                }}
-                onLoad={() => {
-                  console.log('Image loaded successfully');
                 }}
               />
             ) : (
