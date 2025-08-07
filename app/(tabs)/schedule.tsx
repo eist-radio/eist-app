@@ -13,11 +13,9 @@ import {
   Dimensions,
   Image,
   Linking,
-  Platform,
   RefreshControl,
   SectionList,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -209,10 +207,10 @@ export default function ScheduleScreen() {
         {section.title}
       </SelectableThemedText>
       <View style={styles.headerRow}>
-        <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
+        <SelectableThemedText style={[styles.headerCellTime, { color: colors.primary }]}>
           Time
         </SelectableThemedText>
-        <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
+        <SelectableThemedText style={[styles.headerCellShow, { color: colors.primary }]}>
           Show
         </SelectableThemedText>
       </View>
@@ -228,7 +226,7 @@ export default function ScheduleScreen() {
         <View style={styles.row}>
           <SelectableThemedText
             style={[
-              styles.cell,
+              styles.cellTime,
               {
                 color: colors.text,
                 fontWeight: isCurrent ? '700' : '400',
@@ -241,7 +239,7 @@ export default function ScheduleScreen() {
 
           <Link
             href={`/show/${encodeURIComponent(item.id)}`}
-            style={{ flex: 1 }}
+            style={{ flex: 1.3 }}
           >
             <View style={styles.showCellContent}>
               {isCurrent && (
@@ -422,15 +420,24 @@ export default function ScheduleScreen() {
             timeZone: currentTimezone,
           });
 
+          // Helper function to remove :00 from times
+          const formatTime = (timeStr: string) => {
+            return timeStr.replace(':00', '');
+          };
+
           const startParts = startStr.split(/\s+/);
           const endParts = endStr.split(/\s+/);
 
           let timeLabel: string;
           if (startParts.length === 2 && endParts.length === 2) {
-            // Always show format: "11:00 – 12:00 PM" (no AM on start time)
-            timeLabel = `${startParts[0]} – ${endStr}`;
+            // Always show format: "11:00 – 12:00 PM" (no AM on start time), but remove :00 when minutes are 00
+            const formattedStart = formatTime(startParts[0]);
+            const formattedEnd = formatTime(endStr);
+            timeLabel = `${formattedStart}–${formattedEnd}`;
           } else {
-            timeLabel = `${startStr} – ${endStr}`;
+            const formattedStart = formatTime(startStr);
+            const formattedEnd = formatTime(endStr);
+            timeLabel = `${formattedStart}–${formattedEnd}`;
           }
 
           return {
@@ -548,6 +555,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'left',
   },
+  headerCellTime: {
+    flex: 0.7,
+    fontSize: 18,
+    fontWeight: '500',
+    textAlign: 'left',
+  },
+  headerCellShow: {
+    flex: 1.3,
+    fontSize: 18,
+    fontWeight: '500',
+    textAlign: 'left',
+  },
   list: {
     paddingBottom: 16,
   },
@@ -556,7 +575,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   cell: {
-    flex: 1,
+    flex: 0.3,
+    fontSize: 18,
+    textAlign: 'left',
+  },
+  cellTime: {
+    flex: 0.7, // 20% smaller than default flex: 1
     fontSize: 18,
     textAlign: 'left',
   },
@@ -566,7 +590,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     flexWrap: 'nowrap',
     flexShrink: 1,
-    minWidth: '90%', // Ensure proper text wrapping on iOS
+    minWidth: '100%',
   },
   playIcon: {
     marginRight: 6,
@@ -577,7 +601,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'left',
     flexShrink: 1,
-    minWidth: '90%', // Ensure proper text wrapping on iOS
+    minWidth: '100%',
   },
 
   titleContainer: {
