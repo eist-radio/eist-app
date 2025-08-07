@@ -160,7 +160,6 @@ export default function ListenScreen() {
   const {
     isPlaying,
     togglePlayStop,
-    setupPlayer,
     updateMetadata,
     isBusy,
     isPlayerReady,
@@ -615,12 +614,7 @@ export default function ListenScreen() {
     }, [fetchNowPlayingWithArtist, fetchLiveScheduleOnly, isPlaying])
   )
 
-  useEffect(() => {
-    setupPlayer().catch(error => {
-      console.error('Failed to setup player:', error)
-      // Don't let errors propagate - just log them
-    })
-  }, [setupPlayer])
+  // Player setup is handled by TrackPlayerContext, no need to call setupPlayer here
 
   // Refresh now playing info whenever the app returns to the foreground
   useEffect(() => {
