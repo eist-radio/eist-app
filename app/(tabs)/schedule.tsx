@@ -1,6 +1,5 @@
 // app/(tabs)/schedule.tsx
 
-import { FormattedShowTitle } from '@/components/FormattedShowTitle';
 import { SelectableThemedText } from '@/components/SelectableThemedText';
 import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,10 +17,12 @@ import {
   RefreshControl,
   SectionList,
   StyleSheet,
+  Text,
   TouchableOpacity,
   View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FormattedShowTitle } from '../../components/FormattedShowTitle';
 import { apiKey } from '../../config';
 import { useTrackPlayer } from '../../context/TrackPlayerContext';
 import { useTimezoneChange } from '../../hooks/useTimezoneChange';
@@ -202,10 +203,10 @@ export default function ScheduleScreen() {
     });
   };
 
-  const renderSectionHeader = React.useCallback(({ section: { title } }: { section: { title: string } }) => (
+  const renderSectionHeader = React.useCallback(({ section }: { section: any }) => (
     <>
       <SelectableThemedText style={[styles.sectionHeader, { color: colors.primary }]}>
-        {title}
+        {section.title}
       </SelectableThemedText>
       <View style={styles.headerRow}>
         <SelectableThemedText style={[styles.headerCell, { color: colors.primary }]}>
@@ -255,23 +256,22 @@ export default function ScheduleScreen() {
                 title={item.title}
                 color={colors.primary}
                 size={18}
-                inline={true}
-                numberOfLines={3}
                 style={[
                   styles.cellText,
-                  Platform.OS === 'android' && { maxWidth: maxTitleWidth },
-                  {
+                  { 
+                    maxWidth: maxTitleWidth,
                     fontWeight: isCurrent ? '700' : '600',
                     fontStyle: isCurrent ? 'italic' : 'normal',
                   },
                 ]}
+                numberOfLines={3}
               />
             </View>
           </Link>
         </View>
       </CellWrapper>
     );
-  }, [currentShowId, colors.text, colors.primary, fadeAnim]);
+  }, [currentShowId, colors.text, colors.primary, fadeAnim, maxTitleWidth]);
 
   useEffect(() => {
     (async () => {
@@ -564,8 +564,9 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
     flexShrink: 1,
+    minWidth: '100%', // Ensure proper text wrapping on iOS
   },
   playIcon: {
     marginRight: 6,
@@ -576,6 +577,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'left',
     flexShrink: 1,
+    minWidth: '100%', // Ensure proper text wrapping on iOS
   },
 
   titleContainer: {
@@ -586,7 +588,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     position: 'absolute',
-    top: -26,
+    top: -44,
     right: 5,
   },
   logoBackground: {
