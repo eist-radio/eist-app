@@ -1,25 +1,24 @@
 // context/TrackPlayerContext.tsx
 
 import {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState
+    createContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState
 } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
+import { setupTrackPlayer } from '../utils/trackPlayerSetup';
 
 // Only import TrackPlayer on mobile platforms
-let TrackPlayer: any, AppKilledPlaybackBehavior: any, Capability: any, Event: any, State: any;
+let TrackPlayer: any, Event: any, State: any;
 if (Platform.OS !== 'web') {
   try {
     const trackPlayerModule = require('react-native-track-player');
     TrackPlayer = trackPlayerModule.default;
-    AppKilledPlaybackBehavior = trackPlayerModule.AppKilledPlaybackBehavior;
-    Capability = trackPlayerModule.Capability;
     Event = trackPlayerModule.Event;
     State = trackPlayerModule.State;
   } catch (error) {
@@ -218,49 +217,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       console.log('Setting up player...')
 
       if (!hasInitialized.current) {
-        await TrackPlayer.setupPlayer()
+        // Use the best practice setup function
+        await setupTrackPlayer()
         hasInitialized.current = true
       }
 
-      // Capabilities configuration - Using Capability enum as per best practices
-      const capabilities = [
-        Capability.Play,
-        Capability.Pause, 
-        Capability.Stop,
-        Capability.SeekTo,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
-      ]
-      
-      const compactCapabilities = [
-        Capability.Play, 
-        Capability.Pause, 
-        Capability.SkipToNext, 
-        Capability.SkipToPrevious
-      ]
-
-      // Options setup - Following best practices
-      const updateOptions: any = {
-        android: {
-          appKilledPlaybackBehavior: AppKilledPlaybackBehavior?.StopPlaybackAndRemoveNotification,
-        },
-        ios: {
-          // iOS-specific audio session configuration
-          backgroundMode: 'audio',
-          capabilities: capabilities,
-          notificationCapabilities: capabilities,
-          compactCapabilities: compactCapabilities,
-        },
-        stopWithApp: false,
-        alwaysPausable: true,
-        notificationCapabilities: capabilities,
-        compactCapabilities: compactCapabilities,
-        // Progress update interval
-        progressUpdateEventInterval: 1,
-      }
-
-      // Add capabilities to root level for backward compatibility
-      updateOptions.capabilities = capabilities
       setIsPlayerReady(true)
       console.log('Player setup completed')
     } catch (err) {
