@@ -1,6 +1,6 @@
 // utils/urlDetection.ts
 
-import { Linking } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 // URL regex pattern that matches various URL formats
 const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+|[^\s]+\.[a-z]{2,}\/[^\s]*)/gi;
@@ -111,6 +111,7 @@ export const getMixcloudAppUrl = (webUrl: string): string => {
 export const openMixcloudShow = async (webUrl: string): Promise<boolean> => {
   try {
     console.log('Attempting to open Mixcloud show:', webUrl)
+    console.log('Platform:', Platform.OS)
     
     // Validate the URL first
     if (!webUrl || typeof webUrl !== 'string') {
@@ -164,6 +165,47 @@ export const openMixcloudShow = async (webUrl: string): Promise<boolean> => {
       }
     } catch (mobileError) {
       console.error('Error checking/opening mobile URL:', mobileError)
+    }
+    
+    // iOS-specific fallback: try with different URL schemes
+    if (Platform.OS === 'ios') {
+      console.log('Trying iOS-specific fallbacks...')
+      
+      // Try with https:// prefix if not present
+      if (!webUrl.startsWith('https://') && !webUrl.startsWith('http://')) {
+        const httpsUrl = `https://${webUrl}`
+        console.log('Trying with https prefix:', httpsUrl)
+        
+        try {
+          const canOpenHttps = await Linking.canOpenURL(httpsUrl)
+          console.log('Can open https URL:', canOpenHttps)
+          
+          if (canOpenHttps) {
+            console.log('Opening with https prefix...')
+            await Linking.openURL(httpsUrl)
+            return true
+          }
+        } catch (httpsError) {
+          console.error('Error with https URL:', httpsError)
+        }
+      }
+      
+      // Try opening in Safari specifically
+      const safariUrl = webUrl.startsWith('http') ? webUrl : `https://${webUrl}`
+      console.log('Trying Safari URL:', safariUrl)
+      
+      try {
+        const canOpenSafari = await Linking.canOpenURL(safariUrl)
+        console.log('Can open Safari URL:', canOpenSafari)
+        
+        if (canOpenSafari) {
+          console.log('Opening in Safari...')
+          await Linking.openURL(safariUrl)
+          return true
+        }
+      } catch (safariError) {
+        console.error('Error with Safari URL:', safariError)
+      }
     }
     
     console.log('All URL opening attempts failed')
