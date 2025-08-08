@@ -127,16 +127,7 @@ export default function MixcloudScreen() {
 
   const openShow = async (show: MixcloudShow) => {
     try {
-      const canOpen = await Linking.canOpenURL(show.url)
-      if (canOpen) {
-        await Linking.openURL(show.url)
-      } else {
-        Alert.alert(
-          'Cannot Open Show',
-          'Unable to open this show. Please make sure you have an internet connection.',
-          [{ text: 'OK' }]
-        )
-      }
+      await Linking.openURL(show.url)
     } catch {
       Alert.alert(
         'Error',

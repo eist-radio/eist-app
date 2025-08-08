@@ -147,12 +147,19 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await new Promise(resolve => setTimeout(resolve, 100))
 
       // Re-add fresh stream track with preserved metadata if available
+      let artwork = currentTrack?.artwork || showArtworkUrl || require('../assets/images/eist-logo.png')
+      
+      // For Android, prefer HTTP URLs for artwork
+      if (Platform.OS === 'android' && showArtworkUrl && typeof showArtworkUrl === 'string' && showArtworkUrl.startsWith('http')) {
+        artwork = showArtworkUrl
+      }
+      
       const trackToAdd = {
         id: 'radio-stream-' + Date.now(), // Unique ID for fresh track
         url: STREAM_URL,
         title: currentTrack?.title || showTitle || 'éist',
         artist: currentTrack?.artist || (showArtist ? `${showArtist} · éist` : 'éist'),
-        artwork: currentTrack?.artwork || showArtworkUrl || require('../assets/images/eist-logo.png'),
+        artwork: artwork,
         isLiveStream: true,
       }
       
@@ -179,12 +186,19 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const queue = await TrackPlayer.getQueue()
       if (!queue || queue.length === 0) {
         // Add a track for display purposes (stopped state)
+        let artwork = showArtworkUrl || require('../assets/images/eist-logo.png')
+        
+        // For Android, prefer HTTP URLs for artwork
+        if (Platform.OS === 'android' && showArtworkUrl && typeof showArtworkUrl === 'string' && showArtworkUrl.startsWith('http')) {
+          artwork = showArtworkUrl
+        }
+        
         const trackToAdd = {
           id: 'radio-display-' + Date.now(),
           url: STREAM_URL,
           title: showTitle || 'éist',
           artist: showArtist ? `${showArtist} · éist` : 'éist',
-          artwork: showArtworkUrl || require('../assets/images/eist-logo.png'),
+          artwork: artwork,
           isLiveStream: true,
         }
 
@@ -514,7 +528,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
 
       // Use HTTP URL for artwork to ensure Android lock screen compatibility
-      // Fall back to eist-logo.png when no artist image available
+      // For Android lockscreen, we need to ensure artwork is properly handled
       let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
 
       if (isDeadAir) {
@@ -524,12 +538,22 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           artwork: artworkToUse,
         }
         
+        // For Android, ensure artwork is properly set
+        if (Platform.OS === 'android' && artworkUrl && typeof artworkUrl === 'string' && artworkUrl.startsWith('http')) {
+          metadata.artwork = artworkUrl
+        }
+        
         await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
       } else {
         const metadata = {
           title,
           artist: metadataArtist,
           artwork: artworkToUse,
+        }
+        
+        // For Android, ensure artwork is properly set
+        if (Platform.OS === 'android' && artworkUrl && typeof artworkUrl === 'string' && artworkUrl.startsWith('http')) {
+          metadata.artwork = artworkUrl
         }
         
         await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
