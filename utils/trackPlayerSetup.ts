@@ -25,6 +25,7 @@ export const setupTrackPlayer = async () => {
     await TrackPlayer.updateOptions({
       android: {
         appKilledPlaybackBehavior: AppKilledPlaybackBehavior.PausePlayback,
+        alwaysPauseOnInterruption: true,
       },
       
       // Capabilities - Use Capability enum, not strings
