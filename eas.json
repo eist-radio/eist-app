@@ -5,19 +5,29 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
+        "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
+      }
     },
     "preview": {
       "distribution": "store",
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
+        "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
       }
     },
     "production": {
       "autoIncrement": "true",
       "distribution": "store",
       "env": {
-        "API_KEY": "@API_KEY"
+        "API_KEY": "@API_KEY",
+        "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
+        "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
       }
     }
   },
