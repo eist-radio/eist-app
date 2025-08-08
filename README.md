@@ -13,7 +13,11 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 1. Install dependencies
 
    ```bash
+   rm -rf node_modules package-lock.json
+
    npm install
+
+   npx expo install
    ```
 
 2. Start the app
@@ -100,6 +104,13 @@ eas submit --platform ios
 ```
 
 ## Android
+
+Local Android build:
+
+```cmd
+eas build --profile development --platform android --local
+
+```
 
 ```cmd
 eas build --platform android

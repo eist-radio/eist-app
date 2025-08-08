@@ -4,6 +4,7 @@
   },
   "build": {
     "development": {
+      "node": "20.18.1",
       "developmentClient": true,
       "distribution": "internal",
       "env": {
@@ -12,6 +13,7 @@
       }
     },
     "preview": {
+      "node": "20.18.1",
       "distribution": "store",
       "ios": {
         "simulator": true
@@ -22,6 +24,7 @@
       }
     },
     "production": {
+      "node": "20.18.1",
       "autoIncrement": "true",
       "distribution": "store",
       "env": {
