@@ -31,7 +31,6 @@ export const setupTrackPlayer = async () => {
       // Capabilities - Use Capability enum, not strings
       capabilities: [
         Capability.Play,
-        Capability.Pause, 
         Capability.Stop
         //Capability.SeekTo,
         //Capability.SkipToNext,
@@ -41,7 +40,7 @@ export const setupTrackPlayer = async () => {
       // Compact capabilities
       compactCapabilities: [
         Capability.Play, 
-        Capability.Pause, 
+        Capability.Stop, 
         Capability.SkipToNext, 
         Capability.SkipToPrevious
       ],
