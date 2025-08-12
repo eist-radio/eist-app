@@ -1,16 +1,17 @@
 // context/TrackPlayerContext.tsx
 
 import {
-    createContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState
 } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
+import { getLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
 import { setupTrackPlayer } from '../utils/trackPlayerSetup';
 
 // Only import TrackPlayer on mobile platforms
@@ -149,10 +150,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Re-add fresh stream track with preserved metadata if available
       let artwork = currentTrack?.artwork || showArtworkUrl || require('../assets/images/eist-logo.png')
       
-      // For Android, prefer HTTP URLs for artwork
-      if (Platform.OS === 'android' && showArtworkUrl && typeof showArtworkUrl === 'string' && showArtworkUrl.startsWith('http')) {
-        artwork = showArtworkUrl
-      }
+      // Use the lock screen image utility for proper Android handling
+      artwork = getLockScreenImage(artwork)
       
       const trackToAdd = {
         id: 'radio-stream-' + Date.now(), // Unique ID for fresh track
@@ -188,10 +187,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         // Add a track for display purposes (stopped state)
         let artwork = showArtworkUrl || require('../assets/images/eist-logo.png')
         
-        // For Android, prefer HTTP URLs for artwork
-        if (Platform.OS === 'android' && showArtworkUrl && typeof showArtworkUrl === 'string' && showArtworkUrl.startsWith('http')) {
-          artwork = showArtworkUrl
-        }
+        // Use the lock screen image utility for proper Android handling
+        artwork = getLockScreenImage(artwork)
         
         const trackToAdd = {
           id: 'radio-display-' + Date.now(),
@@ -333,11 +330,29 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const data = await response.json()
       const title = data?.title || 'éist'
       const artist = data?.artist || ''
-      const artworkUrl = data?.artworkUrl || undefined
+      let artworkUrl = data?.artworkUrl || undefined
+
+      // For Android, ensure artwork URL is properly formatted for lock screen
+      if (Platform.OS === 'android' && artworkUrl && typeof artworkUrl === 'string') {
+        // Ensure the URL is accessible and properly formatted
+        try {
+          const artworkResponse = await fetch(artworkUrl, { method: 'HEAD' })
+          if (!artworkResponse.ok) {
+            // If remote artwork fails, fall back to local lock screen image
+            artworkUrl = undefined
+          }
+        } catch (artworkError) {
+          console.warn('Artwork URL validation failed, using fallback:', artworkError)
+          artworkUrl = undefined
+        }
+      }
 
       setShowTitle(title)
       setShowArtist(artist)
       setShowArtworkUrl(artworkUrl)
+
+      // Preload the lock screen image for Android
+      await preloadLockScreenImage(artworkUrl)
 
       await updateMetadata(title, artist, artworkUrl)
     } catch (err) {
@@ -527,9 +542,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const isDeadAir = title.trim().length === 0
       const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
 
-      // Use HTTP URL for artwork to ensure Android lock screen compatibility
-      // For Android lockscreen, we need to ensure artwork is properly handled
+      // Use appropriate artwork for Android lock screen compatibility
       let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
+
+      // Use the lock screen image utility for proper Android handling
+      artworkToUse = getLockScreenImage(artworkToUse)
 
       if (isDeadAir) {
         const metadata = {
@@ -538,22 +555,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           artwork: artworkToUse,
         }
         
-        // For Android, ensure artwork is properly set
-        if (Platform.OS === 'android' && artworkUrl && typeof artworkUrl === 'string' && artworkUrl.startsWith('http')) {
-          metadata.artwork = artworkUrl
-        }
-        
         await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
       } else {
         const metadata = {
           title,
           artist: metadataArtist,
           artwork: artworkToUse,
-        }
-        
-        // For Android, ensure artwork is properly set
-        if (Platform.OS === 'android' && artworkUrl && typeof artworkUrl === 'string' && artworkUrl.startsWith('http')) {
-          metadata.artwork = artworkUrl
         }
         
         await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
