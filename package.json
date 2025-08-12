@@ -20,8 +20,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint",
-    "postinstall": "patch-package"
+    "lint": "expo lint"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.1.0",
@@ -63,7 +62,7 @@
     "react-native-screens": "~4.11.1",
     "react-native-share": "^12.0.11",
     "react-native-svg": "15.11.2",
-    "react-native-track-player": "^4.1.1",
+    "react-native-track-player": "^4.1.2",
     "react-native-view-shot": "^4.0.3",
     "react-native-web": "~0.20.0",
     "react-native-webview": "13.13.5",
@@ -76,7 +75,6 @@
     "babel-preset-expo": "~13.0.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~9.2.0",
-    "patch-package": "^8.0.0",
     "typescript": "~5.8.3"
   },
   "overrides": {
