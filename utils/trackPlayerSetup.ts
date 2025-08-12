@@ -1,14 +1,18 @@
 // utils/trackPlayerSetup.ts
 
-import TrackPlayer, { 
-  Capability, 
-  IOSCategory, 
-  AndroidAudioContentType,
-  AppKilledPlaybackBehavior 
+import TrackPlayer, {
+    AndroidAudioContentType,
+    AppKilledPlaybackBehavior,
+    Capability,
+    IOSCategory
 } from 'react-native-track-player';
+import { setupAndroidNotificationChannel } from './androidNotificationSetup';
 
 export const setupTrackPlayer = async () => {
   try {
+    // Setup Android notification channel first
+    await setupAndroidNotificationChannel();
+
     // Player setup
     await TrackPlayer.setupPlayer({
       maxBuffer: 50,
