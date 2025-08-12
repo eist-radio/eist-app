@@ -110,21 +110,11 @@ export default function ArtistScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const { colors } = useTheme();
 
-  if (!slug) {
-    return (
-      <SwipeNavigator>
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
-          <Text style={{ color: colors.notification }}>
-            No artist specified.
-          </Text>
-        </View>
-      </SwipeNavigator>
-    );
-  }
-
+  // Move all hooks to the top before any conditional returns
   const { data: artist } = useQuery({
     queryKey: ['artist', slug],
-    queryFn: () => fetchArtistBySlug(slug),
+    queryFn: () => fetchArtistBySlug(slug || ''),
+    enabled: !!slug, // Only run query if slug exists
   });
 
   const fallbackImage = require('../../../assets/images/eist_online.png');
@@ -152,11 +142,11 @@ export default function ArtistScreen() {
           img.onload = () => {
             resolve(true)
           }
-          img.onerror = (error: any) => {
+          img.onerror = () => {
             resolve(false)
           }
           img.src = uri
-        } catch (error) {
+        } catch {
           resolve(true) // Fallback: assume image will load fine
         }
       } else {
@@ -166,7 +156,7 @@ export default function ArtistScreen() {
             .then(() => {
               resolve(true)
             })
-            .catch((error) => {
+            .catch(() => {
               resolve(false)
             })
         } else {
@@ -219,21 +209,32 @@ export default function ArtistScreen() {
           setPreloadedImageUrl(remoteImage);
           setImageFailed(false);
         } else {
-          setImageFailed(true);
           setPreloadedImageUrl(null);
+          setImageFailed(true);
         }
-      } catch (error) {
-        console.error('Image preload error:', error);
-        setImageFailed(true);
+      } catch {
         setPreloadedImageUrl(null);
+        setImageFailed(true);
       } finally {
         setIsImageLoading(false);
-        setImageReady(true); // Image is ready (either preloaded or fallback)
+        setImageReady(true);
       }
     };
 
     loadArtistImage();
-  }, [artist, artist?.logo, preloadImage]);
+  }, [artist, preloadImage]);
+
+  if (!slug) {
+    return (
+      <SwipeNavigator>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
+          <Text style={{ color: colors.notification }}>
+            No artist specified.
+          </Text>
+        </View>
+      </SwipeNavigator>
+    );
+  }
 
   if (!artist) {
     return (

@@ -203,7 +203,6 @@ export default function ShowScreen() {
   const [hideShareButton, setHideShareButton] = useState(false);
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [isScrollable, setIsScrollable] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
 
   // Preload image function (same as listen page)
   const preloadImage = useCallback((uri: string): Promise<boolean> => {
@@ -221,11 +220,11 @@ export default function ShowScreen() {
           img.onload = () => {
             resolve(true)
           }
-          img.onerror = (error: any) => {
+          img.onerror = () => {
             resolve(false)
           }
           img.src = uri
-        } catch (error) {
+        } catch {
           resolve(true) // Fallback: assume image will load fine
         }
       } else {
@@ -235,7 +234,7 @@ export default function ShowScreen() {
             .then(() => {
               resolve(true)
             })
-            .catch((error) => {
+            .catch(() => {
               resolve(false)
             })
         } else {
@@ -245,19 +244,11 @@ export default function ShowScreen() {
     })
   }, []);
 
-  if (!slug) {
-    return (
-      <SwipeNavigator>
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
-          <Text style={{ color: colors.notification }}>No show selected.</Text>
-        </View>
-      </SwipeNavigator>
-    );
-  }
-
+  // Move all queries to the top before any conditional returns
   const { data: event } = useQuery({
     queryKey: ['show', slug],
-    queryFn: () => fetchEventById(slug),
+    queryFn: () => fetchEventById(slug || ''),
+    enabled: !!slug, // Only run query if slug exists
   });
 
   const hostId = event?.artistIds?.[0];
@@ -320,8 +311,7 @@ export default function ShowScreen() {
           setImageFailed(true);
           setPreloadedImageUrl(null);
         }
-      } catch (error) {
-        console.error('Image preload error:', error);
+      } catch {
         setImageFailed(true);
         setPreloadedImageUrl(null);
       } finally {
@@ -332,6 +322,16 @@ export default function ShowScreen() {
 
     loadArtistImage();
   }, [hostId, host, hostImageUrl, preloadImage]);
+
+  if (!slug) {
+    return (
+      <SwipeNavigator>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
+          <Text style={{ color: colors.notification }}>No show selected.</Text>
+        </View>
+      </SwipeNavigator>
+    );
+  }
 
   if (!event) {
     return (

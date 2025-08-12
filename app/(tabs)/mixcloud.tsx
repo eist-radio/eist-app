@@ -67,7 +67,6 @@ const LoadingFooter = () => {
 }
 
 const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
-  const { colors } = useTheme()
   const animatedValue = React.useRef(new Animated.Value(0)).current
   
   React.useEffect(() => {
@@ -127,7 +126,7 @@ export default function MixcloudScreen() {
   const [showBackToTop, setShowBackToTop] = useState(false)
   const flatListRef = useRef<FlatList>(null)
 
-  const openShow = async (show: MixcloudShow) => {
+  const openShow = useCallback(async (show: MixcloudShow) => {
     try {
       await Linking.openURL(show.url)
     } catch {
@@ -137,7 +136,7 @@ export default function MixcloudScreen() {
         [{ text: 'OK' }]
       )
     }
-  }
+  }, [])
 
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {

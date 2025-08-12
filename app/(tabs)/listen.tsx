@@ -9,20 +9,20 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    AppState,
-    Dimensions,
-    Image,
-    Linking,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  AppState,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
@@ -33,11 +33,12 @@ import { useTimezoneChange } from '../../hooks/useTimezoneChange'
 let TrackPlayer: any, Event: any;
 if (Platform.OS !== 'web') {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const trackPlayerModule = require('react-native-track-player');
     TrackPlayer = trackPlayerModule.default;
     Event = trackPlayerModule.Event;
-  } catch (error) {
-    console.warn('TrackPlayer not available:', error);
+  } catch {
+    console.warn('TrackPlayer not available');
   }
 }
 
@@ -162,7 +163,6 @@ export default function ListenScreen() {
     togglePlayStop,
     updateMetadata,
     isBusy,
-    isPlayerReady,
   } = useTrackPlayer()
   const { width } = Dimensions.get('window')
   const router = useRouter()
@@ -181,7 +181,6 @@ export default function ListenScreen() {
   const [currentShowId, setCurrentShowId] = useState<string | null>(null)
   const [isContentLoading, setIsContentLoading] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [imageReady, setImageReady] = useState(false)
   const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
   const [isCarConnected, setIsCarConnected] = useState(false)
   const carRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -190,7 +189,7 @@ export default function ListenScreen() {
   const scrollViewRef = useRef<ScrollView>(null)
 
 
-  const formatTime = (isoString: string): string => {
+  const formatTime = useCallback((isoString: string): string => {
     const date = new Date(isoString)
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
@@ -198,7 +197,7 @@ export default function ListenScreen() {
       hour12: true,
       timeZone: currentTimezone,
     })
-  }
+  }, [currentTimezone])
 
   const parseDescription = (blocks: any[]): string =>
     blocks
@@ -231,11 +230,11 @@ export default function ListenScreen() {
           img.onload = () => {
             resolve(true)
           }
-          img.onerror = (error: any) => {
+          img.onerror = () => {
             resolve(false)
           }
           img.src = uri
-        } catch (error) {
+        } catch {
           resolve(true)
         }
       } else {
@@ -245,7 +244,7 @@ export default function ListenScreen() {
             .then(() => {
               resolve(true)
             })
-            .catch((error) => {
+            .catch(() => {
               resolve(false)
             })
         } else {
@@ -296,11 +295,9 @@ export default function ListenScreen() {
     setCurrentShowId(null)
     // Don't clear next show info - it should be preserved when station is off air
     setIsContentLoading(false)
-    setImageReady(true) // Offline images are always "ready"
     try {
       await updateMetadata('éist · off air', '', undefined)
-    } catch (error) {
-      console.error('Error updating metadata in clearNowPlayingState:', error)
+    } catch {
       // Don't let errors propagate - just log them
     }
   }, [updateMetadata])
@@ -373,7 +370,6 @@ export default function ListenScreen() {
         if (newArtistId !== artistId) {
           setArtistId(newArtistId)
           setIsContentLoading(true)
-          setImageReady(false)
 
           const { name, image } = await getArtistDetails(newArtistId)
 
@@ -398,7 +394,6 @@ export default function ListenScreen() {
             await updateMetadata(newShowTitle || 'éist', name, undefined)
           }
 
-          setImageReady(true)
           setIsContentLoading(false)
         } else {
           // Artist ID hasn't changed, just update metadata with current artist info
@@ -410,17 +405,16 @@ export default function ListenScreen() {
           }
         }
       }
-    } catch (err) {
+    } catch {
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, currentTimezone])
+  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime])
 
   const fetchNowPlayingWithArtist = useCallback(async () => {
 
     // Set loading state when starting to fetch new content
     setIsContentLoading(true)
-    setImageReady(false) // Hide image until new content is ready
 
     try {
       const res = await fetch(`${apiUrl}/schedule/live`, {
@@ -504,14 +498,13 @@ export default function ListenScreen() {
         await updateMetadata(newShowTitle || 'éist', name, undefined)
       }
 
-      // Mark image as ready and loading as finished
-      setImageReady(true)
+      // Mark loading as finished
       setIsContentLoading(false)
-    } catch (err) {
+    } catch {
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, currentTimezone])
+  }, [getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime])
 
   // Function to calculate time until next 1 minute past the hour
   const getTimeUntilNextRefresh = () => {
@@ -576,7 +569,7 @@ export default function ListenScreen() {
         remotePauseListener = TrackPlayer.addEventListener(Event.RemotePause, () => {
           setIsCarConnected(true)
         })
-      } catch (error) {
+      } catch {
         // Don't let errors propagate - just log them
       }
     }
@@ -636,8 +629,7 @@ export default function ListenScreen() {
     
     try {
       await togglePlayStop()
-    } catch (error) {
-      console.error('Error in play button press:', error)
+    } catch {
       // Show user-friendly error message
       Alert.alert(
         'Playback Error',
@@ -645,7 +637,7 @@ export default function ListenScreen() {
         [{ text: 'OK' }]
       )
     }
-  }, [togglePlayStop, isPlaying, isBusy, isPlayerReady])
+  }, [togglePlayStop])
 
   const iconName = isPlaying
     ? 'stop-circle-outline'
