@@ -8,11 +8,11 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React, { Suspense, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Image,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Animated,
+    Image,
+    StyleSheet,
+    View,
 } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TrackPlayerProvider } from '../context/TrackPlayerContext';

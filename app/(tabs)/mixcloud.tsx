@@ -119,10 +119,7 @@ export default function MixcloudScreen() {
     isFetchingNextPage 
   } = useMixcloudShows()
 
-  // Flatten all pages into a single array
   const allShows = data?.pages.flatMap(page => page.shows) || []
-  
-  // Scroll state management
   const [showBackToTop, setShowBackToTop] = useState(false)
   const flatListRef = useRef<FlatList>(null)
 
@@ -130,57 +127,33 @@ export default function MixcloudScreen() {
     try {
       await Linking.openURL(show.url)
     } catch {
-      Alert.alert(
-        'Error',
-        'Failed to open show. Please try again later.',
-        [{ text: 'OK' }]
-      )
+      Alert.alert('Error', 'Failed to open show. Please try again later.', [{ text: 'OK' }])
     }
   }, [])
 
   const handleLoadMore = () => {
-    if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage()
-    }
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage()
   }
 
   const handleScroll = (event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y
-    // Show back button when scrolled past 100px (adjust as needed)
     setShowBackToTop(scrollY > 100)
   }
 
   const scrollToTop = () => {
-    if (flatListRef.current) {
-      // Use scrollToOffset with a more reliable approach for Android
-      flatListRef.current.scrollToOffset({ 
-        offset: 0, 
-        animated: true 
-      })
-      
-      // Fallback: if the above doesn't work, try without animation
-      setTimeout(() => {
-        if (flatListRef.current) {
-          flatListRef.current.scrollToOffset({ 
-            offset: 0, 
-            animated: false 
-          })
-        }
-      }, 100)
-    }
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true })
+    setTimeout(() => flatListRef.current?.scrollToOffset({ offset: 0, animated: false }), 100)
   }
 
   const renderShowItem = useCallback(({ item }: { item: MixcloudShow }) => (
     <ShowItem show={item} onPress={() => openShow(item)} />
   ), [openShow])
 
-  const renderFooter = () => {
-    if (!isFetchingNextPage) return null
-    return <LoadingFooter />
-  }
+  const renderFooter = () => (isFetchingNextPage ? <LoadingFooter /> : null)
 
   return (
-    <SwipeNavigator>
+    // Horizontal swipe disabled here; iOS back-swipe still works due to edge exclusion
+    <SwipeNavigator horizontalEnabled={false} allowIOSBackSwipe>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <TouchableOpacity
           style={styles.eistLogoContainer}
@@ -189,19 +162,12 @@ export default function MixcloudScreen() {
           accessibilityRole="link"
         >
           <View style={styles.eistLogoBackground}>
-            <Image
-              source={logoImage}
-              style={{ width: 57, height: 57 }}
-              resizeMode="contain"
-            />
+            <Image source={logoImage} style={{ width: 57, height: 57 }} resizeMode="contain" />
           </View>
         </TouchableOpacity>
+
         <View style={styles.header}>
-          <Image
-            source={mixcloudLogo}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          <Image source={mixcloudLogo} style={styles.logo} resizeMode="contain" />
         </View>
 
         <View style={styles.content}>
@@ -232,7 +198,7 @@ export default function MixcloudScreen() {
               ListFooterComponent={renderFooter}
               onScroll={handleScroll}
               scrollEventThrottle={16}
-              removeClippedSubviews={true}
+              removeClippedSubviews
               maxToRenderPerBatch={5}
               windowSize={5}
               initialNumToRender={8}
@@ -246,7 +212,7 @@ export default function MixcloudScreen() {
             </View>
           )}
         </View>
-        
+
         <BackToTopButton onPress={scrollToTop} visible={showBackToTop} />
       </View>
     </SwipeNavigator>
@@ -254,23 +220,11 @@ export default function MixcloudScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: 64,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  showsList: {
-    flex: 1,
-  },
-  showsListContent: {
-    paddingBottom: 16,
-  },
+  container: { flex: 1 },
+  header: { alignItems: 'center', marginTop: 64 },
+  content: { flex: 1, paddingHorizontal: 16 },
+  showsList: { flex: 1 },
+  showsListContent: { paddingBottom: 16 },
   showItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -279,106 +233,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.1)',
   },
-  thumbnail: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  thumbnailPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  showContent: {
-    flex: 1,
-    marginRight: 12,
-  },
-  showTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-    lineHeight: 24,
-  },
-  showDate: {
-    fontSize: 14,
-    opacity: 0.7,
-    marginBottom: 2,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  errorText: {
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
-    opacity: 0.7,
-  },
-  footerLoading: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
-  },
-  footerText: {
-    fontSize: 14,
-    opacity: 0.7,
-  },
-  logo: {
-    width: 150,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  backToTopButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: '45%',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backToTopTouchable: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chevronIcon: {
-    // Empty style for now, can be used for future styling
-  },
-  eistLogoContainer: { 
-    position: 'absolute', 
-    top: 48,
-    right: 18,
-    zIndex: 1,
-  },
-  eistLogoBackground: {
-    borderRadius: 26,
-    padding: 6,
-  },
-
+  thumbnail: { width: 60, height: 60, borderRadius: 8, marginRight: 12 },
+  thumbnailPlaceholder: { justifyContent: 'center', alignItems: 'center' },
+  showContent: { flex: 1, marginRight: 12 },
+  showTitle: { fontSize: 18, fontWeight: '600', marginBottom: 4, lineHeight: 24 },
+  showDate: { fontSize: 14, opacity: 0.7, marginBottom: 2 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 16 },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  errorText: { fontSize: 16, textAlign: 'center', opacity: 0.7 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
+  emptyText: { fontSize: 16, textAlign: 'center', opacity: 0.7 },
+  footerLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, gap: 8 },
+  footerText: { fontSize: 14, opacity: 0.7 },
+  logo: { width: 150, marginTop: 12, marginBottom: 8 },
+  backToTopButton: { position: 'absolute', bottom: 20, left: '45%', width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+  backToTopTouchable: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
+  chevronIcon: {},
+  eistLogoContainer: { position: 'absolute', top: 48, right: 18, zIndex: 1 },
+  eistLogoBackground: { borderRadius: 26, padding: 6 },
 })
