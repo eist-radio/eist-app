@@ -437,7 +437,23 @@ export default function ShowScreen() {
   }
 
   const scrollToTop = () => {
-    shareViewRef.current?.scrollTo({ y: 0, animated: true })
+    if (shareViewRef.current) {
+      // Use scrollTo with a more reliable approach for Android
+      shareViewRef.current.scrollTo({ 
+        y: 0, 
+        animated: true 
+      })
+      
+      // Fallback: if the above doesn't work, try without animation
+      setTimeout(() => {
+        if (shareViewRef.current) {
+          shareViewRef.current.scrollTo({ 
+            y: 0, 
+            animated: false 
+          })
+        }
+      }, 100)
+    }
   }
 
   return (

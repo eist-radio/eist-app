@@ -10,17 +10,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Image,
-    Linking,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { apiKey } from '../../../config';
 import { stripFormatting } from '../../../utils/stripFormatting';
@@ -320,7 +320,23 @@ export default function ArtistScreen() {
   }
 
   const scrollToTop = () => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: true })
+    if (scrollViewRef.current) {
+      // Use scrollTo with a more reliable approach for Android
+      scrollViewRef.current.scrollTo({ 
+        y: 0, 
+        animated: true 
+      })
+      
+      // Fallback: if the above doesn't work, try without animation
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({ 
+            y: 0, 
+            animated: false 
+          })
+        }
+      }, 100)
+    }
   }
 
   return (

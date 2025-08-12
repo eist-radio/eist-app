@@ -4,24 +4,24 @@ import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
-import React, { useRef, useState } from 'react'
+import React, { memo, useCallback, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
 
 const mixcloudLogo = require('../../assets/images/mc-logo-default.png')
 const logoImage = require('../../assets/images/eist-logo-header.png')
 
-const ShowItem = ({ show, onPress }: { show: MixcloudShow; onPress: () => void }) => {
+const ShowItem = memo(({ show, onPress }: { show: MixcloudShow; onPress: () => void }) => {
   const { colors } = useTheme()
   
-  const formatDate = (dateString: string) => {
+  const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     })
-  }
+  }, [])
 
   return (
     <TouchableOpacity
@@ -50,7 +50,9 @@ const ShowItem = ({ show, onPress }: { show: MixcloudShow; onPress: () => void }
       <Ionicons name="chevron-forward" size={20} color={colors.text} />
     </TouchableOpacity>
   )
-}
+})
+
+ShowItem.displayName = 'ShowItem'
 
 const LoadingFooter = () => {
   const { colors } = useTheme()
@@ -150,12 +152,28 @@ export default function MixcloudScreen() {
   }
 
   const scrollToTop = () => {
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true })
+    if (flatListRef.current) {
+      // Use scrollToOffset with a more reliable approach for Android
+      flatListRef.current.scrollToOffset({ 
+        offset: 0, 
+        animated: true 
+      })
+      
+      // Fallback: if the above doesn't work, try without animation
+      setTimeout(() => {
+        if (flatListRef.current) {
+          flatListRef.current.scrollToOffset({ 
+            offset: 0, 
+            animated: false 
+          })
+        }
+      }, 100)
+    }
   }
 
-  const renderShowItem = ({ item }: { item: MixcloudShow }) => (
+  const renderShowItem = useCallback(({ item }: { item: MixcloudShow }) => (
     <ShowItem show={item} onPress={() => openShow(item)} />
-  )
+  ), [openShow])
 
   const renderFooter = () => {
     if (!isFetchingNextPage) return null
@@ -215,6 +233,11 @@ export default function MixcloudScreen() {
               ListFooterComponent={renderFooter}
               onScroll={handleScroll}
               scrollEventThrottle={16}
+              removeClippedSubviews={true}
+              maxToRenderPerBatch={5}
+              windowSize={5}
+              initialNumToRender={8}
+              updateCellsBatchingPeriod={50}
             />
           ) : (
             <View style={styles.emptyContainer}>
