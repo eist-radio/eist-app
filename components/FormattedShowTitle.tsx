@@ -13,7 +13,7 @@ interface FormattedShowTitleProps {
   asContent?: boolean;
 }
 
-export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
+const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
   title,
   color = '#000',
   size = 16,
@@ -140,3 +140,7 @@ export const FormattedShowTitle: React.FC<FormattedShowTitleProps> = ({
     </Text>
   );
 };
+
+export const FormattedShowTitle = React.memo(FormattedShowTitleComponent);
+
+FormattedShowTitle.displayName = 'FormattedShowTitle';
