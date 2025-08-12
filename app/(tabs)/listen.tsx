@@ -687,21 +687,10 @@ export default function ListenScreen() {
 
   const scrollToTop = () => {
     if (scrollViewRef.current) {
-      // Use scrollTo with a more reliable approach for Android
       scrollViewRef.current.scrollTo({ 
         y: 0, 
         animated: true 
       })
-      
-      // Fallback: if the above doesn't work, try without animation
-      setTimeout(() => {
-        if (scrollViewRef.current) {
-          scrollViewRef.current.scrollTo({ 
-            y: 0, 
-            animated: false 
-          })
-        }
-      }, 100)
     }
   }
 

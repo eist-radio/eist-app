@@ -23,8 +23,11 @@ export const setupAndroidNotificationChannel = async () => {
         enableVibration: false,
         enableLights: false,
         sound: null,
-        // Ensure notification is visible on lock screen
+        // Ensure notification is visible on lock screen with full visibility
         lockscreenVisibility: 1, // VISIBILITY_PUBLIC
+        // Additional settings for better lockscreen display
+        allowBubbles: true,
+        bypassDnd: false,
       });
 
       console.log('Android notification channel created successfully');

@@ -1,17 +1,17 @@
 // context/TrackPlayerContext.tsx
 
 import {
-  createContext,
-  ReactNode,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState
+    createContext,
+    ReactNode,
+    useCallback,
+    useContext,
+    useEffect,
+    useRef,
+    useState
 } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
-import { getLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
+import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
 import { setupTrackPlayer } from '../utils/trackPlayerSetup';
 
 // Only import TrackPlayer on mobile platforms
@@ -44,6 +44,7 @@ type TrackPlayerContextType = {
   ) => Promise<void>
   recoverAudioSession: () => Promise<void>
   forcePlayerReset: () => Promise<void>
+  forceMetadataRefresh: () => Promise<void>
   showTitle: string;
   showArtist: string;
   showArtworkUrl: string | undefined;
@@ -77,6 +78,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const maxRecoveryAttempts = 3;
   const recoveryAttempts = useRef(0);
   const isRecovering = useRef(false);
+
+  // Metadata refresh interval
+  const metadataRefreshInterval = useRef<NodeJS.Timeout | null>(null);
 
   // Network connectivity tracking
   const networkState = useNetworkConnectivity()
@@ -332,6 +336,22 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const artist = data?.artist || ''
       let artworkUrl = data?.artworkUrl || undefined
 
+      // Check if metadata has actually changed
+      const hasMetadataChanged = 
+        title !== showTitle || 
+        artist !== showArtist || 
+        artworkUrl !== showArtworkUrl
+
+      if (!hasMetadataChanged) {
+        console.log('Metadata unchanged, skipping update')
+        return
+      }
+
+      // For Android, invalidate previous artwork cache if URL changed
+      if (Platform.OS === 'android' && showArtworkUrl && showArtworkUrl !== artworkUrl) {
+        invalidateLockScreenImage(showArtworkUrl)
+      }
+
       // For Android, ensure artwork URL is properly formatted for lock screen
       if (Platform.OS === 'android' && artworkUrl && typeof artworkUrl === 'string') {
         // Ensure the URL is accessible and properly formatted
@@ -351,10 +371,20 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setShowArtist(artist)
       setShowArtworkUrl(artworkUrl)
 
-      // Preload the lock screen image for Android
-      await preloadLockScreenImage(artworkUrl)
-
+      // First update metadata with current state (might use fallback image for Android)
       await updateMetadata(title, artist, artworkUrl)
+
+      // Then preload the lock screen image for Android and update metadata again if successful
+      if (Platform.OS === 'android' && artworkUrl) {
+        const imagePreloaded = await preloadLockScreenImage(artworkUrl)
+        if (imagePreloaded) {
+          // Update metadata again with the validated artwork
+          await updateMetadata(title, artist, artworkUrl)
+          console.log('Lock screen image updated after preload validation')
+        }
+      }
+      
+      console.log('Metadata updated successfully:', { title, artist, artworkUrl })
     } catch (err) {
       console.error('Failed to fetch or update show metadata:', err)
       // Fallback to previous state/metadata
@@ -534,6 +564,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     try {
       const queue = await TrackPlayer.getQueue()
       if (!queue || queue.length === 0) {
+        console.log('No queue available for metadata update')
         return
       }
 
@@ -548,23 +579,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Use the lock screen image utility for proper Android handling
       artworkToUse = getLockScreenImage(artworkToUse)
 
-      if (isDeadAir) {
-        const metadata = {
-          title,
-          artist: '',
-          artwork: artworkToUse,
-        }
-        
-        await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
-      } else {
-        const metadata = {
-          title,
-          artist: metadataArtist,
-          artwork: artworkToUse,
-        }
-        
-        await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
+      const metadata = {
+        title,
+        artist: isDeadAir ? '' : metadataArtist,
+        artwork: artworkToUse,
       }
+      
+      console.log('Updating metadata:', { title, artist: metadata.artist, artworkUrl })
+      await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
+      console.log('Metadata updated successfully')
     } catch (err) {
       console.error('Metadata update failed:', err)
     }
@@ -630,8 +653,19 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const onState = TrackPlayer.addEventListener(
         Event.PlaybackState,
         async ({ state }: any) => {
+          const wasPlaying = isPlayingRef.current
           const playing = state === State.Playing
           setIsPlaying(playing)
+
+          // Refresh metadata when starting playback (especially from lock screen)
+          if (state === State.Playing && !wasPlaying) {
+            try {
+              console.log('Playback started, refreshing metadata for lock screen')
+              await fetchAndUpdateShowMetadata()
+            } catch (error) {
+              console.error('Error refreshing metadata on play start:', error)
+            }
+          }
 
           // Ensure metadata display is maintained when stopped
           if (state === State.Stopped) {
@@ -682,7 +716,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       )
 
-
       const onAppState = AppState.addEventListener('change', async (next) => {
         if (next === 'active') {
           // Check if we should resume playback after returning from background
@@ -703,14 +736,42 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       })
 
+      // Set up periodic metadata refresh for Android lockscreen
+      if (Platform.OS === 'android') {
+        metadataRefreshInterval.current = setInterval(async () => {
+          if (isPlaying) {
+            try {
+              await fetchAndUpdateShowMetadata()
+            } catch (error) {
+              console.error('Periodic metadata refresh failed:', error)
+            }
+          }
+        }, 30000) // Refresh every 30 seconds when playing
+      }
+
       return () => {
         onState.remove()
         onError.remove()
         onQueueEnded.remove()
         onAppState.remove()
+        
+        // Clear metadata refresh interval
+        if (metadataRefreshInterval.current) {
+          clearInterval(metadataRefreshInterval.current)
+          metadataRefreshInterval.current = null
+        }
       }
     }
   }, [])
+
+  const forceMetadataRefresh = async () => {
+    try {
+      console.log('Forcing metadata refresh...')
+      await fetchAndUpdateShowMetadata()
+    } catch (error) {
+      console.error('Force metadata refresh failed:', error)
+    }
+  }
 
   return (
     <TrackPlayerContext.Provider
@@ -725,6 +786,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         updateMetadata,
         recoverAudioSession: recoverFromAudioSessionConflict,
         forcePlayerReset: recoverFromAudioSessionConflict,
+        forceMetadataRefresh,
         showTitle,
         showArtist,
         showArtworkUrl,
