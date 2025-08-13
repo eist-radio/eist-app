@@ -190,11 +190,25 @@ export default function ScheduleScreen() {
   };
 
   const scrollToTop = () => {
-    sectionListRef.current?.scrollToLocation({
-      sectionIndex: 0,
-      itemIndex: 0,
-      animated: true
-    });
+    if (sectionListRef.current) {
+      // Use scrollToLocation with a more reliable approach for Android
+      sectionListRef.current.scrollToLocation({
+        sectionIndex: 0,
+        itemIndex: 0,
+        animated: true
+      });
+      
+      // Fallback: if the above doesn't work, try without animation
+      setTimeout(() => {
+        if (sectionListRef.current) {
+          sectionListRef.current.scrollToLocation({
+            sectionIndex: 0,
+            itemIndex: 0,
+            animated: false
+          });
+        }
+      }, 100)
+    }
   };
 
   const renderSectionHeader = React.useCallback(({ section }: { section: any }) => (
@@ -484,9 +498,11 @@ export default function ScheduleScreen() {
           onScroll={handleScroll}
           scrollEventThrottle={16}
           removeClippedSubviews={true}
-          maxToRenderPerBatch={10}
-          windowSize={10}
-          initialNumToRender={10}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          initialNumToRender={8}
+          updateCellsBatchingPeriod={50}
+          getItemLayout={undefined}
           refreshControl={
             <RefreshControl
               refreshing={isRefreshing}

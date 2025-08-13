@@ -10,6 +10,9 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Android
+*.apk
+
 # Native
 .kotlin/
 *.orig.*
@@ -40,6 +43,6 @@ yarn-error.*
 .env
 google-service-account.json 
 
-# Android
+# Build folders
 android/
 ios/

@@ -1,14 +1,18 @@
 // utils/trackPlayerSetup.ts
 
-import TrackPlayer, { 
-  Capability, 
-  IOSCategory, 
-  AndroidAudioContentType,
-  AppKilledPlaybackBehavior 
+import TrackPlayer, {
+    AndroidAudioContentType,
+    AppKilledPlaybackBehavior,
+    Capability,
+    IOSCategory
 } from 'react-native-track-player';
+import { setupAndroidNotificationChannel } from './androidNotificationSetup';
 
 export const setupTrackPlayer = async () => {
   try {
+    // Setup Android notification channel first
+    await setupAndroidNotificationChannel();
+
     // Player setup
     await TrackPlayer.setupPlayer({
       maxBuffer: 50,
@@ -25,12 +29,12 @@ export const setupTrackPlayer = async () => {
     await TrackPlayer.updateOptions({
       android: {
         appKilledPlaybackBehavior: AppKilledPlaybackBehavior.PausePlayback,
+        alwaysPauseOnInterruption: true,
       },
       
       // Capabilities - Use Capability enum, not strings
       capabilities: [
         Capability.Play,
-        Capability.Pause, 
         Capability.Stop
         //Capability.SeekTo,
         //Capability.SkipToNext,
@@ -40,7 +44,7 @@ export const setupTrackPlayer = async () => {
       // Compact capabilities
       compactCapabilities: [
         Capability.Play, 
-        Capability.Pause, 
+        Capability.Stop, 
         Capability.SkipToNext, 
         Capability.SkipToPrevious
       ],
