@@ -78,8 +78,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "android.permission.INTERNET",
       "android.permission.WAKE_LOCK",
       "android.permission.FOREGROUND_SERVICE",
-      "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
-    ],
+      "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+      "android.permission.MODIFY_AUDIO_SETTINGS",
+      "android.permission.ACCESS_NETWORK_STATE"
+    ]
   },
   // Disable new architecture for problematic packages
   experiments: {
