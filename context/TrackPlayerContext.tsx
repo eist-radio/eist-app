@@ -136,8 +136,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('Performing clean reset...')
-
       // Stop current playback but don't reset queue yet
       await TrackPlayer.stop().catch(() => { })
 
@@ -226,17 +224,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     // Prevent multiple simultaneous setup attempts
     if (isBusy) {
-      console.log('Setup blocked: player is busy')
       return
     }
 
     try {
-      console.log('Setting up player...')
-
       // Check if TrackPlayer is already initialized before calling setupTrackPlayer
       try {
         const state = await TrackPlayer.getPlaybackState()
-        console.log('TrackPlayer already initialized, skipping setup')
         hasInitialized.current = true
         setIsPlayerReady(true)
         return
@@ -584,10 +578,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         artist: isDeadAir ? '' : metadataArtist,
         artwork: artworkToUse,
       }
-      
-      console.log('Updating metadata:', { title, artist: metadata.artist, artworkUrl })
       await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
-      console.log('Metadata updated successfully')
     } catch (err) {
       console.error('Metadata update failed:', err)
     }
@@ -660,7 +651,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           // Refresh metadata when starting playback (especially from lock screen)
           if (state === State.Playing && !wasPlaying) {
             try {
-              console.log('Playback started, refreshing metadata for lock screen')
               await fetchAndUpdateShowMetadata()
             } catch (error) {
               console.error('Error refreshing metadata on play start:', error)
@@ -694,7 +684,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           error.message?.includes('carplay') ||
           error.message?.includes('android auto') ||
           error.message?.includes('bluetooth')) {
-          console.log('Audio session interruption detected, stopping playback')
           wasPlayingBeforeBackground.current = isPlayingRef.current
           try {
             await stop()
@@ -710,7 +699,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const onQueueEnded = TrackPlayer.addEventListener(
         Event.PlaybackQueueEnded,
         () => {
-          console.log('Playback queue ended')
           setIsPlaying(false)
           setIsBusy(false)
         }
@@ -721,7 +709,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           // Check if we should resume playback after returning from background
           setTimeout(async () => {
             if (wasPlayingBeforeBackground.current && !isPlayingRef.current) {
-              console.log('App became active, resuming playback with fresh stream')
               wasPlayingBeforeBackground.current = false
               try {
                 await play() // This will do a clean reset and start fresh
@@ -766,7 +753,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   const forceMetadataRefresh = async () => {
     try {
-      console.log('Forcing metadata refresh...')
       await fetchAndUpdateShowMetadata()
     } catch (error) {
       console.error('Force metadata refresh failed:', error)
