@@ -223,6 +223,7 @@ export default function MixcloudScreen() {
                   onRefresh={handleRefresh}
                   tintColor={colors.primary}
                   colors={[colors.primary]}
+                  progressBackgroundColor={colors.background}
                 />
               }
               removeClippedSubviews

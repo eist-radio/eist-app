@@ -509,6 +509,7 @@ export default function ScheduleScreen() {
               onRefresh={handleRefresh}
               tintColor={colors.primary}
               colors={[colors.primary]}
+              progressBackgroundColor={colors.background}
             />
           }
           renderSectionHeader={renderSectionHeader}

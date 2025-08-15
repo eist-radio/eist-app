@@ -1,4 +1,4 @@
-.PHONY: help install clean colors reset start lint lint-fix typecheck doctor check eas-dev-ios eas-dev-android eas-build-ios eas-build-android credentials-ios submit-ios submit-android submit-all env-check logs clean version update-deps security
+.PHONY: help install clean colors reset start lint lint-fix typecheck doctor check eas-dev-ios eas-dev-android eas-build-ios eas-build-android credentials-ios eas-submit-ios eas-submit-android env-check logs clean version update-deps security
 
 help:
 	@echo ""
@@ -50,19 +50,17 @@ eas-dev-android:
 eas-build-ios:
 	eas build --platform ios
 
+eas-submit-ios:
+	eas submit --platform ios
+
 eas-build-android:
 	eas build --platform android
 
-credentials-ios:
-	eas credentials --platform ios
-
-submit-ios:
-	eas submit --platform ios
-
-submit-android:
+eas-submit-android:
 	eas submit --platform android
 
-submit-all: submit-ios submit-android
+credentials-ios:
+	eas credentials --platform ios
 
 env-check:
 	@echo "Checking environment variables..."
