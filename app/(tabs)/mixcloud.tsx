@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
 import React, { memo, useCallback, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
 
 const mixcloudLogo = require('../../assets/images/mc-logo-default.png')
@@ -116,11 +116,13 @@ export default function MixcloudScreen() {
     error, 
     fetchNextPage, 
     hasNextPage, 
-    isFetchingNextPage 
+    isFetchingNextPage,
+    refetch 
   } = useMixcloudShows()
 
   const allShows = data?.pages.flatMap(page => page.shows) || []
   const [showBackToTop, setShowBackToTop] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const flatListRef = useRef<FlatList>(null)
 
   const openShow = useCallback(async (show: MixcloudShow) => {
@@ -130,6 +132,17 @@ export default function MixcloudScreen() {
       Alert.alert('Error', 'Failed to open show. Please try again later.', [{ text: 'OK' }])
     }
   }, [])
+
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true)
+    try {
+      await refetch()
+    } catch (error) {
+      console.error('Refresh failed:', error)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [refetch])
 
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage()
@@ -167,7 +180,13 @@ export default function MixcloudScreen() {
         </TouchableOpacity>
 
         <View style={styles.header}>
-          <Image source={mixcloudLogo} style={styles.logo} resizeMode="contain" />
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => Linking.openURL('https://www.mixcloud.com/eistcork/')}
+            accessibilityRole="link"
+          >
+            <Image source={mixcloudLogo} style={styles.logo} resizeMode="contain" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.content}>
@@ -198,6 +217,14 @@ export default function MixcloudScreen() {
               ListFooterComponent={renderFooter}
               onScroll={handleScroll}
               scrollEventThrottle={16}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={colors.primary}
+                  colors={[colors.primary]}
+                />
+              }
               removeClippedSubviews
               maxToRenderPerBatch={5}
               windowSize={5}
