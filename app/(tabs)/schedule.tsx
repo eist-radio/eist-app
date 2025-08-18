@@ -1,5 +1,4 @@
 import { SelectableThemedText } from '@/components/SelectableThemedText';
-import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
@@ -447,28 +446,23 @@ export default function ScheduleScreen() {
 
   if (loading) {
     return (
-      <SwipeNavigator>
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SwipeNavigator>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     );
   }
 
   if (error) {
     return (
-      <SwipeNavigator>
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
-          <SelectableThemedText style={{ color: colors.notification, fontSize: 18 }}>
-            {error}
-          </SelectableThemedText>
-        </View>
-      </SwipeNavigator>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <SelectableThemedText style={{ color: colors.notification, fontSize: 18 }}>
+          {error}
+        </SelectableThemedText>
+      </View>
     );
   }
 
   return (
-    <SwipeNavigator>
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 48 }]}>
         <View style={styles.titleContainer}>
           <SelectableThemedText style={[styles.title, { color: colors.primary }]}>
@@ -521,7 +515,6 @@ export default function ScheduleScreen() {
           visible={showBackToTop && isScrollable}
         />
       </View>
-    </SwipeNavigator>
   );
 }
 

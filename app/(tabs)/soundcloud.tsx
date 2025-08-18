@@ -1,4 +1,3 @@
-import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { faSoundcloud } from '@fortawesome/free-brands-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
@@ -39,7 +38,6 @@ export default function SoundCloudScreen() {
   }
 
   return (
-    <SwipeNavigator>
       <ScrollView 
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.content}
@@ -91,7 +89,6 @@ export default function SoundCloudScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SwipeNavigator>
   )
 }
 
