@@ -1,7 +1,6 @@
 // app/(tabs)/listen.tsx
 
 import { SelectableText } from '@/components/SelectableText'
-import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useTheme } from '@react-navigation/native'
@@ -695,8 +694,7 @@ export default function ListenScreen() {
   }
 
   return (
-    <SwipeNavigator>
-      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <View style={[styles.imageContainer, { height: width }]}>
           <Image
             key={`${artistId}-${remoteImageUrl || 'fallback'}`}
@@ -840,7 +838,6 @@ export default function ListenScreen() {
           onPress={scrollToTop}
           visible={showBackToTop && isScrollable}
         />
-      </View>
-    </SwipeNavigator>
+    </View>
   )
 }

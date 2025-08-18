@@ -1,7 +1,6 @@
 // app/(tabs)/artist/[slug].tsx
 
 import { SelectableText } from '@/components/SelectableText';
-import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
@@ -226,25 +225,21 @@ export default function ArtistScreen() {
 
   if (!slug) {
     return (
-      <SwipeNavigator>
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
-          <Text style={{ color: colors.notification }}>
-            No artist specified.
-          </Text>
-        </View>
-      </SwipeNavigator>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.notification }}>
+          No artist specified.
+        </Text>
+      </View>
     );
   }
 
   if (!artist) {
     return (
-      <SwipeNavigator>
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
-          <Text style={{ color: colors.notification }}>
-            Loading artist...
-          </Text>
-        </View>
-      </SwipeNavigator>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.notification }}>
+          Loading artist...
+        </Text>
+      </View>
     );
   }
 
@@ -330,7 +325,6 @@ export default function ArtistScreen() {
   }
 
   return (
-    <SwipeNavigator>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <View style={styles.avatarContainer}>
           {imageReady ? (
@@ -418,8 +412,7 @@ export default function ArtistScreen() {
           onPress={scrollToTop}
           visible={showBackToTop && isScrollable}
         />
-      </View>
-    </SwipeNavigator>
+    </View>
   );
 }
 

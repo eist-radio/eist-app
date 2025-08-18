@@ -1,6 +1,5 @@
 // app/(tabs)/mixcloud.tsx
 
-import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
@@ -165,9 +164,7 @@ export default function MixcloudScreen() {
   const renderFooter = () => (isFetchingNextPage ? <LoadingFooter /> : null)
 
   return (
-    // Horizontal swipe disabled here; iOS back-swipe still works due to edge exclusion
-    <SwipeNavigator horizontalEnabled={false} allowIOSBackSwipe>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
         <TouchableOpacity
           style={styles.eistLogoContainer}
           activeOpacity={0.7}
@@ -242,8 +239,7 @@ export default function MixcloudScreen() {
         </View>
 
         <BackToTopButton onPress={scrollToTop} visible={showBackToTop} />
-      </View>
-    </SwipeNavigator>
+    </View>
   )
 }
 

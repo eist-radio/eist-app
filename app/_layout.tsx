@@ -14,7 +14,6 @@ import {
     StyleSheet,
     View,
 } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { TrackPlayerProvider } from '../context/TrackPlayerContext';
 import { EistDarkTheme, EistLightTheme } from '../themes';
 
@@ -68,8 +67,7 @@ export default function RootLayout() {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={styles.container}>
+    <View style={styles.container}>
         <Animated.View
           style={[
             styles.container,
@@ -116,8 +114,7 @@ export default function RootLayout() {
             </View>
           </Animated.View>
         )}
-      </View>
-    </GestureHandlerRootView>
+    </View>
   );
 }
 

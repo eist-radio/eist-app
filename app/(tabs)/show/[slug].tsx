@@ -1,7 +1,6 @@
 // app/(tabs)/show/[slug].tsx
 
 import { SelectableText } from '@/components/SelectableText';
-import { SwipeNavigator } from '@/components/SwipeNavigator';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
@@ -325,21 +324,17 @@ export default function ShowScreen() {
 
   if (!slug) {
     return (
-      <SwipeNavigator>
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
-          <Text style={{ color: colors.notification }}>No show selected.</Text>
-        </View>
-      </SwipeNavigator>
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <Text style={{ color: colors.notification }}>No show selected.</Text>
+      </View>
     );
   }
 
   if (!event) {
     return (
-      <SwipeNavigator>
-        <View style={[styles.screen, styles.loadingContainer, { backgroundColor: colors.background }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </SwipeNavigator>
+      <View style={[styles.screen, styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
     );
   }
 
@@ -457,7 +452,6 @@ export default function ShowScreen() {
   }
 
   return (
-    <SwipeNavigator>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <ScrollView
           ref={shareViewRef}
@@ -589,8 +583,7 @@ export default function ShowScreen() {
           onPress={scrollToTop}
           visible={showBackToTop && isScrollable}
         />
-      </View>
-    </SwipeNavigator>
+    </View>
   );
 }
 

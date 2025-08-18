@@ -1,6 +1,5 @@
 // app/(tabs)/instagram.tsx
 
-import { SwipeNavigator } from '@/components/SwipeNavigator'
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
 import React, { useState } from 'react'
@@ -40,7 +39,6 @@ export default function InstagramScreen() {
   }
 
   return (
-    <SwipeNavigator>
       <ScrollView 
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={styles.content}
@@ -92,7 +90,6 @@ export default function InstagramScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SwipeNavigator>
   )
 }
 
