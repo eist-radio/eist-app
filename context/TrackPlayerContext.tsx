@@ -586,7 +586,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   // Handle network connectivity changes
   useEffect(() => {
-    // Skip if this is the initial load
     if (!previousNetworkState.current) {
       previousNetworkState.current = networkState
       return
@@ -595,47 +594,32 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const previous = previousNetworkState.current
     const current = networkState
 
-    // Check if there's a significant network change
-    const hasNetworkChanged =
-      previous.isConnected !== current.isConnected ||
-      previous.type !== current.type ||
-      previous.isInternetReachable !== current.isInternetReachable
+    // Only act on meaningful network changes
+    if (previous.isConnected === current.isConnected && previous.type === current.type) {
+      return
+    }
 
-    if (hasNetworkChanged) {
-      // If we were playing and network changed, remember it
-      if (isPlayingRef.current) {
-        wasPlayingBeforeNetworkChange.current = true
-      }
+    // Remember if we were playing
+    if (isPlayingRef.current) {
+      wasPlayingBeforeNetworkChange.current = true
+    }
 
-      // If we regained connectivity and were playing before, attempt recovery
-      if (current.isConnected && current.isInternetReachable && wasPlayingBeforeNetworkChange.current) {
-        // Small delay to ensure network is stable
-        setTimeout(async () => {
-          if (wasPlayingBeforeNetworkChange.current && !isPlayingRef.current) {
-            wasPlayingBeforeNetworkChange.current = false
-            try {
-              await play() // This will do a clean reset and start fresh
-            } catch (playError) {
-              console.error('Error resuming playback after network recovery:', playError)
-            }
-          }
-        }, 2000) // 2 second delay to ensure network stability
-      }
-
-      // If we lost connectivity while playing, stop playback
-      if (!current.isConnected || !current.isInternetReachable) {
-        if (isPlayingRef.current) {
+    // Auto-resume after network change if we have connectivity
+    if (current.isConnected && wasPlayingBeforeNetworkChange.current) {
+      setTimeout(async () => {
+        if (wasPlayingBeforeNetworkChange.current && !isPlayingRef.current) {
+          wasPlayingBeforeNetworkChange.current = false
           try {
-            stop()
-          } catch (stopError) {
-            console.error('Error stopping playback after network loss:', stopError)
+            await play()
+          } catch (error) {
+            console.error('Auto-resume failed:', error)
           }
         }
-      }
-
-      previousNetworkState.current = current
+      }, 1000)
     }
-  }, [networkState, play, stop])
+
+    previousNetworkState.current = current
+  }, [networkState, play])
 
   useEffect(() => {
     setupPlayer()

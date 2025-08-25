@@ -1,4 +1,4 @@
-.PHONY: help install clean colors reset start lint lint-fix typecheck doctor check eas-dev-ios eas-dev-android eas-build-ios eas-build-android credentials-ios eas-submit-ios eas-submit-android env-check logs clean version update-deps security
+.PHONY: help install clean colors reset start lint lint-fix typecheck doctor check eas-dev-ios eas-dev-android eas-build-ios eas-build-android credentials-ios eas-submit-ios eas-submit-android env-check logs version update-deps security
 
 help:
 	@echo ""
@@ -69,8 +69,6 @@ env-check:
 
 logs:
 	npx expo logs
-
-clean: clean clear
 
 version:
 	@echo "Current version: $$(node -p "require('./package.json').version")"
