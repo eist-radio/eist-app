@@ -35,18 +35,17 @@ export const setupTrackPlayer = async () => {
       // Capabilities - Use Capability enum, not strings
       capabilities: [
         Capability.Play,
-        Capability.Stop
-        //Capability.SeekTo,
-        //Capability.SkipToNext,
-        //Capability.SkipToPrevious,
+        Capability.Pause,
+        Capability.Stop,
+        Capability.SkipToNext,
+        Capability.SkipToPrevious,
       ],
       
-      // Compact capabilities
+      // Compact capabilities for Android Auto
       compactCapabilities: [
         Capability.Play, 
+        Capability.Pause,
         Capability.Stop, 
-        Capability.SkipToNext, 
-        Capability.SkipToPrevious
       ],
       
       // Progress update interval

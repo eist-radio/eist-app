@@ -16,7 +16,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-router",
     "expo-web-browser",
     "expo-font",
-    "expo-video"
+    "expo-video",
+    "./plugins/withAndroidAutoMedia.js"
   ],
   ios: {
     ...config.ios,
