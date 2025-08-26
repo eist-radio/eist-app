@@ -23,6 +23,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { captureRef } from 'react-native-view-shot';
 import { FormattedShowTitle } from '../../../components/FormattedShowTitle';
 import { apiKey } from '../../../config';
@@ -322,6 +323,17 @@ export default function ShowScreen() {
     loadArtistImage();
   }, [hostId, host, hostImageUrl, preloadImage]);
 
+  const handleSwipeGesture = useCallback((event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      
+      // Check for right swipe: positive translation and velocity
+      if (translationX > 50 && velocityX > 500) {
+        router.back();
+      }
+    }
+  }, [router]);
+
   if (!slug) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -452,14 +464,17 @@ export default function ShowScreen() {
   }
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <ScrollView
-          ref={shareViewRef}
-          style={styles.contentContainer}
-          contentContainerStyle={styles.content}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        >
+        <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+          <View style={{ flex: 1 }}>
+            <ScrollView
+              ref={shareViewRef}
+              style={styles.contentContainer}
+              contentContainerStyle={styles.content}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
+            >
           <View 
             ref={shareContentRef} 
             style={styles.shareableContent}
@@ -577,13 +592,16 @@ export default function ShowScreen() {
               </View>
             </View>
           </View>
-        </ScrollView>
-        
-        <BackToTopButton
-          onPress={scrollToTop}
-          visible={showBackToTop && isScrollable}
-        />
-    </View>
+            </ScrollView>
+            
+            <BackToTopButton
+              onPress={scrollToTop}
+              visible={showBackToTop && isScrollable}
+            />
+          </View>
+        </PanGestureHandler>
+      </View>
+    </GestureHandlerRootView>
   );
 }
 

@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,6 +21,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { apiKey } from '../../../config';
 import { stripFormatting } from '../../../utils/stripFormatting';
 
@@ -108,6 +109,7 @@ async function fetchArtistBySlug(slug: string): Promise<RawArtist> {
 export default function ArtistScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const { colors } = useTheme();
+  const router = useRouter();
 
   // Move all hooks to the top before any conditional returns
   const { data: artist } = useQuery({
@@ -223,6 +225,17 @@ export default function ArtistScreen() {
     loadArtistImage();
   }, [artist, preloadImage]);
 
+  const handleSwipeGesture = useCallback((event: any) => {
+    if (event.nativeEvent.state === State.END) {
+      const { translationX, velocityX } = event.nativeEvent;
+      
+      // Check for right swipe: positive translation and velocity
+      if (translationX > 50 && velocityX > 500) {
+        router.back();
+      }
+    }
+  }, [router]);
+
   if (!slug) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -325,8 +338,11 @@ export default function ArtistScreen() {
   }
 
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <View style={styles.avatarContainer}>
+        <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+          <View style={{ flex: 1 }}>
+            <View style={styles.avatarContainer}>
           {imageReady ? (
             <Image
               key={`${artist.id}-${preloadedImageUrl || 'fallback'}`}
@@ -407,12 +423,15 @@ export default function ArtistScreen() {
               </View>
             )}
           </View>
-        </ScrollView>
-        <BackToTopButton
-          onPress={scrollToTop}
-          visible={showBackToTop && isScrollable}
-        />
-    </View>
+            </ScrollView>
+            <BackToTopButton
+              onPress={scrollToTop}
+              visible={showBackToTop && isScrollable}
+            />
+          </View>
+        </PanGestureHandler>
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
