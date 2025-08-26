@@ -2,7 +2,7 @@
 
 import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
-import { useTheme } from '@react-navigation/native'
+import { useTheme, useFocusEffect } from '@react-navigation/native'
 import React, { memo, useCallback, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
@@ -123,6 +123,7 @@ export default function MixcloudScreen() {
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const flatListRef = useRef<FlatList>(null)
+  const lastFocusTime = useRef<number>(Date.now())
 
   const openShow = useCallback(async (show: MixcloudShow) => {
     try {
@@ -162,6 +163,29 @@ export default function MixcloudScreen() {
   ), [openShow])
 
   const renderFooter = () => (isFetchingNextPage ? <LoadingFooter /> : null)
+
+  // Auto-refresh shows when page becomes focused after inactivity
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now()
+      const timeSinceLastFocus = now - lastFocusTime.current
+      const REFRESH_THRESHOLD = 2 * 60 * 60 * 1000 // 2 hours
+
+      // If it's been more than 2 hours since last focus, refresh the data
+      if (timeSinceLastFocus > REFRESH_THRESHOLD) {
+        refetch().catch(err => {
+          console.warn('Failed to auto-refresh Mixcloud shows on focus:', err)
+        })
+      }
+
+      lastFocusTime.current = now
+
+      // Cleanup function when losing focus
+      return () => {
+        lastFocusTime.current = Date.now()
+      }
+    }, [refetch])
+  )
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
