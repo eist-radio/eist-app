@@ -1,6 +1,6 @@
 import { SelectableThemedText } from '@/components/SelectableThemedText';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@react-navigation/native';
+import { useTheme, useFocusEffect } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -118,6 +118,7 @@ export default function ScheduleScreen() {
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const sectionListRef = useRef<SectionList>(null);
+  const lastFocusTime = useRef<number>(Date.now());
 
   function fmt(d: Date, suffix: string) {
     return d.toISOString().split('T')[0] + 'T' + suffix;
@@ -276,6 +277,29 @@ export default function ScheduleScreen() {
       setLoading(false);
     })();
   }, [fetchScheduleData]);
+
+  // Auto-refresh schedule when page becomes focused after inactivity
+  useFocusEffect(
+    useCallback(() => {
+      const now = Date.now();
+      const timeSinceLastFocus = now - lastFocusTime.current;
+      const REFRESH_THRESHOLD = 30 * 60 * 1000; // 30 minutes
+
+      // If it's been more than 30 minutes since last focus, refresh the data
+      if (timeSinceLastFocus > REFRESH_THRESHOLD) {
+        fetchScheduleData().catch(err => {
+          console.warn('Failed to auto-refresh schedule on focus:', err);
+        });
+      }
+
+      lastFocusTime.current = now;
+
+      // Cleanup function when losing focus
+      return () => {
+        lastFocusTime.current = Date.now();
+      };
+    }, [fetchScheduleData])
+  );
 
   useEffect(() => {
     let isMounted = true;
