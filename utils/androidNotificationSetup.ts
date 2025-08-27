@@ -16,7 +16,7 @@ export const setupAndroidNotificationChannel = async () => {
       // Create notification channel for media playback with Android Auto support
       await NotificationManager.createChannel({
         id: 'media-playback',
-        name: 'éist Radio',
+        name: 'éist',
         description: 'éist radio playback controls and notifications',
         importance: 4, // IMPORTANCE_HIGH
         showBadge: true,

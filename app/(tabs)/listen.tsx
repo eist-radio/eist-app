@@ -255,7 +255,7 @@ export default function ListenScreen() {
   }, [])
 
   const getArtistDetails = useCallback(async (id: string | null) => {
-    if (!id) return { name: '', image: null }
+    if (!id) return { name: '', image: placeholderArtistImage }
 
     // Check cache first
     if (artistCache[id]) {
@@ -272,7 +272,7 @@ export default function ListenScreen() {
       const imageUrl = artist.logo?.['1024x1024'] || artist.logo?.['512x512'] || artist.logo?.['256x256']
       const artistData = {
         name: artist.name || '',
-        image: imageUrl ? { uri: imageUrl } : null,
+        image: imageUrl ? { uri: imageUrl } : placeholderArtistImage,
       }
 
       // Cache the result
@@ -281,7 +281,7 @@ export default function ListenScreen() {
     } catch (err) {
       console.error('Error fetching artist details:', err)
       // Don't let errors propagate - just log them and return fallback
-      return { name: '', image: null }
+      return { name: '', image: placeholderArtistImage }
     }
   }, [artistCache])
 
@@ -383,11 +383,11 @@ export default function ListenScreen() {
               setRemoteImageUrl(image.uri)
               setImageFailed(false)
               await updateMetadata(newShowTitle || 'éist', name, image.uri)
-            } else {
-              setRemoteImageUrl(null)
-              setImageFailed(true)
-              await updateMetadata(newShowTitle || 'éist', name, undefined)
-            }
+                  } else {
+        setRemoteImageUrl(null)
+        setImageFailed(true)
+        await updateMetadata(newShowTitle || 'éist', name, undefined)
+      }
           } else {
             setRemoteImageUrl(null)
             setImageFailed(false)
@@ -399,7 +399,7 @@ export default function ListenScreen() {
           // Artist ID hasn't changed, just update metadata with current artist info
           if (artistId && artistCache[artistId]) {
             const cachedArtist = artistCache[artistId]
-            await updateMetadata(newShowTitle || 'éist', cachedArtist.name, cachedArtist.image?.uri)
+            await updateMetadata(newShowTitle || 'éist', cachedArtist.name, cachedArtist.image?.uri || undefined)
           } else {
             await updateMetadata(newShowTitle || 'éist', artistName, remoteImageUrl || undefined)
           }
@@ -495,7 +495,7 @@ export default function ListenScreen() {
       } else {
         setRemoteImageUrl(null)
         setImageFailed(false)
-        await updateMetadata(newShowTitle || 'éist', name, undefined)
+        await updateMetadata(newShowTitle || 'éist', name, placeholderArtistImage)
       }
 
       // Mark loading as finished

@@ -279,7 +279,7 @@ export default function ShowScreen() {
       if (!hostId) {
         setIsImageLoading(false);
         setPreloadedImageUrl(null);
-        setImageFailed(false);
+        setImageFailed(true); // Mark as failed so fallback shows
         setImageReady(true);
         return;
       }
