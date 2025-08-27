@@ -13,24 +13,29 @@ export const setupAndroidNotificationChannel = async () => {
     const { NotificationManager } = NativeModules;
 
     if (NotificationManager) {
-      // Create notification channel for media playback
+      // Create notification channel for media playback with Android Auto support
       await NotificationManager.createChannel({
         id: 'media-playback',
-        name: 'Media Playback',
-        description: 'Media playback controls and notifications',
+        name: 'éist Radio',
+        description: 'éist radio playback controls and notifications',
         importance: 4, // IMPORTANCE_HIGH
         showBadge: true,
         enableVibration: false,
         enableLights: false,
         sound: null,
-        // Ensure notification is visible on lock screen with full visibility
+        // Ensure notification is visible on lock screen and Android Auto
         lockscreenVisibility: 1, // VISIBILITY_PUBLIC
-        // Additional settings for better lockscreen display
+        // Additional settings for better lockscreen and Android Auto display
         allowBubbles: true,
         bypassDnd: false,
+        // Enhanced settings for Android Auto compatibility
+        showOnLockScreen: true,
+        showInCar: true,
+        // Ensure proper media session integration
+        mediaSession: true,
       });
 
-      console.log('Android notification channel created successfully');
+      console.log('Android notification channel created successfully with Android Auto support');
     }
   } catch (error) {
     console.warn('Failed to create Android notification channel:', error);

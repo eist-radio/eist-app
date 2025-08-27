@@ -1,13 +1,13 @@
 // context/TrackPlayerContext.tsx
 
 import {
-    createContext,
-    ReactNode,
-    useCallback,
-    useContext,
-    useEffect,
-    useRef,
-    useState
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState
 } from 'react';
 import { AppState, Platform } from 'react-native';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
@@ -567,7 +567,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const isDeadAir = title.trim().length === 0
       const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
 
-      // Use appropriate artwork for Android lock screen compatibility
+      // Use appropriate artwork for Android lock screen and Android Auto compatibility
       let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
 
       // Use the lock screen image utility for proper Android handling
@@ -577,6 +577,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         title,
         artist: isDeadAir ? '' : metadataArtist,
         artwork: artworkToUse,
+        // Enhanced metadata for Android Auto
+        album: 'éist Radio',
+        duration: -1, // Live stream indicator
       }
       await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
     } catch (err) {
