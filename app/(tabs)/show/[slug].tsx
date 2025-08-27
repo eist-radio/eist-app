@@ -331,7 +331,11 @@ export default function ShowScreen() {
       // Only handle horizontal swipes, ignore vertical scrolls
       if (Math.abs(translationX) > Math.abs(translationY)) {
         // Check for right swipe: positive translation and velocity
-        if (translationX > 50 && velocityX > 500) {
+        // Use higher thresholds on iOS to avoid conflicts with native gesture
+        const threshold = Platform.OS === 'ios' ? 80 : 50;
+        const velocityThreshold = Platform.OS === 'ios' ? 600 : 500;
+        
+        if (translationX > threshold && velocityX > velocityThreshold) {
           router.back();
         }
       }

@@ -87,7 +87,14 @@ export default function RootLayout() {
                 }
               >
                 <ThemeProvider value={theme}>
-                  <Stack screenOptions={{ headerShown: false }} />
+                  <Stack 
+                    screenOptions={{ 
+                      headerShown: false,
+                      gestureEnabled: true,
+                      gestureDirection: 'horizontal',
+                      animation: 'slide_from_right',
+                    }} 
+                  />
                   <StatusBar style="auto" />
                 </ThemeProvider>
               </Suspense>

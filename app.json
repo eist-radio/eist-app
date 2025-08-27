@@ -52,7 +52,9 @@
       "typedRoutes": false
     },
     "extra": {
-      "router": {},
+      "router": {
+        "enableGestureHandler": true
+      },
       "eas": {
         "projectId": "4f034ae2-70e3-4215-8782-3aec98781aa6"
       }
