@@ -25,25 +25,28 @@ export const setupTrackPlayer = async () => {
       autoUpdateMetadata: true,
     });
 
-    // Options setup - IMPORTANT: Use Capability enums!
+    // Options setup - Enhanced for Android Auto
     await TrackPlayer.updateOptions({
       android: {
         appKilledPlaybackBehavior: AppKilledPlaybackBehavior.PausePlayback,
         alwaysPauseOnInterruption: true,
       },
       
-      // Capabilities - Use Capability enum, not strings
+      // Enhanced capabilities for Android Auto
       capabilities: [
         Capability.Play,
-        Capability.Stop
-        //Capability.SeekTo,
-        //Capability.SkipToNext,
-        //Capability.SkipToPrevious,
+        Capability.Pause,
+        Capability.Stop,
+        Capability.SkipToNext,
+        Capability.SkipToPrevious,
+        // Add rating capability for better Android Auto integration
+        Capability.SetRating,
       ],
       
-      // Compact capabilities
+      // Compact capabilities for notification controls
       compactCapabilities: [
         Capability.Play, 
+        Capability.Pause,
         Capability.Stop, 
         Capability.SkipToNext, 
         Capability.SkipToPrevious
@@ -53,7 +56,7 @@ export const setupTrackPlayer = async () => {
       progressUpdateEventInterval: 1,
     });
 
-    console.log('TrackPlayer setup successful');
+    console.log('TrackPlayer setup successful with Android Auto support');
   } catch (error) {
     console.error('TrackPlayer setup error:', error);
     throw error;
