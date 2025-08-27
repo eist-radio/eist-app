@@ -1,20 +1,20 @@
 import { SelectableThemedText } from '@/components/SelectableThemedText';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useTheme } from '@react-navigation/native';
 import { Link } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  AppState,
-  Dimensions,
-  Image,
-  Linking,
-  RefreshControl,
-  SectionList,
-  StyleSheet,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Animated,
+    AppState,
+    Dimensions,
+    Image,
+    Linking,
+    RefreshControl,
+    SectionList,
+    StyleSheet,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FormattedShowTitle } from '../../components/FormattedShowTitle';
@@ -184,7 +184,8 @@ export default function ScheduleScreen() {
     const contentHeight = event.nativeEvent.contentSize.height;
     const layoutHeight = event.nativeEvent.layoutMeasurement.height;
 
-    const scrollable = contentHeight > layoutHeight;
+    // Check if content is scrollable (with a small buffer)
+    const scrollable = contentHeight > layoutHeight + 10;
     setIsScrollable(scrollable);
     setShowBackToTop(scrollable && scrollY > 100);
   };
@@ -617,6 +618,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },

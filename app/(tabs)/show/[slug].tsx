@@ -263,6 +263,7 @@ export default function ShowScreen() {
     setImageFailed(false);
     setPreloadedImageUrl(null);
     setImageReady(false); // Hide image until new host image is ready
+    setIsImageLoading(false); // Reset loading state
   }, [hostId, host?.id]);
 
   // Extract host image URL for dependency array (same priority as artist page)
@@ -293,7 +294,7 @@ export default function ShowScreen() {
       if (!hostImageUrl) {
         setIsImageLoading(false);
         setPreloadedImageUrl(null);
-        setImageFailed(false);
+        setImageFailed(true); // Mark as failed so fallback shows
         setImageReady(true); // No remote image, fallback is ready
         return;
       }
@@ -325,11 +326,14 @@ export default function ShowScreen() {
 
   const handleSwipeGesture = useCallback((event: any) => {
     if (event.nativeEvent.state === State.END) {
-      const { translationX, velocityX } = event.nativeEvent;
+      const { translationX, velocityX, translationY } = event.nativeEvent;
       
-      // Check for right swipe: positive translation and velocity
-      if (translationX > 50 && velocityX > 500) {
-        router.back();
+      // Only handle horizontal swipes, ignore vertical scrolls
+      if (Math.abs(translationX) > Math.abs(translationY)) {
+        // Check for right swipe: positive translation and velocity
+        if (translationX > 50 && velocityX > 500) {
+          router.back();
+        }
       }
     }
   }, [router]);
@@ -435,8 +439,8 @@ export default function ShowScreen() {
     const contentHeight = event.nativeEvent.contentSize.height
     const layoutHeight = event.nativeEvent.layoutMeasurement.height
     
-    // Check if content is scrollable
-    const scrollable = contentHeight > layoutHeight
+    // Check if content is scrollable (with a small buffer)
+    const scrollable = contentHeight > layoutHeight + 10
     setIsScrollable(scrollable)
     
     // Show back button when scrolled past 100px AND content is scrollable
@@ -466,7 +470,12 @@ export default function ShowScreen() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+        <PanGestureHandler 
+          onHandlerStateChange={handleSwipeGesture}
+          activeOffsetX={[-10, 10]}
+          failOffsetY={[-10, 10]}
+          shouldCancelWhenOutside={true}
+        >
           <View style={{ flex: 1 }}>
             <ScrollView
               ref={shareViewRef}
@@ -481,7 +490,7 @@ export default function ShowScreen() {
             collapsable={false}
           >
             <View style={styles.bannerContainer}>
-              {imageReady ? (
+              {imageReady && (preloadedImageUrl || imageFailed) ? (
                 <Image
                   key={`${hostId}-${preloadedImageUrl || 'fallback'}`}
                   source={getBannerImage()}
@@ -758,6 +767,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },

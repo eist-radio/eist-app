@@ -21,7 +21,7 @@ export default function TabLayout() {
   const gestureStartX = useRef<number>(0)
   
   const handleSwipeGesture = (event: any) => {
-    const { translationX, velocityX, state, absoluteX } = event.nativeEvent
+    const { translationX, velocityX, state, absoluteX, translationY } = event.nativeEvent
     
     if (state === State.BEGAN) {
       gestureStartX.current = absoluteX
@@ -31,15 +31,18 @@ export default function TabLayout() {
       const edgeThreshold = 20 // Start within 20px of left edge
       const swipeThreshold = 100 // Must swipe at least 100px
       
-      // Check if gesture started from left edge and moved right
-      const isSwipeFromEdge = gestureStartX.current < edgeThreshold
-      const isSwipeRight = translationX > swipeThreshold && velocityX > 300
-      
-      if (isSwipeFromEdge && isSwipeRight) {
-        const currentIndex = tabOrder.indexOf(currentTab)
-        if (currentIndex > 0) {
-          const previousTab = tabOrder[currentIndex - 1]
-          router.push(`/(tabs)/${previousTab}`)
+      // Only handle horizontal swipes, ignore vertical scrolls
+      if (Math.abs(translationX) > Math.abs(translationY)) {
+        // Check if gesture started from left edge and moved right
+        const isSwipeFromEdge = gestureStartX.current < edgeThreshold
+        const isSwipeRight = translationX > swipeThreshold && velocityX > 300
+        
+        if (isSwipeFromEdge && isSwipeRight) {
+          const currentIndex = tabOrder.indexOf(currentTab)
+          if (currentIndex > 0) {
+            const previousTab = tabOrder[currentIndex - 1]
+            router.push(`/(tabs)/${previousTab}`)
+          }
         }
       }
     }
@@ -50,8 +53,9 @@ export default function TabLayout() {
       <PanGestureHandler
         onGestureEvent={handleSwipeGesture}
         onHandlerStateChange={handleSwipeGesture}
-        activeOffsetX={[-Number.MAX_SAFE_INTEGER, 10]}
-        failOffsetY={[-20, 20]}
+        activeOffsetX={[-10, 10]}
+        failOffsetY={[-10, 10]}
+        shouldCancelWhenOutside={true}
       >
         <View style={{ flex: 1 }}>
           <Tabs
@@ -69,8 +73,8 @@ export default function TabLayout() {
                 shadowOpacity: 0,
               },
             }}
-            listeners={{
-              state: (e) => {
+            screenListeners={{
+              state: (e: any) => {
                 const route = e.data.state?.routes[e.data.state.index]
                 if (route?.name && tabOrder.includes(route.name)) {
                   setCurrentTab(route.name)

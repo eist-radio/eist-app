@@ -8,20 +8,20 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  AppState,
-  Dimensions,
-  Image,
-  Linking,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    AppState,
+    Dimensions,
+    Image,
+    Linking,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native'
 import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
@@ -135,6 +135,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -676,8 +677,8 @@ export default function ListenScreen() {
     const contentHeight = event.nativeEvent.contentSize.height
     const layoutHeight = event.nativeEvent.layoutMeasurement.height
 
-    // Check if content is scrollable
-    const scrollable = contentHeight > layoutHeight
+    // Check if content is scrollable (with a small buffer)
+    const scrollable = contentHeight > layoutHeight + 10
     setIsScrollable(scrollable)
 
     // Show back button when scrolled past 100px AND content is scrollable
@@ -686,10 +687,21 @@ export default function ListenScreen() {
 
   const scrollToTop = () => {
     if (scrollViewRef.current) {
+      // Use scrollTo with a more reliable approach
       scrollViewRef.current.scrollTo({ 
         y: 0, 
         animated: true 
       })
+      
+      // Fallback: if the above doesn't work, try without animation
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({ 
+            y: 0, 
+            animated: false 
+          })
+        }
+      }, 100)
     }
   }
 
