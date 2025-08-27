@@ -6,7 +6,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
 import { Tabs, useRouter } from 'expo-router'
 import React, { useRef, useState } from 'react'
-import { View } from 'react-native'
+import { Platform, View } from 'react-native'
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler'
 
 export default function TabLayout() {
@@ -28,14 +28,14 @@ export default function TabLayout() {
     }
     
     if (state === State.END) {
-      const edgeThreshold = 20 // Start within 20px of left edge
-      const swipeThreshold = 100 // Must swipe at least 100px
+      const edgeThreshold = Platform.OS === 'ios' ? 30 : 20 // Larger threshold on iOS
+      const swipeThreshold = Platform.OS === 'ios' ? 120 : 100 // Higher threshold on iOS
       
       // Only handle horizontal swipes, ignore vertical scrolls
       if (Math.abs(translationX) > Math.abs(translationY)) {
         // Check if gesture started from left edge and moved right
         const isSwipeFromEdge = gestureStartX.current < edgeThreshold
-        const isSwipeRight = translationX > swipeThreshold && velocityX > 300
+        const isSwipeRight = translationX > swipeThreshold && velocityX > (Platform.OS === 'ios' ? 400 : 300)
         
         if (isSwipeFromEdge && isSwipeRight) {
           const currentIndex = tabOrder.indexOf(currentTab)
@@ -53,9 +53,10 @@ export default function TabLayout() {
       <PanGestureHandler
         onGestureEvent={handleSwipeGesture}
         onHandlerStateChange={handleSwipeGesture}
-        activeOffsetX={[-10, 10]}
-        failOffsetY={[-10, 10]}
+        activeOffsetX={Platform.OS === 'ios' ? [-15, 15] : [-10, 10]}
+        failOffsetY={Platform.OS === 'ios' ? [-15, 15] : [-10, 10]}
         shouldCancelWhenOutside={true}
+        simultaneousHandlers={Platform.OS === 'ios' ? undefined : undefined}
       >
         <View style={{ flex: 1 }}>
           <Tabs
