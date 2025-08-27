@@ -47,10 +47,18 @@ const startFreshStream = async () => {
 };
 
 module.exports = async function() {
-  TrackPlayer.addEventListener(Event.RemotePlay, startFreshStream);
+  // Use simple play/pause for lock screen controls
+  TrackPlayer.addEventListener(Event.RemotePlay, () => TrackPlayer.play());
   TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.pause());
-  TrackPlayer.addEventListener(Event.RemoteNext, () => TrackPlayer.skipToNext());
-  TrackPlayer.addEventListener(Event.RemotePrevious, () => TrackPlayer.skipToPrevious());
+  
+  // Disable previous and next controls - they do nothing for live radio
+  TrackPlayer.addEventListener(Event.RemoteNext, () => {
+    // nothing
+  });
+  TrackPlayer.addEventListener(Event.RemotePrevious, () => {
+    // nothing
+  });
+  
   TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.stop());
   TrackPlayer.addEventListener(Event.RemoteSeek, (event) => TrackPlayer.seekTo(event.position));
   

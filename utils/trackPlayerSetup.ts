@@ -32,31 +32,32 @@ export const setupTrackPlayer = async () => {
         alwaysPauseOnInterruption: true,
       },
       
-      // Enhanced capabilities for Android Auto
+      // Enhanced capabilities for Android Auto - removed SkipToNext/SkipToPrevious for live radio
       capabilities: [
         Capability.Play,
         Capability.Pause,
         Capability.Stop,
-        Capability.SkipToNext,
-        Capability.SkipToPrevious,
+        Capability.PlayFromId,
+        Capability.PlayFromSearch,
+        Capability.SeekTo,
+        // Removed SkipToNext and SkipToPrevious - not applicable for live radio
         // Add rating capability for better Android Auto integration
         Capability.SetRating,
       ],
       
-      // Compact capabilities for notification controls
+      // Compact capabilities for notification controls - removed SkipToNext/SkipToPrevious
       compactCapabilities: [
         Capability.Play, 
         Capability.Pause,
         Capability.Stop, 
-        Capability.SkipToNext, 
-        Capability.SkipToPrevious
+        // Removed SkipToNext and SkipToPrevious - not applicable for live radio
       ],
       
       // Progress update interval
       progressUpdateEventInterval: 1,
     });
 
-    console.log('TrackPlayer setup successful with Android Auto support');
+    console.log('TrackPlayer setup successful with Android Auto support - previous/next controls disabled for live radio');
   } catch (error) {
     console.error('TrackPlayer setup error:', error);
     throw error;

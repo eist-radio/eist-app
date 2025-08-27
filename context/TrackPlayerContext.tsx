@@ -199,6 +199,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           artist: showArtist ? `${showArtist} · éist` : 'éist',
           artwork: artwork,
           isLiveStream: true,
+          duration: -1, // Live stream indicator
+          album: 'éist',
         }
 
         try {
@@ -578,7 +580,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         artist: isDeadAir ? '' : metadataArtist,
         artwork: artworkToUse,
         // Enhanced metadata for Android Auto
-        album: 'éist Radio',
+        album: 'éist',
         duration: -1, // Live stream indicator
       }
       await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
