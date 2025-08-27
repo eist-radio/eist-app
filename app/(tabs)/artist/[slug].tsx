@@ -172,6 +172,7 @@ export default function ArtistScreen() {
     setImageFailed(false);
     setPreloadedImageUrl(null);
     setImageReady(false); // Hide image until new artist image is ready
+    setIsImageLoading(false); // Reset loading state
   }, [slug, artist?.id]);
 
   // Preload artist image when artist data becomes available
@@ -195,7 +196,7 @@ export default function ArtistScreen() {
       if (!remoteImage) {
         setIsImageLoading(false);
         setPreloadedImageUrl(null);
-        setImageFailed(false);
+        setImageFailed(true); // Mark as failed so fallback shows
         setImageReady(true); // No remote image, show fallback
         return;
       }
@@ -227,11 +228,14 @@ export default function ArtistScreen() {
 
   const handleSwipeGesture = useCallback((event: any) => {
     if (event.nativeEvent.state === State.END) {
-      const { translationX, velocityX } = event.nativeEvent;
+      const { translationX, velocityX, translationY } = event.nativeEvent;
       
-      // Check for right swipe: positive translation and velocity
-      if (translationX > 50 && velocityX > 500) {
-        router.back();
+      // Only handle horizontal swipes, ignore vertical scrolls
+      if (Math.abs(translationX) > Math.abs(translationY)) {
+        // Check for right swipe: positive translation and velocity
+        if (translationX > 50 && velocityX > 500) {
+          router.back();
+        }
       }
     }
   }, [router]);
@@ -257,10 +261,7 @@ export default function ArtistScreen() {
   }
 
   // Use preloaded image instead of direct remote image
-  const imageSource =
-    imageFailed || !preloadedImageUrl
-      ? fallbackImage
-      : { uri: preloadedImageUrl };
+  const imageSource = preloadedImageUrl && !imageFailed ? { uri: preloadedImageUrl } : fallbackImage;
 
   const plain = stripFormatting(artist.description?.content);
   const paragraphs = plain
@@ -320,8 +321,8 @@ export default function ArtistScreen() {
     const contentHeight = event.nativeEvent.contentSize.height
     const layoutHeight = event.nativeEvent.layoutMeasurement.height
     
-    // Check if content is scrollable
-    const scrollable = contentHeight > layoutHeight
+    // Check if content is scrollable (with a small buffer)
+    const scrollable = contentHeight > layoutHeight + 10
     setIsScrollable(scrollable)
     
     // Show back button when scrolled past 100px AND content is scrollable
@@ -330,20 +331,36 @@ export default function ArtistScreen() {
 
   const scrollToTop = () => {
     if (scrollViewRef.current) {
+      // Use scrollTo with a more reliable approach
       scrollViewRef.current.scrollTo({ 
         y: 0, 
         animated: true 
       })
+      
+      // Fallback: if the above doesn't work, try without animation
+      setTimeout(() => {
+        if (scrollViewRef.current) {
+          scrollViewRef.current.scrollTo({ 
+            y: 0, 
+            animated: false 
+          })
+        }
+      }, 100)
     }
   }
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
+        <PanGestureHandler 
+          onHandlerStateChange={handleSwipeGesture}
+          activeOffsetX={[-10, 10]}
+          failOffsetY={[-10, 10]}
+          shouldCancelWhenOutside={true}
+        >
           <View style={{ flex: 1 }}>
             <View style={styles.avatarContainer}>
-          {imageReady ? (
+          {imageReady && (preloadedImageUrl || imageFailed) ? (
             <Image
               key={`${artist.id}-${preloadedImageUrl || 'fallback'}`}
               source={imageSource}
@@ -515,6 +532,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
   },

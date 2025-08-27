@@ -2,7 +2,7 @@
 
 import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
-import { useTheme, useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useTheme } from '@react-navigation/native'
 import React, { memo, useCallback, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
@@ -150,7 +150,12 @@ export default function MixcloudScreen() {
 
   const handleScroll = (event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y
-    setShowBackToTop(scrollY > 100)
+    const contentHeight = event.nativeEvent.contentSize.height
+    const layoutHeight = event.nativeEvent.layoutMeasurement.height
+    
+    // Check if content is scrollable (with a small buffer)
+    const scrollable = contentHeight > layoutHeight + 10
+    setShowBackToTop(scrollable && scrollY > 100)
   }
 
   const scrollToTop = () => {
@@ -295,7 +300,17 @@ const styles = StyleSheet.create({
   footerLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, gap: 8 },
   footerText: { fontSize: 14, opacity: 0.7 },
   logo: { width: 150, marginTop: 12, marginBottom: 8 },
-  backToTopButton: { position: 'absolute', bottom: 20, left: '45%', width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center' },
+  backToTopButton: { 
+    position: 'absolute', 
+    bottom: 20, 
+    left: '45%', 
+    width: 50, 
+    height: 50, 
+    borderRadius: 25, 
+    backgroundColor: 'transparent',
+    justifyContent: 'center', 
+    alignItems: 'center',
+  },
   backToTopTouchable: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
   chevronIcon: {},
   eistLogoContainer: { position: 'absolute', top: 48, right: 18, zIndex: 1 },
