@@ -579,9 +579,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         title,
         artist: isDeadAir ? '' : metadataArtist,
         artwork: artworkToUse,
-        // Enhanced metadata for Android Auto
+        // Enhanced metadata for Android Auto and car OS compatibility
         album: 'éist',
         duration: -1, // Live stream indicator
+        genre: 'Radio',
+        date: new Date().toISOString(),
+        // Additional Android Auto-specific metadata
+        isLiveStream: true,
+        description: 'éist · live',
+        // Force metadata refresh for Android Auto
+        _metadata_refresh: Date.now(),
       }
       await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
     } catch (err) {

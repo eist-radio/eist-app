@@ -47,8 +47,24 @@ const startFreshStream = async () => {
 };
 
 module.exports = async function() {
-  // Use simple play/pause for lock screen controls
-  TrackPlayer.addEventListener(Event.RemotePlay, () => TrackPlayer.play());
+  // Enhanced play/pause for lock screen and Android Auto controls
+  TrackPlayer.addEventListener(Event.RemotePlay, async () => {
+    try {
+      await TrackPlayer.play();
+      // Force metadata refresh for Android Auto after play
+      const queue = await TrackPlayer.getQueue();
+      if (queue && queue.length > 0) {
+        const currentTrack = queue[0];
+        await TrackPlayer.updateMetadataForTrack(0, {
+          ...currentTrack,
+          _metadata_refresh: Date.now(),
+        });
+      }
+    } catch (error) {
+      console.error('Remote play error:', error);
+    }
+  });
+  
   TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.pause());
   
   // Disable previous and next controls - they do nothing for live radio
