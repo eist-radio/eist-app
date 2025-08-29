@@ -363,87 +363,87 @@ export default function ArtistScreen() {
           shouldCancelWhenOutside={true}
         >
           <View style={{ flex: 1 }}>
-            <View style={styles.avatarContainer}>
-          {imageReady && (preloadedImageUrl || imageFailed) ? (
-            <Image
-              key={`${artist.id}-${preloadedImageUrl || 'fallback'}`}
-              source={imageSource}
-              style={styles.fullWidthAvatar}
-              resizeMode="cover"
-              onError={(error) => {
-                setImageFailed(true);
-                setPreloadedImageUrl(null);
-              }}
-            />
-          ) : (
-            <View style={[styles.fullWidthAvatar, { backgroundColor: colors.card }]} />
-          )}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.2)']}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          {isImageLoading && (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          )}
-        </View>
-
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.contentContainer}
-          contentContainerStyle={styles.content}
-          onScroll={handleScroll}
-          scrollEventThrottle={16}
-        >
-          <View style={styles.titleRow}>
-            <Ionicons
-              name="headset-outline"
-              size={36}
-              color={colors.primary}
-              style={styles.icon}
-            />
-            <ThemedText
-              type="subtitle"
-              style={[styles.header, { color: colors.primary }]}
-              numberOfLines={2}
-              ellipsizeMode="tail"
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.contentContainer}
+              contentContainerStyle={styles.content}
+              onScroll={handleScroll}
+              scrollEventThrottle={16}
             >
-              {artist.name || 'Unnamed Artist'}
-            </ThemedText>
-          </View>
-
-          <View style={styles.textContainer}>
-            {paragraphs.map((p, i) => (
-              <SelectableText
-                key={i}
-                text={p}
-                style={[styles.bodyText, { color: colors.text }]}
-                linkStyle={{ color: colors.primary }}
-              />
-            ))}
-
-            {entries.length > 0 && (
-              <View style={styles.linkRow}>
-                {entries.map(([label, url], idx) => (
-                  <React.Fragment key={label}>
-                    <TouchableOpacity onPress={() => openLink(url)}>
-                      <Text style={[styles.linkText, { color: colors.primary }]}>
-                        {label}
-                      </Text>
-                    </TouchableOpacity>
-                    {idx < entries.length - 1 && (
-                      <Text style={[styles.separator, { color: colors.text }]}>
-                        {' / '}
-                      </Text>
-                    )}
-                  </React.Fragment>
-                ))}
+              <View style={styles.avatarContainer}>
+                {imageReady && (preloadedImageUrl || imageFailed) ? (
+                  <Image
+                    key={`${artist.id}-${preloadedImageUrl || 'fallback'}`}
+                    source={imageSource}
+                    style={styles.fullWidthAvatar}
+                    resizeMode="cover"
+                    onError={(error) => {
+                      setImageFailed(true);
+                      setPreloadedImageUrl(null);
+                    }}
+                  />
+                ) : (
+                  <View style={[styles.fullWidthAvatar, { backgroundColor: colors.card }]} />
+                )}
+                <LinearGradient
+                  colors={['transparent', 'rgba(0,0,0,0.2)']}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                {isImageLoading && (
+                  <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color={colors.primary} />
+                  </View>
+                )}
               </View>
-            )}
-          </View>
+
+              <View style={styles.titleRow}>
+                <Ionicons
+                  name="headset-outline"
+                  size={36}
+                  color={colors.primary}
+                  style={styles.icon}
+                />
+                <ThemedText
+                  type="subtitle"
+                  style={[styles.header, { color: colors.primary }]}
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                >
+                  {artist.name || 'Unnamed Artist'}
+                </ThemedText>
+              </View>
+
+              <View style={styles.textContainer}>
+                {paragraphs.map((p, i) => (
+                  <SelectableText
+                    key={i}
+                    text={p}
+                    style={[styles.bodyText, { color: colors.text }]}
+                    linkStyle={{ color: colors.primary }}
+                  />
+                ))}
+
+                {entries.length > 0 && (
+                  <View style={styles.linkRow}>
+                    {entries.map(([label, url], idx) => (
+                      <React.Fragment key={label}>
+                        <TouchableOpacity onPress={() => openLink(url)}>
+                          <Text style={[styles.linkText, { color: colors.primary }]}>
+                            {label}
+                          </Text>
+                        </TouchableOpacity>
+                        {idx < entries.length - 1 && (
+                          <Text style={[styles.separator, { color: colors.text }]}>
+                            {' / '}
+                          </Text>
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </View>
+                )}
+              </View>
             </ScrollView>
             <BackToTopButton
               onPress={scrollToTop}
