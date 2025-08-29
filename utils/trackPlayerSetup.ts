@@ -30,6 +30,9 @@ export const setupTrackPlayer = async () => {
       android: {
         appKilledPlaybackBehavior: AppKilledPlaybackBehavior.PausePlayback,
         alwaysPauseOnInterruption: true,
+        // Enhanced Android Auto support
+        enableAutoAndroidAuto: true,
+        androidAutoSupported: true,
       },
       
       // Enhanced capabilities for Android Auto - removed SkipToNext/SkipToPrevious for live radio
