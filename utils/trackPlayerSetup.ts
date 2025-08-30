@@ -13,11 +13,11 @@ export const setupTrackPlayer = async () => {
     // Setup Android notification channel first
     await setupAndroidNotificationChannel();
 
-    // Player setup
+    // Player setup - Optimized for live radio streaming
     await TrackPlayer.setupPlayer({
-      maxBuffer: 50,
-      minBuffer: 15,
-      playBuffer: 2.5,
+      maxBuffer: 8,
+      minBuffer: 3,
+      playBuffer: 1.5,
       backBuffer: 0,
       iosCategory: IOSCategory.Playback,
       androidAudioContentType: AndroidAudioContentType.Music,
@@ -35,32 +35,24 @@ export const setupTrackPlayer = async () => {
         androidAutoSupported: true,
       },
       
-      // Enhanced capabilities for Android Auto - removed SkipToNext/SkipToPrevious for live radio
+      // Enhanced capabilities for live radio - Play/Stop only (no pause for CarPlay)
       capabilities: [
         Capability.Play,
-        Capability.Pause,
         Capability.Stop,
         Capability.PlayFromId,
         Capability.PlayFromSearch,
-        Capability.SeekTo,
-        // Removed SkipToNext and SkipToPrevious - not applicable for live radio
-        // Add rating capability for better Android Auto integration
         Capability.SetRating,
       ],
       
-      // Compact capabilities for notification controls - removed SkipToNext/SkipToPrevious
+      // Compact capabilities for notification controls - Play/Stop only
       compactCapabilities: [
         Capability.Play, 
-        Capability.Pause,
         Capability.Stop, 
-        // Removed SkipToNext and SkipToPrevious - not applicable for live radio
       ],
       
       // Progress update interval
       progressUpdateEventInterval: 1,
     });
-
-    console.log('TrackPlayer setup successful with Android Auto support - previous/next controls disabled for live radio');
   } catch (error) {
     console.error('TrackPlayer setup error:', error);
     throw error;
