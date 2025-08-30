@@ -84,7 +84,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   // Network connectivity tracking
   const networkState = useNetworkConnectivity()
-  const wasPlayingBeforeNetworkChange = useRef(false)
   const previousNetworkState = useRef(networkState)
 
   useEffect(() => {
@@ -200,7 +199,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           artwork: artwork,
           isLiveStream: true,
           duration: -1, // Live stream indicator
-          album: 'éist',
+          album: '',
         }
 
         try {
@@ -596,7 +595,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  // Handle network connectivity changes
+  // Handle network connectivity changes - always resume on reconnect for live radio
   useEffect(() => {
     if (!previousNetworkState.current) {
       previousNetworkState.current = networkState
@@ -606,28 +605,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const previous = previousNetworkState.current
     const current = networkState
 
-    // Only act on meaningful network changes
-    if (previous.isConnected === current.isConnected && previous.type === current.type) {
-      return
-    }
-
-    // Remember if we were playing
-    if (isPlayingRef.current) {
-      wasPlayingBeforeNetworkChange.current = true
-    }
-
-    // Auto-resume after network change if we have connectivity
-    if (current.isConnected && wasPlayingBeforeNetworkChange.current) {
+    // Auto-resume when network comes back online
+    if (!previous.isConnected && current.isConnected) {
       setTimeout(async () => {
-        if (wasPlayingBeforeNetworkChange.current && !isPlayingRef.current) {
-          wasPlayingBeforeNetworkChange.current = false
-          try {
-            await play()
-          } catch (error) {
-            console.error('Auto-resume failed:', error)
-          }
+        try {
+          await play()
+        } catch (error) {
+          console.error('Auto-resume after network reconnect failed:', error)
         }
-      }, 1000)
+      }, 2000) // 2 second delay for network stability
     }
 
     previousNetworkState.current = current

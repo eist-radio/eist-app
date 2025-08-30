@@ -3,7 +3,7 @@ import TrackPlayer, { Event } from 'react-native-track-player';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
-// Function to start fresh stream instead of resuming from buffer
+// Start fresh stream
 const startFreshStream = async () => {
   try {
     // Stop current playback
@@ -47,10 +47,10 @@ const startFreshStream = async () => {
 };
 
 module.exports = async function() {
-  // Enhanced play/pause for lock screen and Android Auto controls
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
     try {
-      await TrackPlayer.play();
+      // Always start fresh stream to avoid playing old buffered audio
+      await startFreshStream();
       // Force metadata refresh for Android Auto after play
       const queue = await TrackPlayer.getQueue();
       if (queue && queue.length > 0) {
@@ -65,7 +65,8 @@ module.exports = async function() {
     }
   });
   
-  TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.pause());
+  // For live radio, treat pause as stop (CarPlay/Android Auto compatibility)
+  TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.stop());
   
   // Disable previous and next controls - they do nothing for live radio
   TrackPlayer.addEventListener(Event.RemoteNext, () => {
@@ -76,15 +77,4 @@ module.exports = async function() {
   });
   
   TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.stop());
-  TrackPlayer.addEventListener(Event.RemoteSeek, (event) => TrackPlayer.seekTo(event.position));
-  
-  TrackPlayer.addEventListener(Event.RemoteJumpForward, async (event) => {
-    const position = await TrackPlayer.getPosition();
-    await TrackPlayer.seekTo(position + (event.interval || 10));
-  });
-  
-  TrackPlayer.addEventListener(Event.RemoteJumpBackward, async (event) => {
-    const position = await TrackPlayer.getPosition();
-    await TrackPlayer.seekTo(Math.max(0, position - (event.interval || 10)));
-  });
 };
