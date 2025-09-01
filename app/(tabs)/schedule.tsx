@@ -6,7 +6,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
-    AppState,
     Dimensions,
     Image,
     Linking,
@@ -26,7 +25,6 @@ const logoImage = require('../../assets/images/eist-logo-header.png')
 
 const STATION_ID = 'eist-radio';
 const NUM_DAYS = 7;
-const LIVE_POLL_INTERVAL = 600_000; // Reduced from 5 minutes to 10 minutes
 
 type RawScheduleItem = {
   id: string;
@@ -118,7 +116,6 @@ export default function ScheduleScreen() {
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const sectionListRef = useRef<SectionList>(null);
-  const lastFocusTime = useRef<number>(Date.now());
 
   function fmt(d: Date, suffix: string) {
     return d.toISOString().split('T')[0] + 'T' + suffix;
@@ -138,9 +135,12 @@ export default function ScheduleScreen() {
       setError(undefined);
     } catch (err) {
       console.warn('ScheduleScreen fetch error:', err);
-      setError('Could not load schedule.');
+      // Only set error if we don't have existing data
+      if (sections.length === 0) {
+        setError('Could not load schedule.');
+      }
     }
-  }, [currentTimezone]);
+  }, [currentTimezone, sections.length]);
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
@@ -149,6 +149,9 @@ export default function ScheduleScreen() {
         fetchScheduleData(),
         (async () => {
           try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+            
             const res = await fetch(
               `https://api.radiocult.fm/api/station/${STATION_ID}/schedule/live`,
               {
@@ -156,8 +159,10 @@ export default function ScheduleScreen() {
                   'x-api-key': apiKey,
                   'Content-Type': 'application/json',
                 },
+                signal: controller.signal,
               }
             );
+            clearTimeout(timeoutId);
             if (!res.ok) throw new Error(`Live fetch error: ${res.statusText}`);
             const json = await res.json();
 
@@ -279,110 +284,53 @@ export default function ScheduleScreen() {
     })();
   }, [fetchScheduleData]);
 
-  // Auto-refresh schedule when page becomes focused after inactivity
+  // Auto-refresh schedule and check now playing indicator when page becomes focused
   useFocusEffect(
     useCallback(() => {
-      const now = Date.now();
-      const timeSinceLastFocus = now - lastFocusTime.current;
-      const REFRESH_THRESHOLD = 30 * 60 * 1000; // 30 minutes
+      // Always refresh both schedule data and now playing indicator when page becomes focused
+      const refreshOnFocus = async () => {
+        try {
+          await Promise.all([
+            fetchScheduleData(),
+            (async () => {
+              try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                const res = await fetch(
+                  `https://api.radiocult.fm/api/station/${STATION_ID}/schedule/live`,
+                  {
+                    headers: {
+                      'x-api-key': apiKey,
+                      'Content-Type': 'application/json',
+                    },
+                    signal: controller.signal,
+                  }
+                );
+                clearTimeout(timeoutId);
+                if (!res.ok) throw new Error(`Live fetch error: ${res.statusText}`);
+                const json = await res.json();
 
-      // If it's been more than 30 minutes since last focus, refresh the data
-      if (timeSinceLastFocus > REFRESH_THRESHOLD) {
-        fetchScheduleData().catch(err => {
-          console.warn('Failed to auto-refresh schedule on focus:', err);
-        });
-      }
+                const newId =
+                  json?.result?.status === 'schedule'
+                    ? json?.result?.content?.id
+                    : null;
 
-      lastFocusTime.current = now;
-
-      // Cleanup function when losing focus
-      return () => {
-        lastFocusTime.current = Date.now();
+                setCurrentShowId(newId || null);
+              } catch (err) {
+                console.warn('Live-show fetch error on focus:', err);
+              }
+            })()
+          ]);
+        } catch (err) {
+          console.warn('Failed to refresh on focus:', err);
+        }
       };
+
+      refreshOnFocus();
     }, [fetchScheduleData])
   );
 
-  useEffect(() => {
-    let isMounted = true;
-    let interval: NodeJS.Timeout | null = null;
-
-    const fetchLiveShow = async () => {
-      try {
-        const res = await fetch(
-          `https://api.radiocult.fm/api/station/${STATION_ID}/schedule/live`,
-          {
-            headers: {
-              'x-api-key': apiKey,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-        if (!res.ok) throw new Error(`Live fetch error: ${res.statusText}`);
-        const json = await res.json();
-
-        const newId =
-          json?.result?.status === 'schedule'
-            ? json?.result?.content?.id
-            : null;
-
-        if (!isMounted) return;
-
-        setCurrentShowId((prevId) => {
-          if (prevId !== newId) {
-            Animated.timing(fadeAnim, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: true,
-            }).start(() => {
-              fetchScheduleData().catch(err => {
-                console.warn('Failed to refresh schedule on show change:', err);
-              });
-
-              Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              }).start();
-            });
-            return newId || null;
-          }
-          return prevId;
-        });
-      } catch (err) {
-        console.warn('Live-show fetch error:', err);
-      }
-    };
-
-    const startPolling = () => {
-      if (isPlaying && AppState.currentState === 'active' && !interval) {
-        interval = setInterval(fetchLiveShow, LIVE_POLL_INTERVAL);
-      }
-    };
-
-    const stopPolling = () => {
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-    };
-
-    fetchLiveShow();
-    startPolling();
-
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (nextState === 'active' && isPlaying) {
-        startPolling();
-      } else if (nextState === 'background' || nextState === 'inactive') {
-        stopPolling();
-      }
-    });
-
-    return () => {
-      isMounted = false;
-      stopPolling();
-      subscription.remove();
-    };
-  }, [isPlaying, fadeAnim, fetchScheduleData]);
 
   async function fetchSchedule(startDate: string, endDate: string) {
     const url =
@@ -390,11 +338,22 @@ export default function ScheduleScreen() {
       `?startDate=${encodeURIComponent(startDate)}` +
       `&endDate=${encodeURIComponent(endDate)}` +
       `&timeZone=${encodeURIComponent(currentTimezone)}`;
-    const res = await fetch(url, {
-      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-    });
-    if (!res.ok) throw new Error(res.statusText);
-    return (await res.json()) as { schedules?: RawScheduleItem[] };
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+    
+    try {
+      const res = await fetch(url, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(res.statusText);
+      return (await res.json()) as { schedules?: RawScheduleItem[] };
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
   }
 
   function groupByDate(items: RawScheduleItem[]): SectionData[] {
