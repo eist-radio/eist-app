@@ -33,11 +33,12 @@ eas credentials --platform ios                    # Manage iOS credentials
 ## Tech Stack & Architecture
 
 ### Core Technologies
-- **React Native 0.79.5** with **Expo 53.0.20**
+- **React Native 0.79.5** with **Expo 53.0.22**
+- **React 19.0.0** with **React DOM 19.0.0**
 - **Expo Router** for file-based navigation
 - **TypeScript** with strict mode enabled
 - **React Query (@tanstack/react-query)** for data fetching
-- **React Native Track Player** (@doublesymmetry/react-native-track-player) for audio streaming
+- **React Native Track Player 4.1.2** (@doublesymmetry/react-native-track-player) for audio streaming
 
 ### Key Dependencies
 - **Audio**: @doublesymmetry/react-native-track-player, expo-audio
@@ -45,12 +46,14 @@ eas credentials --platform ios                    # Manage iOS credentials
 - **Network**: @react-native-community/netinfo
 - **Storage**: @react-native-async-storage/async-storage
 - **UI**: @expo/vector-icons, @fortawesome/react-native-fontawesome
+- **Media**: expo-image, expo-video, react-native-svg, shaka-player
+- **Sharing**: react-native-share, expo-sharing, react-native-view-shot
+- **Other**: react-native-webview, expo-web-browser, expo-haptics, react-native-dotenv
 
 ### Application Architecture
 
 #### Core Context System
 - **TrackPlayerContext** (`context/TrackPlayerContext.tsx`): Central audio management with comprehensive error handling, network recovery, background playback support, and CarPlay/Android Auto integration
-- **Theme System** (`themes.ts`): Custom light/dark themes extending React Navigation themes
 
 #### File-based Routing Structure
 ```
@@ -99,7 +102,7 @@ app/
 ### Key Features
 - **Live Radio Streaming**: Continuous audio with metadata updates
 - **Background Playback**: Continues playing when app is backgrounded
-- **CarPlay/Android Auto**: Full integration with vehicle systems
+- **CarPlay**: Minimal integration with vehicle systems.
 - **Network Recovery**: Automatic reconnection on network changes
 - **Show Schedule**: Live and upcoming show information with FormattedShowTitle component
 - **Social Integration**: Links to Discord, Instagram, SoundCloud, Mixcloud
@@ -127,22 +130,6 @@ app/
 - The app implements comprehensive audio session recovery for iOS CarPlay/AirPlay interruptions
 - Always use `cleanResetPlayer()` before starting new streams to prevent buffering issues
 - Track metadata is preserved during stops for lock screen/CarPlay display
-
-### Network Handling
-- Automatic pause/resume on network connectivity changes
-- Smart recovery that remembers playback state during network outages
-- 2-second delay before attempting network recovery to ensure stability
-
-### Error Handling
-- All audio operations have comprehensive try/catch blocks
-- Errors are logged but don't propagate to prevent app crashes
-- Graceful degradation for unsupported platforms (web audio fallbacks)
-
-### Mixcloud Integration
-- **Simplified URL Opening**: The Mixcloud page uses a streamlined approach for opening show URLs
-- **Network Connectivity Check**: Only verifies internet connection before attempting to open URLs
-- **Utility Function**: Uses `openMixcloudShow()` utility function for URL handling
-- **No Complex Error Dialogs**: Relies on the utility function for error handling, minimal user-facing alerts
 
 ### Build Considerations
 - Uses EAS Build for production builds
