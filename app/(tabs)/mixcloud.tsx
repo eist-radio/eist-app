@@ -3,8 +3,21 @@
 import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useTheme } from '@react-navigation/native'
-import React, { memo, useCallback, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Animated, FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  AppState,
+  FlatList,
+  Image,
+  Linking,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native'
 import { MixcloudShow, useMixcloudShows } from '../../hooks/useMixcloudShows'
 
 const mixcloudLogo = require('../../assets/images/mc-logo-default.png')
@@ -12,13 +25,13 @@ const logoImage = require('../../assets/images/eist-logo-header.png')
 
 const ShowItem = memo(({ show, onPress }: { show: MixcloudShow; onPress: () => void }) => {
   const { colors } = useTheme()
-  
+
   const formatDate = useCallback((dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     })
   }, [])
 
@@ -28,13 +41,11 @@ const ShowItem = memo(({ show, onPress }: { show: MixcloudShow; onPress: () => v
       onPress={onPress}
     >
       {show.thumbnailUrl ? (
-        <Image
-          source={{ uri: show.thumbnailUrl }}
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: show.thumbnailUrl }} style={styles.thumbnail} resizeMode="cover" />
       ) : (
-        <View style={[styles.thumbnail, styles.thumbnailPlaceholder, { backgroundColor: colors.border }]}>
+        <View
+          style={[styles.thumbnail, styles.thumbnailPlaceholder, { backgroundColor: colors.border }]}
+        >
           <Ionicons name="musical-notes" size={16} color={colors.text} />
         </View>
       )}
@@ -42,15 +53,12 @@ const ShowItem = memo(({ show, onPress }: { show: MixcloudShow; onPress: () => v
         <Text style={[styles.showTitle, { color: colors.text }]} numberOfLines={2}>
           {show.title}
         </Text>
-        <Text style={[styles.showDate, { color: colors.text }]}>
-          {formatDate(show.createdAt)}
-        </Text>
+        <Text style={[styles.showDate, { color: colors.text }]}>{formatDate(show.createdAt)}</Text>
       </View>
       <Ionicons name="chevron-forward" size={20} color={colors.text} />
     </TouchableOpacity>
   )
 })
-
 ShowItem.displayName = 'ShowItem'
 
 const LoadingFooter = () => {
@@ -67,7 +75,7 @@ const LoadingFooter = () => {
 
 const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
   const animatedValue = React.useRef(new Animated.Value(0)).current
-  
+
   React.useEffect(() => {
     Animated.timing(animatedValue, {
       toValue: visible ? 1 : 0,
@@ -75,33 +83,26 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
       useNativeDriver: true,
     }).start()
   }, [visible, animatedValue])
-  
+
   return (
     <Animated.View
       style={[
         styles.backToTopButton,
-        { 
+        {
           opacity: animatedValue,
-          transform: [{
-            scale: animatedValue.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.8, 1],
-            })
-          }]
-        }
+          transform: [
+            {
+              scale: animatedValue.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.8, 1],
+              }),
+            },
+          ],
+        },
       ]}
     >
-      <TouchableOpacity
-        onPress={onPress}
-        activeOpacity={0.8}
-        style={styles.backToTopTouchable}
-      >
-        <Ionicons 
-          name="chevron-up" 
-          size={32} 
-          color="#AFFC41" 
-          style={styles.chevronIcon}
-        />
+      <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.backToTopTouchable}>
+        <Ionicons name="chevron-up" size={32} color="#AFFC41" style={styles.chevronIcon} />
       </TouchableOpacity>
     </Animated.View>
   )
@@ -109,21 +110,13 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
 
 export default function MixcloudScreen() {
   const { colors } = useTheme()
-  const { 
-    data, 
-    isLoading, 
-    error, 
-    fetchNextPage, 
-    hasNextPage, 
-    isFetchingNextPage,
-    refetch 
-  } = useMixcloudShows()
+  const { data, isLoading, error, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =
+    useMixcloudShows()
 
-  const allShows = data?.pages.flatMap(page => page.shows) || []
+  const allShows = data?.pages.flatMap((page) => page.shows) || []
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const flatListRef = useRef<FlatList>(null)
-  const lastFocusTime = useRef<number>(Date.now())
 
   const openShow = useCallback(async (show: MixcloudShow) => {
     try {
@@ -133,16 +126,28 @@ export default function MixcloudScreen() {
     }
   }, [])
 
+  // Prevent overlapping refetches
+  const isRefetchingRef = useRef(false)
+  const safeRefetch = useCallback(async () => {
+    if (isRefetchingRef.current) return
+    isRefetchingRef.current = true
+    try {
+      await refetch()
+    } finally {
+      isRefetchingRef.current = false
+    }
+  }, [refetch])
+
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     try {
-      await refetch()
-    } catch (error) {
-      console.error('Refresh failed:', error)
+      await safeRefetch()
+    } catch (err) {
+      console.error('Refresh failed:', err)
     } finally {
       setIsRefreshing(false)
     }
-  }, [refetch])
+  }, [safeRefetch])
 
   const handleLoadMore = () => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage()
@@ -152,8 +157,6 @@ export default function MixcloudScreen() {
     const scrollY = event.nativeEvent.contentOffset.y
     const contentHeight = event.nativeEvent.contentSize.height
     const layoutHeight = event.nativeEvent.layoutMeasurement.height
-    
-    // Check if content is scrollable (with a small buffer)
     const scrollable = contentHeight > layoutHeight + 10
     setShowBackToTop(scrollable && scrollY > 100)
   }
@@ -163,111 +166,114 @@ export default function MixcloudScreen() {
     setTimeout(() => flatListRef.current?.scrollToOffset({ offset: 0, animated: false }), 100)
   }
 
-  const renderShowItem = useCallback(({ item }: { item: MixcloudShow }) => (
-    <ShowItem show={item} onPress={() => openShow(item)} />
-  ), [openShow])
-
+  const renderShowItem = useCallback(
+    ({ item }: { item: MixcloudShow }) => <ShowItem show={item} onPress={() => openShow(item)} />,
+    [openShow]
+  )
   const renderFooter = () => (isFetchingNextPage ? <LoadingFooter /> : null)
 
-  // Auto-refresh shows when page becomes focused after inactivity
+  // Auto-refresh when the screen regains focus, but skip the first mount to avoid double fetch
+  const didInitialFocus = useRef(false)
   useFocusEffect(
     useCallback(() => {
-      const now = Date.now()
-      const timeSinceLastFocus = now - lastFocusTime.current
-      const REFRESH_THRESHOLD = 2 * 60 * 60 * 1000 // 2 hours
-
-      // If it's been more than 2 hours since last focus, refresh the data
-      if (timeSinceLastFocus > REFRESH_THRESHOLD) {
-        refetch().catch(err => {
+      if (didInitialFocus.current) {
+        safeRefetch().catch((err) =>
           console.warn('Failed to auto-refresh Mixcloud shows on focus:', err)
-        })
+        )
+      } else {
+        didInitialFocus.current = true
       }
-
-      lastFocusTime.current = now
-
-      // Cleanup function when losing focus
-      return () => {
-        lastFocusTime.current = Date.now()
-      }
-    }, [refetch])
+    }, [safeRefetch])
   )
+
+  // Auto-refresh when app returns to foreground
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        safeRefetch().catch((err) =>
+          console.warn('Failed to refresh Mixcloud shows on app foreground:', err)
+        )
+      }
+    })
+    return () => sub.remove()
+  }, [safeRefetch])
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <TouchableOpacity
+        style={styles.eistLogoContainer}
+        activeOpacity={0.7}
+        onPress={() => Linking.openURL('https://eist.radio/support')}
+        accessibilityRole="link"
+      >
+        <View style={styles.eistLogoBackground}>
+          <Image source={logoImage} style={{ width: 57, height: 57 }} resizeMode="contain" />
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.header}>
         <TouchableOpacity
-          style={styles.eistLogoContainer}
           activeOpacity={0.7}
-          onPress={() => Linking.openURL('https://eist.radio/support')}
+          onPress={() => Linking.openURL('https://www.mixcloud.com/eistcork/')}
           accessibilityRole="link"
         >
-          <View style={styles.eistLogoBackground}>
-            <Image source={logoImage} style={{ width: 57, height: 57 }} resizeMode="contain" />
-          </View>
+          <Image source={mixcloudLogo} style={styles.logo} resizeMode="contain" />
         </TouchableOpacity>
+      </View>
 
-        <View style={styles.header}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => Linking.openURL('https://www.mixcloud.com/eistcork/')}
-            accessibilityRole="link"
-          >
-            <Image source={mixcloudLogo} style={styles.logo} resizeMode="contain" />
-          </TouchableOpacity>
-        </View>
+      <View style={styles.content}>
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <ThemedText type="default" style={[styles.loadingText, { color: colors.text }]}>
+              Loading shows...
+            </ThemedText>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <ThemedText type="default" style={[styles.errorText, { color: colors.text }]}>
+              Unable to load shows. Please try again later.
+            </ThemedText>
+          </View>
+        ) : allShows.length > 0 ? (
+          <FlatList
+            ref={flatListRef}
+            data={allShows}
+            renderItem={renderShowItem}
+            keyExtractor={(item) => item.id}
+            style={styles.showsList}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.showsListContent}
+            onEndReached={handleLoadMore}
+            onEndReachedThreshold={0.1}
+            ListFooterComponent={renderFooter}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefreshing}
+                onRefresh={handleRefresh}
+                tintColor={colors.primary}
+                colors={[colors.primary]}
+                progressBackgroundColor={colors.background}
+              />
+            }
+            removeClippedSubviews
+            maxToRenderPerBatch={5}
+            windowSize={5}
+            initialNumToRender={8}
+            updateCellsBatchingPeriod={50}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <ThemedText type="default" style={[styles.emptyText, { color: colors.text }]}>
+              No shows available at the moment.
+            </ThemedText>
+          </View>
+        )}
+      </View>
 
-        <View style={styles.content}>
-          {isLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-              <ThemedText type="default" style={[styles.loadingText, { color: colors.text }]}>
-                Loading shows...
-              </ThemedText>
-            </View>
-          ) : error ? (
-            <View style={styles.errorContainer}>
-              <ThemedText type="default" style={[styles.errorText, { color: colors.text }]}>
-                Unable to load shows. Please try again later.
-              </ThemedText>
-            </View>
-          ) : allShows.length > 0 ? (
-            <FlatList
-              ref={flatListRef}
-              data={allShows}
-              renderItem={renderShowItem}
-              keyExtractor={(item) => item.id}
-              style={styles.showsList}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.showsListContent}
-              onEndReached={handleLoadMore}
-              onEndReachedThreshold={0.1}
-              ListFooterComponent={renderFooter}
-              onScroll={handleScroll}
-              scrollEventThrottle={16}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={handleRefresh}
-                  tintColor={colors.primary}
-                  colors={[colors.primary]}
-                  progressBackgroundColor={colors.background}
-                />
-              }
-              removeClippedSubviews
-              maxToRenderPerBatch={5}
-              windowSize={5}
-              initialNumToRender={8}
-              updateCellsBatchingPeriod={50}
-            />
-          ) : (
-            <View style={styles.emptyContainer}>
-              <ThemedText type="default" style={[styles.emptyText, { color: colors.text }]}>
-                No shows available at the moment.
-              </ThemedText>
-            </View>
-          )}
-        </View>
-
-        <BackToTopButton onPress={scrollToTop} visible={showBackToTop} />
+      <BackToTopButton onPress={scrollToTop} visible={showBackToTop} />
     </View>
   )
 }
@@ -297,18 +303,24 @@ const styles = StyleSheet.create({
   errorText: { fontSize: 16, textAlign: 'center', opacity: 0.7 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 },
   emptyText: { fontSize: 16, textAlign: 'center', opacity: 0.7 },
-  footerLoading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, gap: 8 },
+  footerLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
   footerText: { fontSize: 14, opacity: 0.7 },
   logo: { width: 150, marginTop: 12, marginBottom: 8 },
-  backToTopButton: { 
-    position: 'absolute', 
-    bottom: 20, 
-    left: '45%', 
-    width: 50, 
-    height: 50, 
-    borderRadius: 25, 
+  backToTopButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: '45%',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'transparent',
-    justifyContent: 'center', 
+    justifyContent: 'center',
     alignItems: 'center',
   },
   backToTopTouchable: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
