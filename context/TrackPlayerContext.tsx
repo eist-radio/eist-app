@@ -605,19 +605,26 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const previous = previousNetworkState.current
     const current = networkState
 
-    // Auto-resume when network comes back online
-    if (!previous.isConnected && current.isConnected) {
+    // Auto-resume when network comes back online OR when switching network types
+    const shouldResume = (
+      // Network reconnection (disconnected -> connected)
+      (!previous.isConnected && current.isConnected) ||
+      // Network type change while connected (wifi <-> cellular)
+      (previous.isConnected && current.isConnected && previous.type !== current.type)
+    )
+
+    if (shouldResume && isPlaying) {
       setTimeout(async () => {
         try {
           await play()
         } catch (error) {
-          console.error('Auto-resume after network reconnect failed:', error)
+          console.error('Auto-resume after network change failed:', error)
         }
       }, 2000) // 2 second delay for network stability
     }
 
     previousNetworkState.current = current
-  }, [networkState, play])
+  }, [networkState, play, isPlaying])
 
   useEffect(() => {
     setupPlayer()
