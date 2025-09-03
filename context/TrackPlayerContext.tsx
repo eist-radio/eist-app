@@ -32,7 +32,6 @@ const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
 type TrackPlayerContextType = {
   isPlaying: boolean
   isPlayerReady: boolean
-  isBusy: boolean
   play: () => Promise<void>
   stop: () => Promise<void>
   togglePlayStop: () => Promise<void>
@@ -62,7 +61,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isWeb = Platform.OS === 'web'
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayerReady, setIsPlayerReady] = useState(false)
-  const [isBusy, setIsBusy] = useState(false)
 
   // Store the latest show metadata in state
   const [showTitle, setShowTitle] = useState<string>('éist');
@@ -74,10 +72,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isPlayingRef = useRef(isPlaying)
   const wasPlayingBeforeBackground = useRef(false)
 
-  // Recovery guard to prevent infinite recovery loops
-  const maxRecoveryAttempts = 3;
-  const recoveryAttempts = useRef(0);
+  // Separate user intent tracking from actual playback state
+  const userPlay = useRef(false)
+
+  // Unified recovery state - keeps trying as long as user hasn't stopped
   const isRecovering = useRef(false);
+  const retryTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Metadata refresh interval
   const metadataRefreshInterval = useRef<NodeJS.Timeout | null>(null);
@@ -199,7 +199,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           artwork: artwork,
           isLiveStream: true,
           duration: -1, // Live stream indicator
-          album: '',
         }
 
         try {
@@ -220,11 +219,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     if (isWeb) {
       setIsPlayerReady(true)
-      return
-    }
-
-    // Prevent multiple simultaneous setup attempts
-    if (isBusy) {
       return
     }
 
@@ -264,60 +258,89 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const recoverFromAudioSessionConflict = async () => {
+  // Unified restart mechanism that uses user intent instead of current playing state
+  const attemptStreamRestart = async (reason: string = 'unknown') => {
     if (isRecovering.current) return
-    isRecovering.current = true
-
-    if (recoveryAttempts.current >= maxRecoveryAttempts) {
-      console.error('Max recovery attempts reached. Giving up.')
-      setIsPlaying(false)
-      setIsBusy(false)
-      setIsPlayerReady(false)
-      hasInitialized.current = false
-      isRecovering.current = false
+    
+    // Use userPlay instead of isPlayingRef.current
+    if (!userPlay.current) {
+      console.log('Not restarting - user has stopped playback')
       return
     }
 
-    recoveryAttempts.current++
+    isRecovering.current = true
+    console.log(`Attempting stream restart due to: ${reason}`)
+
+    // Clear any existing retry timeout
+    if (retryTimeout.current) {
+      clearTimeout(retryTimeout.current)
+      retryTimeout.current = null
+    }
+
+    // Don't change userPlay here - just update UI state
     setIsPlaying(false)
-    setIsBusy(false)
-    setIsPlayerReady(false)
 
     if (isWeb) {
-      audioRef.current?.pause()
-      audioRef.current = null
-      setIsPlayerReady(true)
+      try {
+        // Clean reset for web
+        if (audioRef.current) {
+          audioRef.current.pause()
+          audioRef.current.src = ''
+          audioRef.current.load()
+          audioRef.current = null
+        }
+
+        // Wait a moment then restart
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        
+        // Check userPlay instead of isPlayingRef.current
+        if (userPlay.current) {
+          await play()
+        }
+      } catch (err) {
+        console.error('Web restart failed:', err)
+        scheduleRetry(reason)
+      }
       isRecovering.current = false
       return
     }
 
     try {
-      console.log('Recovering from audio session conflict...')
-
-      // Reset initialization flag
+      // Reset player state
+      setIsPlayerReady(false)
       hasInitialized.current = false
 
-      // Perform clean reset
+      // Clean reset
       await cleanResetPlayer()
 
       // Wait for cleanup
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 2000))
 
-      // Reinitialize player
-      await setupPlayer()
-
-      recoveryAttempts.current = 0
-      isRecovering.current = false
-
-      console.log('Audio session recovery completed')
+      // Check userPlay instead of isPlayingRef.current
+      if (userPlay.current) {
+        await setupPlayer()
+        await play()
+        console.log(`Stream restart completed after: ${reason}`)
+      }
     } catch (err) {
-      console.error('Recovery failed:', err)
-      setIsPlaying(false)
-      setIsBusy(false)
-      setIsPlayerReady(false)
-      hasInitialized.current = false
-      isRecovering.current = false
+      console.error(`Restart failed after ${reason}:`, err)
+      scheduleRetry(reason)
     }
+    
+    isRecovering.current = false
+  }
+
+  // Schedule a retry that respects user intent
+  const scheduleRetry = (reason: string) => {
+    // Check userPlay instead of isPlayingRef.current
+    if (!userPlay.current) return // Don't retry if user stopped
+
+    const retryDelay = Math.min(5000 + Math.random() * 5000, 60000) // 5-10s with max 60s
+    
+    retryTimeout.current = setTimeout(() => {
+      console.log(`Retrying stream restart after delay for: ${reason}`)
+      attemptStreamRestart(`retry-${reason}`)
+    }, retryDelay)
   }
 
   // Fetch the latest show metadata from the radiocult API and update state/metadata
@@ -392,11 +415,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const play = useCallback(async () => {
-    if (isBusy) {
-      console.log('Play blocked: player is busy')
-      return
-    }
-    setIsBusy(true)
+    // Set user intent first
+    userPlay.current = true
 
     if (isWeb) {
       // Clean reset for web
@@ -419,8 +439,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         await fetchAndUpdateShowMetadata()
       } catch (err) {
         console.error('Web audio play failed:', err)
-      } finally {
-        setIsBusy(false)
       }
       return
     }
@@ -430,11 +448,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       if (!isPlayerReady) {
         await setupPlayer()
         if (!isPlayerReady) {
-          await recoverFromAudioSessionConflict()
-          if (!isPlayerReady) {
-            setIsBusy(false)
-            return
-          }
+          await attemptStreamRestart('player-not-ready')
+          return
         }
       }
 
@@ -454,43 +469,21 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       console.error('Play failed:', err)
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
-      // More specific error handling for iOS
-      if (
-        msg.includes('audio session') ||
-        msg.includes('interrupted') ||
-        msg.includes('invalid state') ||
-        msg.includes('not ready') ||
-        msg.includes('permission') ||
-        msg.includes('unauthorized')
-      ) {
-        console.log('Audio session issue detected, attempting recovery...')
-        
-        await recoverFromAudioSessionConflict()
-
-        // Try playing again after recovery
-        try {
-          console.log('Retrying playback after recovery...')
-          await cleanResetPlayer()
-          await fetchAndUpdateShowMetadata()
-          await TrackPlayer.play()
-          setIsPlaying(true)
-          await storeLastPlayedState(true)
-          console.log('Stream started after recovery')
-        } catch (retryErr) {
-          console.error('Play failed after recovery:', retryErr)
-          setIsPlaying(false)
-        }
-      } else {
-        setIsPlaying(false)
-      }
-    } finally {
-      setIsBusy(false)
+      // Use unified restart for all play errors
+      console.log('Play failed, attempting restart...')
+      await attemptStreamRestart('play-error')
     }
-  }, [isBusy, isPlayerReady, isWeb, setupPlayer, recoverFromAudioSessionConflict, cleanResetPlayer, fetchAndUpdateShowMetadata])
+  }, [isPlayerReady, isWeb, setupPlayer, attemptStreamRestart, cleanResetPlayer, fetchAndUpdateShowMetadata])
 
   const stop = useCallback(async () => {
-    if (isBusy) return
-    setIsBusy(true)
+    // Clear user intent when manually stopping
+    userPlay.current = false
+
+    // Clear any pending retry attempts when user manually stops
+    if (retryTimeout.current) {
+      clearTimeout(retryTimeout.current)
+      retryTimeout.current = null
+    }
 
     if (isWeb) {
       if (audioRef.current) {
@@ -501,7 +494,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
       setIsPlaying(false)
       await storeLastPlayedState(false)
-      setIsBusy(false)
       return
     }
 
@@ -523,17 +515,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Force stop even if there's an error
       setIsPlaying(false)
       await storeLastPlayedState(false)
-    } finally {
-      setIsBusy(false)
     }
-  }, [isBusy, isWeb, ensureTrackForDisplay])
+  }, [isWeb, ensureTrackForDisplay])
 
   const togglePlayStop = async () => {
-    if (isBusy) {
-      console.log('Toggle blocked: player is busy')
-      return
-    }
-
     if (isPlaying) {
       try {
         await stop()
@@ -579,7 +564,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         artist: isDeadAir ? '' : metadataArtist,
         artwork: artworkToUse,
         // Enhanced metadata for Android Auto and car OS compatibility
-        album: 'éist',
         duration: -1, // Live stream indicator
         genre: 'Radio',
         date: new Date().toISOString(),
@@ -595,7 +579,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  // Handle network connectivity changes - always resume on reconnect for live radio
+  // Handle network connectivity changes with proper user intent checking
   useEffect(() => {
     if (!previousNetworkState.current) {
       previousNetworkState.current = networkState
@@ -605,26 +589,28 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const previous = previousNetworkState.current
     const current = networkState
 
-    // Auto-resume when network comes back online OR when switching network types
-    const shouldResume = (
+    // Auto-restart when network comes back online OR when switching network types
+    const shouldRestart = (
       // Network reconnection (disconnected -> connected)
       (!previous.isConnected && current.isConnected) ||
       // Network type change while connected (wifi <-> cellular)
-      (previous.isConnected && current.isConnected && previous.type !== current.type)
+      (previous.isConnected && current.isConnected && previous.type !== current.type) ||
+      // Network disconnection while playing (to trigger retry when reconnected)
+      (previous.isConnected && !current.isConnected && userPlay.current)
     )
 
-    if (shouldResume && isPlaying) {
+    // Check userPlay instead of isPlaying to handle network disconnection cases
+    if (shouldRestart && userPlay.current) {
+      console.log(`Network change detected - Previous: ${previous.type}/${previous.isConnected}, Current: ${current.type}/${current.isConnected}`)
+      console.log(`User wants to play: ${userPlay.current}, Currently playing: ${isPlaying}`)
+      
       setTimeout(async () => {
-        try {
-          await play()
-        } catch (error) {
-          console.error('Auto-resume after network change failed:', error)
-        }
+        await attemptStreamRestart(`network-change-${previous.type}-to-${current.type}`)
       }, 2000) // 2 second delay for network stability
     }
 
     previousNetworkState.current = current
-  }, [networkState, play, isPlaying])
+  }, [networkState, attemptStreamRestart, isPlaying]) // Keep isPlaying in deps for logging
 
   useEffect(() => {
     setupPlayer()
@@ -636,6 +622,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           const wasPlaying = isPlayingRef.current
           const playing = state === State.Playing
           setIsPlaying(playing)
+
+          // Only clear user intent if the stop was intentional (not due to network/error)
+          if (state === State.Stopped && !isRecovering.current) {
+            // This was likely an intentional stop, not a network error
+            // But don't clear userPlay here as it might be a temporary stop
+          }
 
           // Refresh metadata when starting playback (especially from lock screen)
           if (state === State.Playing && !wasPlaying) {
@@ -653,14 +645,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             } catch (error) {
               console.error('Error ensuring track for display:', error)
             }
-          }
-
-          if (
-            state === State.Playing ||
-            state === State.Paused ||
-            state === State.Stopped
-          ) {
-            setIsBusy(false)
           }
         }
       )
@@ -680,16 +664,20 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             console.error('Error stopping playback after interruption:', stopError)
           }
         } else {
-          setIsPlaying(false)
-          setIsBusy(false)
+          // Use unified restart for all other playback errors
+          await attemptStreamRestart('playback-error')
         }
       })
 
       const onQueueEnded = TrackPlayer.addEventListener(
         Event.PlaybackQueueEnded,
-        () => {
-          setIsPlaying(false)
-          setIsBusy(false)
+        async () => {
+          // Use userPlay instead of isPlayingRef.current
+          if (userPlay.current) {
+            await attemptStreamRestart('queue-ended')
+          } else {
+            setIsPlaying(false)
+          }
         }
       )
 
@@ -699,11 +687,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           setTimeout(async () => {
             if (wasPlayingBeforeBackground.current && !isPlayingRef.current) {
               wasPlayingBeforeBackground.current = false
-              try {
-                await play() // This will do a clean reset and start fresh
-              } catch (playError) {
-                console.error('Error resuming playback after app became active:', playError)
-              }
+              // Set user intent before attempting restart
+              userPlay.current = true
+              await attemptStreamRestart('app-foregrounded')
             }
           }, 1000)
         } else if (next === 'background' || next === 'inactive') {
@@ -736,6 +722,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           clearInterval(metadataRefreshInterval.current)
           metadataRefreshInterval.current = null
         }
+        
+        // Clear retry timeout
+        if (retryTimeout.current) {
+          clearTimeout(retryTimeout.current)
+          retryTimeout.current = null
+        }
       }
     }
   }, [])
@@ -753,14 +745,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       value={{
         isPlaying,
         isPlayerReady,
-        isBusy,
         play,
         stop,
         togglePlayStop,
         setupPlayer,
         updateMetadata,
-        recoverAudioSession: recoverFromAudioSessionConflict,
-        forcePlayerReset: recoverFromAudioSessionConflict,
+        recoverAudioSession: attemptStreamRestart,
+        forcePlayerReset: attemptStreamRestart,
         forceMetadataRefresh,
         showTitle,
         showArtist,
