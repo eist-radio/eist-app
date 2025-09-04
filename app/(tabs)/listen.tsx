@@ -162,7 +162,6 @@ export default function ListenScreen() {
     isPlaying,
     togglePlayStop,
     updateMetadata,
-    isBusy,
   } = useTrackPlayer()
   const { width } = Dimensions.get('window')
   const router = useRouter()
@@ -747,14 +746,13 @@ export default function ListenScreen() {
             <TouchableOpacity 
               onPress={handlePlayButtonPress} 
               style={styles.playButton}
-              disabled={isBusy}
               accessibilityRole="button"
               accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}
             >
               <Ionicons 
                 name={iconName} 
                 size={56} 
-                color={isBusy ? colors.text + '40' : colors.primary} 
+                color={colors.text}
               />
             </TouchableOpacity>
 

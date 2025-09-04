@@ -31,7 +31,6 @@ export const setupTrackPlayer = async () => {
         appKilledPlaybackBehavior: AppKilledPlaybackBehavior.PausePlayback,
         alwaysPauseOnInterruption: true,
         // Enhanced Android Auto support
-        enableAutoAndroidAuto: true,
         androidAutoSupported: true,
       },
       
