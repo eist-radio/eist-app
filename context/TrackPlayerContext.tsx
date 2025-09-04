@@ -459,14 +459,29 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Fetch fresh metadata before starting playback
       await fetchAndUpdateShowMetadata()
 
-      // Start playback with fresh stream
+      // Start playback with muted volume to allow buffering without glitch
+      await TrackPlayer.setVolume(0)
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
+      
+      // Wait 2 seconds for proper buffering to avoid startup glitch
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Gradually restore volume to avoid jarring audio start
+      await TrackPlayer.setVolume(1)
 
       console.log('Stream started successfully')
     } catch (err) {
       console.error('Play failed:', err)
+      
+      // Ensure volume is restored even if play fails
+      try {
+        await TrackPlayer.setVolume(1)
+      } catch (volumeErr) {
+        console.error('Failed to restore volume after play error:', volumeErr)
+      }
+      
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
       // Use unified restart for all play errors
