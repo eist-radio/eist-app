@@ -251,32 +251,66 @@ export default function ShowScreen() {
     enabled: !!slug, // Only run query if slug exists
   });
 
-  const hostId = event?.artistIds?.[0];
-  const { data: host } = useQuery({
-    queryKey: ['artist', hostId],
-    queryFn: () => fetchHostArtist(hostId!),
-    enabled: Boolean(hostId),
+  const hostIds = event?.artistIds || [];
+  
+  // Fetch all hosts using individual useQuery calls
+  const host1 = useQuery({
+    queryKey: ['artist', hostIds[0]],
+    queryFn: () => fetchHostArtist(hostIds[0]),
+    enabled: Boolean(hostIds[0]),
   });
+  
+  const host2 = useQuery({
+    queryKey: ['artist', hostIds[1]],
+    queryFn: () => fetchHostArtist(hostIds[1]),
+    enabled: Boolean(hostIds[1]),
+  });
+  
+  const host3 = useQuery({
+    queryKey: ['artist', hostIds[2]],
+    queryFn: () => fetchHostArtist(hostIds[2]),
+    enabled: Boolean(hostIds[2]),
+  });
+  
+  const host4 = useQuery({
+    queryKey: ['artist', hostIds[3]],
+    queryFn: () => fetchHostArtist(hostIds[3]),
+    enabled: Boolean(hostIds[3]),
+  });
+  
+  // Collect all fetched hosts
+  const hosts = [host1.data, host2.data, host3.data, host4.data].filter(Boolean);
 
-  // Reset image states when host changes
+  // Extract dependency arrays
+  const hostIdsKey = hostIds.join(',');
+  const hostIds2Key = hosts.map(h => h?.id).join(',');
+  
+  // Reset image states when hosts change
   useEffect(() => {
     setImageFailed(false);
     setPreloadedImageUrl(null);
     setImageReady(false); // Hide image until new host image is ready
     setIsImageLoading(false); // Reset loading state
-  }, [hostId, host?.id]);
+  }, [hostIdsKey, hostIds2Key]);
 
-  // Extract host image URL for dependency array (same priority as artist page)
-  const hostImageUrl = host?.logo?.['1024x1024'] ||
-    host?.logo?.['512x512'] ||
-    host?.logo?.['256x256'] ||
-    host?.logo?.default;
+  // Extract image URL from first host with an image (same priority as artist page)
+  const primaryHost = hosts.find(host => 
+    host?.logo?.['1024x1024'] || 
+    host?.logo?.['512x512'] || 
+    host?.logo?.['256x256'] || 
+    host?.logo?.default
+  );
+  
+  const hostImageUrl = primaryHost?.logo?.['1024x1024'] ||
+    primaryHost?.logo?.['512x512'] ||
+    primaryHost?.logo?.['256x256'] ||
+    primaryHost?.logo?.default;
 
   // Preload artist image when host data becomes available
   useEffect(() => {
     const loadArtistImage = async () => {
-      // If there's no hostId at all, show fallback immediately
-      if (!hostId) {
+      // If there are no hostIds at all, show fallback immediately
+      if (hostIds.length === 0) {
         setIsImageLoading(false);
         setPreloadedImageUrl(null);
         setImageFailed(true); // Mark as failed so fallback shows
@@ -284,8 +318,8 @@ export default function ShowScreen() {
         return;
       }
 
-      // If we have a hostId but no host data yet, wait
-      if (hostId && !host) {
+      // If we have hostIds but not all host data yet, wait
+      if (hostIds.length > 0 && hosts.length === 0) {
         setImageReady(false);
         return;
       }
@@ -322,7 +356,7 @@ export default function ShowScreen() {
     };
 
     loadArtistImage();
-  }, [hostId, host, hostImageUrl, preloadImage]);
+  }, [hostIdsKey, hostIds.length, hosts.length, hostImageUrl, preloadImage]);
 
   const handleSwipeGesture = useCallback((event: any) => {
     if (event.nativeEvent.state === State.END) {
@@ -496,7 +530,7 @@ export default function ShowScreen() {
             <View style={styles.bannerContainer}>
               {imageReady && (preloadedImageUrl || imageFailed) ? (
                 <Image
-                  key={`${hostId}-${preloadedImageUrl || 'fallback'}`}
+                  key={`${hostIds.join(',')}-${preloadedImageUrl || 'fallback'}`}
                   source={getBannerImage()}
                   style={styles.bannerImage}
                   resizeMode="cover"
@@ -560,21 +594,24 @@ export default function ShowScreen() {
             </View>
 
             <View style={styles.shareableText}>
-              {host?.name && (
+              {hosts.length > 0 && (
                 <View style={styles.hostRow}>
-                  <TouchableOpacity
-                    onPress={() => hostId && router.push(`/artist/${hostId}`)}
-                    disabled={!hostId}
-                  >
-                    <ThemedText
-                      type="default"
-                      style={[styles.hostText, { color: colors.primary }]}
-                      numberOfLines={3}
-                      ellipsizeMode="tail"
+                  {hosts.map((host, index) => (
+                    <TouchableOpacity
+                      key={host?.id}
+                      onPress={() => host?.id && router.push(`/artist/${host.id}`)}
+                      style={index > 0 ? styles.additionalHost : undefined}
                     >
-                      {host.name}
-                    </ThemedText>
-                  </TouchableOpacity>
+                      <ThemedText
+                        type="default"
+                        style={[styles.hostText, { color: colors.primary }]}
+                        numberOfLines={3}
+                        ellipsizeMode="tail"
+                      >
+                        {host?.name}
+                      </ThemedText>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               )}
 
@@ -673,6 +710,9 @@ const styles = StyleSheet.create({
   },
   hostRow: {
     marginBottom: 6,
+  },
+  additionalHost: {
+    marginTop: 4,
   },
   hostText: {
     fontSize: 19,

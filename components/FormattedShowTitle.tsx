@@ -74,6 +74,7 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
   const patterns = [
     /\(eist aris\)/gi,
     /\(éist arís\)/gi,
+    /\(eíst arís\)/gi,
     /\(éist aris\)/gi,
     /\(eist arís\)/gi,
   ];
