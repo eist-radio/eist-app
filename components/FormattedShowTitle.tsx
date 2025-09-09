@@ -70,12 +70,16 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
     );
   }
 
-  // Case 2: replace "(eist aris)" variants with repeat icon
+  // Case 2: replace "(eíst arís)" variants with repeat icon
   const patterns = [
     /\(eist aris\)/gi,
     /\(éist arís\)/gi,
     /\(eíst arís\)/gi,
     /\(éist aris\)/gi,
+    /\(éíst aris\)/gi,
+    /\(éist áris\)/gi,
+    /\(éíst árís\)/gi,
+    /\(eist áris\)/gi,
     /\(eist arís\)/gi,
   ];
 
