@@ -692,6 +692,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 6,
+    flexWrap: 'wrap',
   },
   dateText: {
     fontSize: 18,
@@ -700,6 +701,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 2,
     marginVertical: 2,
     marginRight: 4,
+    flexShrink: 1,
   },
   timeText: {
     fontSize: 16,
@@ -707,6 +709,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginHorizontal: 2,
     marginVertical: 2,
+    flexShrink: 1,
   },
   hostRow: {
     marginBottom: 6,
