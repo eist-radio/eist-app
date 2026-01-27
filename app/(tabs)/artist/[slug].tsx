@@ -1,7 +1,9 @@
 // app/(tabs)/artist/[slug].tsx
 
+import { ArchiveShowCard } from '@/components/ArchiveShowCard';
 import { SelectableText } from '@/components/SelectableText';
 import { ThemedText } from '@/components/ThemedText';
+import { useArchiveShowsByArtist } from '@/hooks/useArchiveShows';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -117,6 +119,9 @@ export default function ArtistScreen() {
     queryFn: () => fetchArtistBySlug(slug || ''),
     enabled: !!slug, // Only run query if slug exists
   });
+
+  // Fetch archived shows for this artist
+  const { shows: archivedShows } = useArchiveShowsByArtist(slug, 8);
 
   const fallbackImage = require('../../../assets/images/eist_online.png');
   const [imageFailed, setImageFailed] = useState(false);
@@ -443,6 +448,20 @@ export default function ArtistScreen() {
                     ))}
                   </View>
                 )}
+
+                {archivedShows.length > 0 && (
+                  <View style={styles.showHistorySection}>
+                    <ThemedText
+                      type="subtitle"
+                      style={[styles.showHistoryTitle, { color: colors.primary }]}
+                    >
+                      Show History
+                    </ThemedText>
+                    {archivedShows.map((show) => (
+                      <ArchiveShowCard key={show.id} show={show} />
+                    ))}
+                  </View>
+                )}
               </View>
             </ScrollView>
             <BackToTopButton
@@ -547,5 +566,14 @@ const styles = StyleSheet.create({
   },
   chevronIcon: {
     // No specific styling needed, icon will handle its own size
+  },
+  showHistorySection: {
+    marginTop: 24,
+    width: '100%',
+  },
+  showHistoryTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 12,
   },
 });

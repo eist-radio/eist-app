@@ -7,16 +7,18 @@ import {
   ActivityIndicator,
   Animated,
   AppState,
-  Dimensions,
   Image,
   Linking,
   RefreshControl,
   SectionList,
+  SectionListData,
   StyleSheet,
+  Text,
   TouchableOpacity,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import localShowsData from '../../assets/data/shows.json'
 import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
@@ -46,17 +48,38 @@ type RawScheduleItem = {
 
 type SectionRow = {
   time: string
+  startTime: string
+  endTime: string
   title: string
   id: string
   artistIds?: string[]
+  artistName?: string
 }
 
 type SectionData = {
-  // keep machine-sortable key to avoid locale parsing issues
   key: string // YYYY-MM-DD
   title: string // localized label
+  dayName: string // "Today", "Tomorrow", or weekday
+  dateLabel: string // "27 January"
   data: SectionRow[]
 }
+
+// Build artist ID to name mapping from local shows data
+function buildArtistIdToNameMap(): Record<string, string> {
+  const map: Record<string, string> = {}
+  ;(localShowsData as any[]).forEach((show) => {
+    if (show.artistIds && show.artistName) {
+      show.artistIds.forEach((id: string) => {
+        if (!map[id]) {
+          map[id] = show.artistName
+        }
+      })
+    }
+  })
+  return map
+}
+
+const artistIdToNameMap = buildArtistIdToNameMap()
 
 const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
   const animatedValue = React.useRef(new Animated.Value(0)).current
@@ -93,13 +116,33 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
   )
 }
 
+// Live indicator component with pulsing animation
+const LiveIndicator = () => {
+  const pulseAnim = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    )
+    pulse.start()
+    return () => pulse.stop()
+  }, [pulseAnim])
+
+  return (
+    <Animated.View style={[styles.liveIndicator, { opacity: pulseAnim }]}>
+      <View style={styles.liveDot} />
+      <Text style={styles.liveText}>LIVE</Text>
+    </Animated.View>
+  )
+}
+
 export default function ScheduleScreen() {
   const { colors } = useTheme()
   const currentTimezone = useTimezoneChange()
   const insets = useSafeAreaInsets()
-  const screenWidth = Dimensions.get('window').width
-  const availableWidth = screenWidth - 32 // 16px each side
-  const maxTitleWidth = availableWidth * 0.6
 
   const [sections, setSections] = useState<SectionData[]>([])
   const [loading, setLoading] = useState(true)
@@ -110,7 +153,7 @@ export default function ScheduleScreen() {
   const [isScrollable, setIsScrollable] = useState(false)
 
   const fadeAnim = useRef(new Animated.Value(1)).current
-  const sectionListRef = useRef<SectionList>(null)
+  const sectionListRef = useRef<SectionList<SectionRow, SectionData>>(null)
 
   // guards to avoid overlapping fetches from mount + focus + foreground
   const isFetchingSchedule = useRef(false)
@@ -161,7 +204,8 @@ export default function ScheduleScreen() {
       const endIso = fmt(endDate, '23:59:59Z')
 
       const raw = await fetchSchedule(startIso, endIso, currentTimezone)
-      setSections(groupByDate(raw.schedules || [], currentTimezone))
+      const grouped = groupByDate(raw.schedules || [], currentTimezone)
+      setSections(grouped)
       setError(undefined)
     } catch (err) {
       console.warn('ScheduleScreen fetch error:', err)
@@ -207,66 +251,87 @@ export default function ScheduleScreen() {
   }
 
   const renderSectionHeader = React.useCallback(
-    ({ section }: { section: any }) => (
-      <SelectableThemedText style={[styles.sectionHeader, { color: colors.primary }]}>
-        {section.title}
-      </SelectableThemedText>
+    ({ section }: { section: SectionListData<SectionRow, SectionData> }) => (
+      <View style={styles.sectionHeaderContainer}>
+        <View style={styles.sectionHeaderContent}>
+          <Text style={[styles.sectionDayName, { color: colors.primary }]}>
+            {section.dayName}
+          </Text>
+          <Text style={[styles.sectionDateLabel, { color: colors.text }]}>
+            {section.dateLabel}
+          </Text>
+        </View>
+        <View style={[styles.sectionHeaderLine, { backgroundColor: colors.primary + '30' }]} />
+      </View>
     ),
-    [colors.primary]
+    [colors.primary, colors.text]
   )
 
   const renderItem = React.useCallback(
     ({ item }: { item: SectionRow }) => {
       const isCurrent = item.id === currentShowId
-      const CellWrapper: any = isCurrent ? Animated.View : View
+      const artistId = item.artistIds?.[0]
+      const artistName = artistId ? artistIdToNameMap[artistId] : undefined
 
       return (
-        <CellWrapper style={isCurrent ? { opacity: fadeAnim } : undefined}>
-          <View style={styles.row}>
-            <SelectableThemedText
-              style={[
-                styles.cellTime,
-                {
-                  color: colors.text,
-                  fontWeight: isCurrent ? '700' : '400',
-                  fontStyle: isCurrent ? 'italic' : 'normal',
-                },
-              ]}
-            >
-              {item.time}
-            </SelectableThemedText>
-
-            <Link href={`/show/${encodeURIComponent(item.id)}`} style={{ flex: 1, minWidth: 0 }}>
-              <View style={styles.showCellContent}>
-                {isCurrent && (
-                  <Ionicons
-                    name="arrow-forward-outline"
-                    size={18}
-                    color={colors.primary}
-                    style={styles.playIcon}
-                  />
-                )}
-                <FormattedShowTitle
-                  title={item.title}
-                  color={colors.primary}
-                  size={18}
-                  style={[
-                    styles.cellText,
-                    {
-                      fontWeight: isCurrent ? '700' : '600',
-                      fontStyle: isCurrent ? 'italic' : 'normal',
-                      maxWidth: maxTitleWidth,
-                    },
-                  ]}
-                  numberOfLines={undefined}
-                />
+        <Animated.View
+          style={[
+            styles.showCard,
+            isCurrent && styles.showCardCurrent,
+            isCurrent && { borderLeftColor: colors.primary },
+            { opacity: isCurrent ? fadeAnim : 1 },
+          ]}
+        >
+          <Link href={`/show/${encodeURIComponent(item.id)}`} style={styles.showCardLink}>
+            <View style={styles.showCardInner}>
+              {/* Time column */}
+              <View style={styles.timeColumn}>
+                <Text style={[styles.startTime, { color: isCurrent ? colors.primary : colors.text }]}>
+                  {item.startTime}
+                </Text>
+                <Text style={[styles.endTime, { color: colors.text }]}>
+                  {item.endTime}
+                </Text>
               </View>
-            </Link>
-          </View>
-        </CellWrapper>
+
+              {/* Content column */}
+              <View style={styles.contentColumn}>
+                <View style={styles.titleRow}>
+                  {isCurrent && <LiveIndicator />}
+                  <FormattedShowTitle
+                    title={item.title}
+                    color={colors.primary}
+                    size={17}
+                    style={[
+                      styles.showTitle,
+                      isCurrent && styles.showTitleCurrent,
+                    ]}
+                    numberOfLines={2}
+                  />
+                </View>
+                {artistName && (
+                  <Text
+                    style={[styles.artistName, { color: colors.text }]}
+                    numberOfLines={1}
+                  >
+                    {artistName}
+                  </Text>
+                )}
+              </View>
+
+              {/* Chevron */}
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={colors.text + '60'}
+                style={styles.rowChevron}
+              />
+            </View>
+          </Link>
+        </Animated.View>
       )
     },
-    [currentShowId, colors.text, colors.primary, fadeAnim, maxTitleWidth]
+    [currentShowId, colors.text, colors.primary, fadeAnim]
   )
 
   // pulse the "current" row briefly when it changes
@@ -400,7 +465,12 @@ async function fetchSchedule(startDate: string, endDate: string, currentTimezone
 }
 
 function groupByDate(items: RawScheduleItem[], currentTimezone: string): SectionData[] {
-  const todayKey = new Date().toISOString().split('T')[0]
+  const today = new Date()
+  const todayKey = today.toISOString().split('T')[0]
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+  const tomorrowKey = tomorrow.toISOString().split('T')[0]
+
   const buckets: Record<string, RawScheduleItem[]> = {}
 
   items.forEach((item) => {
@@ -419,17 +489,27 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
     }
   })
 
-  const toTimeLabel = (startUtc: string, endUtc: string) => {
-    const start = new Date(startUtc)
-    const end = new Date(endUtc)
-    const fmt = (d: Date) =>
-      d.toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: currentTimezone,
-      }).replace(':00', '') // drop :00
-    return `${fmt(start)}–${fmt(end)}`
+  const formatTime = (utcString: string) => {
+    const d = new Date(utcString)
+    return d.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: currentTimezone,
+    }).replace(':00 ', ' ') // drop :00 but keep AM/PM
+  }
+
+  const getDayName = (dateKey: string): string => {
+    if (dateKey === todayKey) return 'Today'
+    if (dateKey === tomorrowKey) return 'Tomorrow'
+    return new Date(dateKey + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' })
+  }
+
+  const getDateLabel = (dateKey: string): string => {
+    return new Date(dateKey + 'T12:00:00').toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'long',
+    })
   }
 
   return Object.entries(buckets)
@@ -442,34 +522,25 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
       return {
         key: dateKey,
         title,
+        dayName: getDayName(dateKey),
+        dateLabel: getDateLabel(dateKey),
         data: dayItems.map((it) => ({
-          time: toTimeLabel(it.startDateUtc, it.endDateUtc),
+          time: `${formatTime(it.startDateUtc)}–${formatTime(it.endDateUtc)}`,
+          startTime: formatTime(it.startDateUtc),
+          endTime: formatTime(it.endDateUtc),
           title: it.title.trim(),
           id: it.id,
           artistIds: it.artistIds,
         })),
       }
     })
-    // sort by machine key (stable across locales)
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
 }
  
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
   title: { fontSize: 28, fontWeight: '700', marginBottom: 8, paddingTop: 10 },
-  sectionHeader: { fontSize: 20, fontWeight: '600', marginTop: 12, marginBottom: 4 },
-  list: { paddingBottom: 16 },
-  row: { flexDirection: 'row', paddingVertical: 6, alignItems: 'flex-start' },
-  cellTime: { flex: 0.6, fontSize: 18, textAlign: 'left' },
-  showCellContent: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-start',
-  },
-  playIcon: { marginRight: 6, marginTop: 2 },
-  cellText: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 18, textAlign: 'left' },
+  list: { paddingBottom: 24 },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -478,6 +549,123 @@ const styles = StyleSheet.create({
   },
   logoContainer: { position: 'absolute', top: -44, right: 5 },
   logoBackground: { borderRadius: 26, padding: 6 },
+
+  // Section header styles
+  sectionHeaderContainer: {
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  sectionHeaderContent: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    marginBottom: 8,
+  },
+  sectionDayName: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.5,
+  },
+  sectionDateLabel: {
+    fontSize: 15,
+    opacity: 0.6,
+    fontWeight: '500',
+  },
+  sectionHeaderLine: {
+    height: 1,
+    width: '100%',
+  },
+
+  // Show card styles
+  showCard: {
+    marginBottom: 2,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  showCardCurrent: {
+    borderLeftWidth: 3,
+    backgroundColor: 'rgba(175, 252, 65, 0.08)',
+  },
+  showCardLink: {
+    flex: 1,
+  },
+  showCardInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+
+  // Time column
+  timeColumn: {
+    width: 70,
+    marginRight: 12,
+  },
+  startTime: {
+    fontSize: 15,
+    fontWeight: '600',
+    letterSpacing: -0.3,
+  },
+  endTime: {
+    fontSize: 12,
+    opacity: 0.5,
+    marginTop: 2,
+  },
+
+  // Content column
+  contentColumn: {
+    flex: 1,
+    minWidth: 0,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  showTitle: {
+    fontWeight: '600',
+    flex: 1,
+  },
+  showTitleCurrent: {
+    fontWeight: '700',
+  },
+  artistName: {
+    fontSize: 14,
+    opacity: 0.6,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+
+  // Row chevron
+  rowChevron: {
+    marginLeft: 8,
+  },
+
+  // Live indicator
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(175, 252, 65, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    gap: 5,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#AFFC41',
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#AFFC41',
+    letterSpacing: 0.5,
+  },
+
+  // Back to top button
   backToTopButton: {
     position: 'absolute',
     bottom: 20,
@@ -489,6 +677,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backToTopTouchable: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
+  backToTopTouchable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   chevronIcon: {},
 })

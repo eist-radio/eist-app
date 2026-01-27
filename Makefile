@@ -1,4 +1,4 @@
-.PHONY: help install clean colors reset start lint lint-fix typecheck doctor check eas-dev-ios eas-dev-android eas-build-ios eas-build-android credentials-ios eas-submit-ios eas-submit-android env-check logs version update-deps security
+.PHONY: help install clean colors reset start lint lint-fix typecheck doctor check verify preview eas-dev-ios eas-dev-android eas-build-ios eas-build-android credentials-ios eas-submit-ios eas-submit-android env-check logs version update-deps security
 
 help:
 	@echo ""
@@ -40,6 +40,16 @@ doctor:
 	npx expo-doctor
 
 check: lint typecheck doctor
+
+verify: check
+	@rm -rf dist
+	npx expo export --platform web
+	@echo ""
+	@echo "Build verified successfully"
+	@echo "Preview with: npx serve dist"
+
+preview: verify
+	npx serve dist -p 3000
 
 eas-dev-ios:
 	eas build --platform ios --profile development

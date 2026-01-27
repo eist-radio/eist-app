@@ -16,7 +16,7 @@ export default function TabLayout() {
   const INACTIVE = 'rgba(175, 252, 65, 0.5)'
   
   // Tab order for navigation
-  const tabOrder = ['listen', 'schedule', 'discord', 'instagram', 'soundcloud', 'mixcloud']
+  const tabOrder = ['listen', 'schedule', 'archive', 'artists', 'discord', 'instagram', 'soundcloud', 'mixcloud']
   const [currentTab, setCurrentTab] = useState<string>('listen')
   const gestureStartX = useRef<number>(0)
   
@@ -110,6 +110,32 @@ export default function TabLayout() {
             />
 
             <Tabs.Screen
+              name="archive"
+              options={{
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons
+                    name="library-outline"
+                    size={(size ?? 26) * 1.2}
+                    color={color}
+                  />
+                ),
+              }}
+            />
+
+            <Tabs.Screen
+              name="artists"
+              options={{
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons
+                    name="people-outline"
+                    size={(size ?? 26) * 1.2}
+                    color={color}
+                  />
+                ),
+              }}
+            />
+
+            <Tabs.Screen
               name="discord"
               options={{
                 tabBarIcon: ({ color, size }) => (
@@ -170,6 +196,13 @@ export default function TabLayout() {
             />
             <Tabs.Screen
               name="show/[slug]"
+              options={{
+                tabBarButton: () => null,
+                tabBarItemStyle: { display: 'none' },
+              }}
+            />
+            <Tabs.Screen
+              name="archive/[slug]"
               options={{
                 tabBarButton: () => null,
                 tabBarItemStyle: { display: 'none' },

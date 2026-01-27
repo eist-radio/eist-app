@@ -30,8 +30,6 @@ export const setupTrackPlayer = async () => {
       android: {
         appKilledPlaybackBehavior: AppKilledPlaybackBehavior.PausePlayback,
         alwaysPauseOnInterruption: true,
-        // Enhanced Android Auto support
-        androidAutoSupported: true,
       },
       
       // Enhanced capabilities for live radio - Play/Stop only (no pause for CarPlay)
