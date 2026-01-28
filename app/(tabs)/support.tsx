@@ -135,28 +135,6 @@ export default function SupportScreen() {
           />
         </View>
 
-        {/* Listen elsewhere */}
-        <View style={styles.listenSection}>
-          <Text style={[styles.sectionTitle, { color: colors.primary }]}>LISTEN ELSEWHERE</Text>
-          <View style={styles.listenLinks}>
-            <Pressable
-              style={styles.listenLink}
-              onPress={() => openUrl('https://www.mixcloud.com/eistcork/', 'Mixcloud')}
-            >
-              <Text style={[styles.listenLinkText, { color: colors.text }]}>Mixcloud</Text>
-              <Ionicons name="open-outline" size={14} color={colors.text} style={{ opacity: 0.4 }} />
-            </Pressable>
-            <Text style={[styles.listenDivider, { color: colors.text }]}>·</Text>
-            <Pressable
-              style={styles.listenLink}
-              onPress={() => openUrl('https://soundcloud.com/eistcork', 'SoundCloud')}
-            >
-              <Text style={[styles.listenLinkText, { color: colors.text }]}>SoundCloud</Text>
-              <Ionicons name="open-outline" size={14} color={colors.text} style={{ opacity: 0.4 }} />
-            </Pressable>
-          </View>
-        </View>
-
         {/* Version */}
         <Text style={[styles.versionText, { color: colors.text }]}>
           App version 1.0.0
@@ -256,36 +234,6 @@ const styles = StyleSheet.create({
   linkDescription: {
     fontSize: 13,
     opacity: 0.6,
-  },
-
-  // Listen elsewhere
-  listenSection: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 12,
-    opacity: 0.7,
-  },
-  listenLinks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  listenLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  listenLinkText: {
-    fontSize: 15,
-    fontWeight: '500',
-    opacity: 0.8,
-  },
-  listenDivider: {
-    opacity: 0.4,
   },
 
   // Version

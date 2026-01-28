@@ -1,6 +1,8 @@
 // app/(tabs)/social.tsx
 
 import { Ionicons } from '@expo/vector-icons'
+import { faMixcloud, faSoundcloud } from '@fortawesome/free-brands-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
 import React, { useCallback, useState } from 'react'
 import {
@@ -8,6 +10,7 @@ import {
   Image,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -23,14 +26,14 @@ const COLORS = {
   limeBorder: 'rgba(175, 252, 65, 0.15)',
 }
 
-type SocialButtonProps = {
-  icon: keyof typeof Ionicons.glyphMap
+type SocialCardProps = {
+  icon: React.ReactNode
   title: string
   subtitle: string
   onPress: () => void
 }
 
-const SocialButton = ({ icon, title, subtitle, onPress }: SocialButtonProps) => {
+const SocialCard = ({ icon, title, subtitle, onPress }: SocialCardProps) => {
   const { colors } = useTheme()
   const [pressed, setPressed] = useState(false)
 
@@ -40,17 +43,17 @@ const SocialButton = ({ icon, title, subtitle, onPress }: SocialButtonProps) => 
       onPressOut={() => setPressed(false)}
       onPress={onPress}
       style={[
-        styles.socialButton,
-        pressed && styles.socialButtonPressed,
+        styles.socialCard,
+        pressed && styles.socialCardPressed,
       ]}
     >
       <View style={styles.socialIconWrapper}>
-        <Ionicons name={icon} size={32} color={COLORS.lime} />
+        {icon}
       </View>
       <Text style={[styles.socialTitle, { color: colors.primary }]}>{title}</Text>
       <Text style={[styles.socialSubtitle, { color: colors.text }]}>{subtitle}</Text>
-      <View style={styles.socialArrow}>
-        <Ionicons name="open-outline" size={16} color={colors.primary} style={{ opacity: 0.5 }} />
+      <View style={styles.externalIcon}>
+        <Ionicons name="open-outline" size={14} color={colors.primary} style={{ opacity: 0.4 }} />
       </View>
     </Pressable>
   )
@@ -78,40 +81,70 @@ export default function SocialScreen() {
   }, [])
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.primary }]}>Social</Text>
-        <Pressable
-          style={styles.logoContainer}
-          onPress={() => Linking.openURL('https://eist.radio/support')}
-          accessibilityRole="link"
-        >
-          <Image source={logoImage} style={styles.logo} resizeMode="contain" />
-        </Pressable>
-      </View>
-
-      {/* Social Buttons */}
-      <View style={styles.content}>
-        <View style={styles.buttonsContainer}>
-          <SocialButton
-            icon="logo-discord"
-            title="Discord"
-            subtitle="Join the community"
-            onPress={() => openUrl('https://discord.gg/4eHnAAUmFN', 'Discord')}
-          />
-          <SocialButton
-            icon="logo-instagram"
-            title="Instagram"
-            subtitle="@eistradio"
-            onPress={() => openUrl('https://www.instagram.com/eistradio', 'Instagram')}
-          />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={[styles.title, { color: colors.primary }]}>Social</Text>
+          <Pressable
+            style={styles.logoContainer}
+            onPress={() => Linking.openURL('https://eist.radio/support')}
+            accessibilityRole="link"
+          >
+            <Image source={logoImage} style={styles.logo} resizeMode="contain" />
+          </Pressable>
         </View>
 
+        {/* Connect Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.primary }]}>CONNECT</Text>
+          <View style={styles.cardsRow}>
+            <SocialCard
+              icon={<Ionicons name="logo-discord" size={28} color={COLORS.lime} />}
+              title="Discord"
+              subtitle="Join the chat"
+              onPress={() => openUrl('https://discord.gg/4eHnAAUmFN', 'Discord')}
+            />
+            <SocialCard
+              icon={<Ionicons name="logo-instagram" size={28} color={COLORS.lime} />}
+              title="Instagram"
+              subtitle="@eistradio"
+              onPress={() => openUrl('https://www.instagram.com/eistradio', 'Instagram')}
+            />
+          </View>
+        </View>
+
+        {/* Listen Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.primary }]}>LISTEN</Text>
+          <View style={styles.cardsRow}>
+            <SocialCard
+              icon={<FontAwesomeIcon icon={faMixcloud} size={26} color={COLORS.lime} />}
+              title="Mixcloud"
+              subtitle="Past shows"
+              onPress={() => openUrl('https://www.mixcloud.com/eistcork/', 'Mixcloud')}
+            />
+            <SocialCard
+              icon={<FontAwesomeIcon icon={faSoundcloud} size={24} color={COLORS.lime} />}
+              title="SoundCloud"
+              subtitle="Tracks"
+              onPress={() => openUrl('https://soundcloud.com/eistcork', 'SoundCloud')}
+            />
+          </View>
+        </View>
+
+        {/* Footer */}
         <Text style={[styles.footerText, { color: colors.text }]}>
           Connect with DJs and listeners, get show updates, and discover new music.
         </Text>
-      </View>
+      </ScrollView>
     </View>
   )
 }
@@ -119,13 +152,18 @@ export default function SocialScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 32,
+    marginBottom: 28,
     paddingTop: 8,
   },
   title: {
@@ -140,58 +178,68 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
   },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 80,
-  },
-  buttonsContainer: {
-    flexDirection: 'row',
-    gap: 12,
+
+  // Sections
+  section: {
     marginBottom: 24,
   },
-  socialButton: {
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.5,
+    marginBottom: 12,
+    opacity: 0.6,
+  },
+  cardsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+
+  // Cards
+  socialCard: {
     flex: 1,
     backgroundColor: COLORS.limeSubtle,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.limeBorder,
-    padding: 20,
+    padding: 18,
     alignItems: 'center',
   },
-  socialButtonPressed: {
+  socialCardPressed: {
     backgroundColor: 'rgba(175, 252, 65, 0.12)',
     transform: [{ scale: 0.98 }],
   },
   socialIconWrapper: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: 'rgba(175, 252, 65, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   socialTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   socialSubtitle: {
-    fontSize: 13,
-    opacity: 0.6,
-    marginBottom: 8,
+    fontSize: 12,
+    opacity: 0.55,
   },
-  socialArrow: {
+  externalIcon: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 10,
+    right: 10,
   },
+
+  // Footer
   footerText: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 19,
     textAlign: 'center',
-    opacity: 0.5,
-    paddingHorizontal: 20,
+    opacity: 0.45,
+    paddingHorizontal: 24,
+    marginTop: 8,
   },
 })
