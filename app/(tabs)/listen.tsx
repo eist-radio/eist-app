@@ -1,7 +1,6 @@
 // app/(tabs)/listen.tsx
 
 import { SelectableText } from '@/components/SelectableText'
-import { ThemedText } from '@/components/ThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useTheme } from '@react-navigation/native'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -23,6 +22,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
@@ -39,6 +39,29 @@ if (Platform.OS !== 'web') {
   } catch {
     console.warn('TrackPlayer not available');
   }
+}
+
+// Live indicator with pulsing animation (matches schedule page and website)
+const LiveIndicator = () => {
+  const pulseAnim = useRef(new Animated.Value(1)).current
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    )
+    pulse.start()
+    return () => pulse.stop()
+  }, [pulseAnim])
+
+  return (
+    <Animated.View style={[styles.liveIndicator, { opacity: pulseAnim }]}>
+      <View style={styles.liveDot} />
+      <Text style={styles.liveText}>LIVE</Text>
+    </Animated.View>
+  )
 }
 
 const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
@@ -83,72 +106,6 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
   )
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1 },
-  imageContainer: { width: '100%', position: 'relative', overflow: 'hidden' },
-  fullWidthImage: { width: '100%', height: '100%' },
-  logoContainer: { position: 'absolute', top: 36, right: 18 },
-  logoBackground: {
-    borderRadius: 37,
-    padding: 8,
-  },
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bottom: { flex: 1, paddingBottom: 12, alignItems: 'flex-start' },
-  controlContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 8,
-    marginVertical: 16,
-  },
-  playButton: { marginRight: 8 },
-  artistContainer: { flex: 1 },
-  artistNameWrapped: {
-    fontSize: 28,
-    fontWeight: '700',
-    flexShrink: 1,
-    flexWrap: 'wrap',
-  },
-  nowPlayingContainer: { flex: 1, width: '100%' },
-  nowPlayingContent: { paddingHorizontal: 16 },
-  nextRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  nextIcon: { marginRight: 6 },
-  nextUp: { fontSize: 20, fontWeight: '500', flex: 1, flexWrap: 'wrap' },
-  showTitle: { fontSize: 24, fontWeight: '500', marginHorizontal: 2, marginVertical: 2 },
-  showDescription: { fontSize: 18, lineHeight: 22, marginHorizontal: 2, marginVertical: 2 },
-  backToTopButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: '45%',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  backToTopTouchable: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chevronIcon: {
-    // No specific style needed, icon will handle its own size and color
-  },
-})
-
 const placeholderArtistImage = require('../../assets/images/eist_online.png')
 const placeholderOfflineImage = require('../../assets/images/eist_offline.png')
 const logoImage = require('../../assets/images/eist-logo-header.png')
@@ -158,12 +115,13 @@ const apiUrl = `https://api.radiocult.fm/api/station/${stationId}`
 
 export default function ListenScreen() {
   const { colors } = useTheme()
+  const insets = useSafeAreaInsets()
   const {
     isPlaying,
     togglePlayStop,
     updateMetadata,
   } = useTrackPlayer()
-  const { width } = Dimensions.get('window')
+  const { width, height } = Dimensions.get('window')
   const router = useRouter()
   const currentTimezone = useTimezoneChange()
 
@@ -704,150 +662,450 @@ export default function ListenScreen() {
     }
   }
 
+  // Calculate hero height - roughly 55% of screen like website
+  const heroHeight = Math.min(height * 0.55, width * 1.1)
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <View style={[styles.imageContainer, { height: width }]}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.background}
+          />
+        }
+      >
+        {/* Hero Section - Image with gradient overlay like website */}
+        <View style={[styles.heroContainer, { height: heroHeight }]}>
           <Image
             key={`${artistId}-${remoteImageUrl || 'fallback'}`}
             source={getImageSource()}
-            style={styles.fullWidthImage}
+            style={styles.heroImage}
             resizeMode="cover"
             onError={handleImageError}
           />
+
+          {/* Gradient overlay matching website style */}
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.1)']}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFill}
+            colors={[
+              'transparent',
+              'rgba(71, 51, 255, 0.15)',
+              'rgba(71, 51, 255, 0.4)',
+              'rgba(71, 51, 255, 0.8)',
+              'rgba(71, 51, 255, 0.97)',
+              '#4733FF',
+            ]}
+            locations={[0, 0.2, 0.4, 0.6, 0.8, 1]}
+            style={styles.heroGradient}
           />
+
+          {/* Loading overlay */}
           {isContentLoading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
             </View>
           )}
+
+          {/* Logo in top right */}
           <TouchableOpacity
-            style={styles.logoContainer}
+            style={[styles.logoContainer, { top: insets.top + 12 }]}
             activeOpacity={0.7}
             onPress={() => Linking.openURL('https://eist.radio/support')}
             accessibilityRole="link"
           >
-            <View style={styles.logoBackground}>
-              <Image
-                source={logoImage}
-                style={{ width: 81.4, height: 81.4 }}
-                resizeMode="contain"
-              />
-            </View>
+            <Image
+              source={logoImage}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
-        </View>
 
-        <View style={styles.bottom}>
-          <View style={styles.controlContainer}>
-            <TouchableOpacity 
-              onPress={handlePlayButtonPress} 
-              style={styles.playButton}
-              accessibilityRole="button"
-              accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}
-            >
-              <Ionicons 
-                name={iconName} 
-                size={56} 
-                color={colors.text}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => artistId && router.push(`/artist/${artistId}`)}
-              disabled={!artistId}
-              style={styles.artistContainer}
-            >
-              <ThemedText
-                type="subtitle"
-                style={[styles.artistNameWrapped, { color: colors.text }]}
-                numberOfLines={2}
-                ellipsizeMode="tail"
-              >
-                {artistName}
-              </ThemedText>
-            </TouchableOpacity>
-          </View>
-
-
-
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.nowPlayingContainer}
-            contentContainerStyle={styles.nowPlayingContent}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-            refreshControl={
-              <RefreshControl
-                refreshing={isRefreshing}
-                onRefresh={handleRefresh}
-                tintColor={colors.primary}
-                colors={[colors.primary]}
-                progressBackgroundColor={colors.background}
-              />
-            }
-          >
-            {(() => {
-              return broadcastStatus !== 'schedule' && nextShowId
-            })() && (
-                <TouchableOpacity
-                  onPress={() => router.push(`/show/${nextShowId}`)}
-                  style={styles.nextRow}
-                >
-                  <Ionicons
-                    name="calendar-clear-outline"
-                    size={20}
-                    color={colors.text}
-                    style={styles.nextIcon}
-                  />
-                  <Text style={[styles.nextUp, { color: colors.text }]}>
-                    <Text style={{ fontWeight: '400' }}>Next: </Text>
-                    <FormattedShowTitle
-                      title={nextShowTitle}
-                      color={colors.text}
-                      size={20}
-                      style={{ fontWeight: '700' }}
-                      asContent={true}
-                    />
-                    <Text style={{ fontWeight: '400' }}> at {nextShowTime}</Text>
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-            {currentShowId ? (
+          {/* Hero content at bottom - show title over image */}
+          <View style={styles.heroContent}>
+            {broadcastStatus === 'schedule' && showTitle && (
               <TouchableOpacity
-                onPress={() => router.push(`/show/${currentShowId}`)}
-                activeOpacity={0.7}
+                onPress={() => currentShowId && router.push(`/show/${currentShowId}`)}
+                disabled={!currentShowId}
+                activeOpacity={0.8}
               >
                 <FormattedShowTitle
                   title={showTitle}
                   color={colors.primary}
-                  size={24}
-                  style={styles.showTitle}
+                  size={28}
+                  style={styles.heroTitle}
                 />
               </TouchableOpacity>
-            ) : (
-              <FormattedShowTitle
-                title={showTitle}
-                color={colors.text}
-                size={24}
-                style={styles.showTitle}
-              />
             )}
-            <SelectableText
-              text={showDescription}
-              style={[styles.showDescription, { color: colors.text }]}
-              linkStyle={{ color: colors.primary }}
-            />
-          </ScrollView>
+          </View>
         </View>
-        <BackToTopButton
-          onPress={scrollToTop}
-          visible={showBackToTop && isScrollable}
-        />
+
+        {/* Content Section */}
+        <View style={styles.contentSection}>
+          {/* Player controls row */}
+          <View style={styles.playerRow}>
+            <TouchableOpacity
+              onPress={handlePlayButtonPress}
+              style={styles.playButton}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}
+            >
+              <Ionicons
+                name={iconName}
+                size={52}
+                color={colors.text}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.statusContainer}>
+              {broadcastStatus === 'schedule' ? (
+                <View style={styles.liveStatusRow}>
+                  <LiveIndicator />
+                  <TouchableOpacity
+                    onPress={() => artistId && router.push(`/artist/${artistId}`)}
+                    disabled={!artistId}
+                    style={styles.artistNameContainer}
+                  >
+                    <Text
+                      style={[styles.artistName, { color: colors.text }]}
+                      numberOfLines={2}
+                    >
+                      {artistName}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <Text style={[styles.offAirText, { color: colors.text }]}>
+                  {artistName}
+                </Text>
+              )}
+            </View>
+          </View>
+
+          {/* Description */}
+          {showDescription ? (
+            <View style={styles.descriptionContainer}>
+              <SelectableText
+                text={showDescription}
+                style={[styles.showDescription, { color: colors.text }]}
+                linkStyle={{ color: colors.primary }}
+              />
+            </View>
+          ) : null}
+
+          {/* Divider */}
+          <View style={[styles.divider, { backgroundColor: colors.primary + '25' }]} />
+
+          {/* Next show section (when off air) */}
+          {broadcastStatus !== 'schedule' && nextShowId && (
+            <TouchableOpacity
+              onPress={() => router.push(`/show/${nextShowId}`)}
+              style={styles.nextShowCard}
+              activeOpacity={0.7}
+            >
+              <View style={styles.nextShowHeader}>
+                <Text style={[styles.sectionLabel, { color: colors.primary + '99' }]}>
+                  COMING UP
+                </Text>
+              </View>
+              <View style={styles.nextShowContent}>
+                <View style={styles.nextShowTime}>
+                  <Ionicons
+                    name="time-outline"
+                    size={16}
+                    color={colors.primary}
+                    style={styles.timeIcon}
+                  />
+                  <Text style={[styles.timeText, { color: colors.primary }]}>
+                    {nextShowTime}
+                  </Text>
+                </View>
+                <FormattedShowTitle
+                  title={nextShowTitle}
+                  color={colors.primary}
+                  size={18}
+                  style={styles.nextShowTitle}
+                />
+              </View>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={colors.text + '60'}
+                style={styles.nextShowChevron}
+              />
+            </TouchableOpacity>
+          )}
+
+          {/* Quick links section */}
+          <View style={styles.linksSection}>
+            <View style={[styles.divider, { backgroundColor: colors.primary + '25' }]} />
+            <View style={styles.quickLinks}>
+              <TouchableOpacity
+                style={styles.quickLink}
+                onPress={() => Linking.openURL('https://discord.gg/4eHnAAUmFN')}
+              >
+                <Ionicons name="chatbubbles-outline" size={18} color={colors.text + '99'} />
+                <Text style={[styles.quickLinkText, { color: colors.text }]}>
+                  Join the Discord
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quickLink}
+                onPress={() => Linking.openURL('https://eist.radio/support')}
+              >
+                <Ionicons name="heart-outline" size={18} color={colors.text + '99'} />
+                <Text style={[styles.quickLinkText, { color: colors.text }]}>
+                  Support éist
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      <BackToTopButton
+        onPress={scrollToTop}
+        visible={showBackToTop && isScrollable}
+      />
     </View>
   )
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+
+  // Hero section (matches website front-hero style)
+  heroContainer: {
+    width: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+    borderRadius: 8,
+  },
+  heroImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  heroGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  heroContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    paddingBottom: 20,
+  },
+  heroTitle: {
+    fontWeight: '700',
+    lineHeight: 32,
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 30,
+  },
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoContainer: {
+    position: 'absolute',
+    right: 16,
+  },
+  logo: {
+    width: 64,
+    height: 64,
+  },
+
+  // Content section
+  contentSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
+  },
+
+  // Player row
+  playerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  playButton: {
+    padding: 4,
+  },
+  statusContainer: {
+    flex: 1,
+    minWidth: 0,
+  },
+  liveStatusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+  },
+  artistNameContainer: {
+    flex: 1,
+    minWidth: 0,
+  },
+  artistName: {
+    fontSize: 22,
+    fontWeight: '700',
+    letterSpacing: -0.3,
+  },
+  offAirText: {
+    fontSize: 22,
+    fontWeight: '600',
+    opacity: 0.8,
+  },
+
+  // Live indicator (matches schedule page and website)
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(175, 252, 65, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    gap: 6,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#AFFC41',
+  },
+  liveText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#AFFC41',
+    letterSpacing: 0.8,
+  },
+
+  // Description
+  descriptionContainer: {
+    marginBottom: 16,
+  },
+  showDescription: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+
+  // Divider (matches schedule page style)
+  divider: {
+    height: 1,
+    width: '100%',
+    marginVertical: 16,
+  },
+
+  // Section label
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+
+  // Next show card (when off air)
+  nextShowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(175, 252, 65, 0.08)',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#AFFC41',
+    padding: 12,
+    paddingLeft: 14,
+  },
+  nextShowHeader: {
+    position: 'absolute',
+    top: -20,
+    left: 0,
+  },
+  nextShowContent: {
+    flex: 1,
+    gap: 4,
+  },
+  nextShowTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timeIcon: {
+    marginRight: 2,
+  },
+  timeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  nextShowTitle: {
+    fontWeight: '600',
+  },
+  nextShowChevron: {
+    marginLeft: 8,
+  },
+
+  // Quick links section
+  linksSection: {
+    marginTop: 8,
+  },
+  quickLinks: {
+    flexDirection: 'row',
+    gap: 16,
+    flexWrap: 'wrap',
+  },
+  quickLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  quickLinkText: {
+    fontSize: 14,
+    fontWeight: '500',
+    opacity: 0.85,
+  },
+
+  // Back to top button
+  backToTopButton: {
+    position: 'absolute',
+    bottom: 20,
+    left: '45%',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  backToTopTouchable: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chevronIcon: {},
+})
