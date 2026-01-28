@@ -2,6 +2,7 @@
 
 import { Ionicons } from '@expo/vector-icons'
 import { useTheme } from '@react-navigation/native'
+import Constants from 'expo-constants'
 import React, { useCallback, useState } from 'react'
 import {
   Alert,
@@ -137,7 +138,7 @@ export default function SupportScreen() {
 
         {/* Version */}
         <Text style={[styles.versionText, { color: colors.text }]}>
-          App version 1.0.0
+          App version {Constants.expoConfig?.version ?? '1.0.0'}
         </Text>
       </ScrollView>
     </View>
