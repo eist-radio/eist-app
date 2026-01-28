@@ -14,6 +14,7 @@ import {
     StyleSheet,
     View,
 } from 'react-native';
+import { NotificationProvider } from '../context/NotificationContext';
 import { TrackPlayerProvider } from '../context/TrackPlayerContext';
 import { EistDarkTheme, EistLightTheme } from '../themes';
 
@@ -79,25 +80,27 @@ export default function RootLayout() {
         >
           <QueryClientProvider client={queryClient}>
             <TrackPlayerProvider>
-              <Suspense
-                fallback={
-                  <View style={styles.loader}>
-                    <ActivityIndicator size="large" />
-                  </View>
-                }
-              >
-                <ThemeProvider value={theme}>
-                  <Stack 
-                    screenOptions={{ 
-                      headerShown: false,
-                      gestureEnabled: true,
-                      gestureDirection: 'horizontal',
-                      animation: 'slide_from_right',
-                    }} 
-                  />
-                  <StatusBar style="auto" />
-                </ThemeProvider>
-              </Suspense>
+              <NotificationProvider>
+                <Suspense
+                  fallback={
+                    <View style={styles.loader}>
+                      <ActivityIndicator size="large" />
+                    </View>
+                  }
+                >
+                  <ThemeProvider value={theme}>
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        gestureEnabled: true,
+                        gestureDirection: 'horizontal',
+                        animation: 'slide_from_right',
+                      }}
+                    />
+                    <StatusBar style="auto" />
+                  </ThemeProvider>
+                </Suspense>
+              </NotificationProvider>
             </TrackPlayerProvider>
           </QueryClientProvider>
         </Animated.View>

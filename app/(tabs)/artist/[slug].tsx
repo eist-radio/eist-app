@@ -1,6 +1,7 @@
 // app/(tabs)/artist/[slug].tsx
 
 import { ArchiveShowCard } from '@/components/ArchiveShowCard';
+import { ArtistNotifyButton } from '@/components/ArtistNotifyButton';
 import { SelectableText } from '@/components/SelectableText';
 import { useArchiveShowsByArtist } from '@/hooks/useArchiveShows';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
@@ -552,6 +553,17 @@ export default function ArtistScreen() {
                       ))}
                     </View>
                   )}
+
+                  {/* Notify Button */}
+                  {artist.id && slug && (
+                    <View style={styles.notifyButtonContainer}>
+                      <ArtistNotifyButton
+                        artistId={artist.id}
+                        artistName={artist.name || 'Unnamed Artist'}
+                        artistSlug={slug}
+                      />
+                    </View>
+                  )}
                 </View>
               </View>
 
@@ -746,6 +758,9 @@ const styles = StyleSheet.create({
   socialsRow: {
     flexDirection: 'row',
     gap: 8,
+  },
+  notifyButtonContainer: {
+    marginTop: 12,
   },
   socialButton: {
     width: 36,

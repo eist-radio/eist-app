@@ -1,3 +1,4 @@
+import { ReminderButton } from '@/components/ReminderButton'
 import { SelectableThemedText } from '@/components/SelectableThemedText'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useTheme } from '@react-navigation/native'
@@ -54,6 +55,7 @@ type SectionRow = {
   id: string
   artistIds?: string[]
   artistName?: string
+  startDateUtc: string
 }
 
 type SectionData = {
@@ -282,52 +284,65 @@ export default function ScheduleScreen() {
             { opacity: isCurrent ? fadeAnim : 1 },
           ]}
         >
-          <Link href={`/show/${encodeURIComponent(item.id)}`} style={styles.showCardLink}>
-            <View style={styles.showCardInner}>
-              {/* Time column */}
-              <View style={styles.timeColumn}>
-                <Text style={[styles.startTime, { color: isCurrent ? colors.primary : colors.text }]}>
-                  {item.startTime}
-                </Text>
-                <Text style={[styles.endTime, { color: colors.text }]}>
-                  {item.endTime}
-                </Text>
-              </View>
-
-              {/* Content column */}
-              <View style={styles.contentColumn}>
-                <View style={styles.titleRow}>
-                  {isCurrent && <LiveIndicator />}
-                  <FormattedShowTitle
-                    title={item.title}
-                    color={colors.primary}
-                    size={17}
-                    style={[
-                      styles.showTitle,
-                      isCurrent && styles.showTitleCurrent,
-                    ]}
-                    numberOfLines={2}
-                  />
-                </View>
-                {artistName && (
-                  <Text
-                    style={[styles.artistName, { color: colors.text }]}
-                    numberOfLines={1}
-                  >
-                    {artistName}
+          <View style={styles.showCardRow}>
+            <Link href={`/show/${encodeURIComponent(item.id)}`} style={styles.showCardLink}>
+              <View style={styles.showCardInner}>
+                {/* Time column */}
+                <View style={styles.timeColumn}>
+                  <Text style={[styles.startTime, { color: isCurrent ? colors.primary : colors.text }]}>
+                    {item.startTime}
                   </Text>
-                )}
-              </View>
+                  <Text style={[styles.endTime, { color: colors.text }]}>
+                    {item.endTime}
+                  </Text>
+                </View>
 
-              {/* Chevron */}
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={colors.text + '60'}
-                style={styles.rowChevron}
+                {/* Content column */}
+                <View style={styles.contentColumn}>
+                  <View style={styles.titleRow}>
+                    {isCurrent && <LiveIndicator />}
+                    <FormattedShowTitle
+                      title={item.title}
+                      color={colors.primary}
+                      size={17}
+                      style={[
+                        styles.showTitle,
+                        isCurrent && styles.showTitleCurrent,
+                      ]}
+                      numberOfLines={2}
+                    />
+                  </View>
+                  {artistName && (
+                    <Text
+                      style={[styles.artistName, { color: colors.text }]}
+                      numberOfLines={1}
+                    >
+                      {artistName}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Chevron */}
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  color={colors.text + '60'}
+                  style={styles.rowChevron}
+                />
+              </View>
+            </Link>
+
+            {/* Reminder Button - outside Link to handle its own press */}
+            {!isCurrent && (
+              <ReminderButton
+                showId={item.id}
+                showTitle={item.title}
+                artistName={artistName}
+                startDateUtc={item.startDateUtc}
+                size={20}
               />
-            </View>
-          </Link>
+            )}
+          </View>
         </Animated.View>
       )
     },
@@ -531,6 +546,7 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
           title: it.title.trim(),
           id: it.id,
           artistIds: it.artistIds,
+          startDateUtc: it.startDateUtc,
         })),
       }
     })
@@ -585,6 +601,10 @@ const styles = StyleSheet.create({
   showCardCurrent: {
     borderLeftWidth: 3,
     backgroundColor: 'rgba(175, 252, 65, 0.08)',
+  },
+  showCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   showCardLink: {
     flex: 1,
