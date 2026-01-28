@@ -32,6 +32,7 @@ const TabIcon = ({
         { color },
         focused && styles.tabLabelActive
       ]}
+      numberOfLines={1}
     >
       {label}
     </Text>
@@ -262,6 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
+    minWidth: 50,
   },
   iconActive: {
     opacity: 1,
@@ -274,6 +276,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
+    textAlign: 'center',
   },
   tabLabelActive: {
     fontWeight: '700',
