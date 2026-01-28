@@ -30,6 +30,7 @@ import {
 } from 'react-native-gesture-handler';
 import { apiKey } from '../../../config';
 import { stripFormatting } from '../../../utils/stripFormatting';
+import { useTimezoneChange } from '../../../hooks/useTimezoneChange';
 
 // éist brand colors
 const COLORS = {
@@ -92,6 +93,24 @@ const BackToTopButton = ({
 
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
+
+// Patterns that indicate a repeat broadcast
+const REPEAT_PATTERNS = [
+  'éist arís',
+  'eist arís',
+  'eist aris',
+  'replay',
+  'repeat',
+  'from the archives',
+];
+
+type ScheduleItem = {
+  id: string;
+  title: string;
+  startDateUtc: string;
+  endDateUtc: string;
+  artistIds?: string[];
+};
 
 type RawArtist = {
   id: string;
@@ -160,6 +179,61 @@ const GenrePill = ({ genre }: { genre: string }) => (
   </View>
 );
 
+// Next show callout component
+const NextShowCallout = ({
+  dateStr,
+  onPress,
+}: {
+  dateStr: string;
+  onPress: () => void;
+}) => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(animatedValue, {
+      toValue: 1,
+      duration: 400,
+      delay: 200,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [animatedValue]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.nextShowCallout,
+        {
+          opacity: animatedValue,
+          transform: [
+            {
+              translateY: animatedValue.interpolate({
+                inputRange: [0, 1],
+                outputRange: [8, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <TouchableOpacity
+        onPress={onPress}
+        activeOpacity={0.7}
+        style={styles.nextShowTouchable}
+      >
+        <Ionicons name="calendar-outline" size={14} color={COLORS.highlight} />
+        <Text style={styles.nextShowLabel}>Next show:</Text>
+        <Text style={styles.nextShowTime}>{dateStr}</Text>
+        <Ionicons
+          name="chevron-forward"
+          size={12}
+          color={COLORS.lime}
+          style={styles.nextShowChevron}
+        />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
 function extractTagValue(
   tags: string[] | undefined,
   prefix: string
@@ -176,6 +250,49 @@ async function fetchArtistById(id: string): Promise<RawArtist> {
   const json = (await res.json()) as { artist?: RawArtist };
   if (!json.artist) throw new Error('Artist not found');
   return json.artist;
+}
+
+async function fetchNextShowForArtist(
+  artistId: string,
+  timezone: string
+): Promise<ScheduleItem | null> {
+  const now = new Date();
+  const weekAhead = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 2 weeks ahead
+
+  const startDate = now.toISOString();
+  const endDate = weekAhead.toISOString();
+
+  const url =
+    `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
+    `?startDate=${encodeURIComponent(startDate)}` +
+    `&endDate=${encodeURIComponent(endDate)}` +
+    `&timeZone=${encodeURIComponent(timezone)}`;
+
+  try {
+    const res = await fetch(url, {
+      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return null;
+
+    const json = (await res.json()) as { schedules?: ScheduleItem[] };
+    const schedules = json.schedules || [];
+
+    // Find the first show for this artist that is NOT a repeat
+    for (const show of schedules) {
+      if (show.artistIds?.includes(artistId)) {
+        const titleLower = show.title.toLowerCase();
+        const isRepeat = REPEAT_PATTERNS.some((pattern) =>
+          titleLower.includes(pattern)
+        );
+        if (!isRepeat) {
+          return show;
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 // Show card component for the grid
@@ -285,11 +402,19 @@ export default function ArtistScreen() {
   const { slug, id } = useLocalSearchParams<{ slug?: string; id?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
+  const currentTimezone = useTimezoneChange();
 
   const { data: artist } = useQuery({
     queryKey: ['artist', id],
     queryFn: () => fetchArtistById(id || ''),
     enabled: !!id,
+  });
+
+  const { data: nextShow } = useQuery({
+    queryKey: ['artist-next-show', id, currentTimezone],
+    queryFn: () => fetchNextShowForArtist(id || '', currentTimezone),
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const { shows: archivedShows } = useArchiveShowsByArtist(slug, 12);
@@ -471,6 +596,39 @@ export default function ArtistScreen() {
   const displayedShows = showAllShows ? archivedShows : archivedShows.slice(0, 8);
   const hasMoreShows = archivedShows.length > 8;
 
+  // Format next show date string
+  const formatNextShowDate = (isoString: string): string => {
+    const showTime = new Date(isoString);
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+    const tomorrowDate = new Date(now);
+    tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+    const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
+    const showDateStr = showTime.toISOString().split('T')[0];
+
+    const timeStr = showTime
+      .toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+      .toLowerCase()
+      .replace(' ', '');
+
+    if (showDateStr === todayStr) {
+      return `Today, ${timeStr}`;
+    } else if (showDateStr === tomorrowStr) {
+      return `Tomorrow, ${timeStr}`;
+    } else {
+      const dateFormatted = showTime.toLocaleDateString('en-US', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      });
+      return `${dateFormatted}, ${timeStr}`;
+    }
+  };
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <View style={styles.screen}>
@@ -536,6 +694,16 @@ export default function ArtistScreen() {
                         <GenrePill key={i} genre={genre} />
                       ))}
                     </View>
+                  )}
+
+                  {/* Next Show Callout */}
+                  {nextShow && (
+                    <NextShowCallout
+                      dateStr={formatNextShowDate(nextShow.startDateUtc)}
+                      onPress={() =>
+                        router.push(`/show/${encodeURIComponent(nextShow.id)}`)
+                      }
+                    />
                   )}
 
                   {/* Social Icons */}
@@ -744,6 +912,39 @@ const styles = StyleSheet.create({
     color: COLORS.lime,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+  },
+
+  // Next Show Callout
+  nextShowCallout: {
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+  },
+  nextShowTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: 'rgba(150, 191, 230, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(150, 191, 230, 0.35)',
+    borderRadius: 4,
+  },
+  nextShowLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(150, 191, 230, 0.85)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  nextShowTime: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: COLORS.lime,
+    letterSpacing: 0.2,
+  },
+  nextShowChevron: {
+    marginLeft: 2,
   },
 
   // Social Buttons
