@@ -9,7 +9,6 @@ import {
   Image,
   Linking,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -18,25 +17,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 const logoImage = require('../../assets/images/eist-logo-header.png')
 
-// éist brand colors (matching artist page)
 const COLORS = {
   eist: '#4733FF',
   lime: '#AFFC41',
   limeSubtle: 'rgba(175, 252, 65, 0.08)',
   limeBorder: 'rgba(175, 252, 65, 0.25)',
-}
-
-// Feature item component
-const FeatureItem = ({ icon, text }: { icon: string; text: string }) => {
-  const { colors } = useTheme()
-  return (
-    <View style={styles.featureItem}>
-      <View style={styles.featureIconContainer}>
-        <Ionicons name={icon as any} size={18} color={COLORS.lime} />
-      </View>
-      <Text style={[styles.featureText, { color: colors.text }]}>{text}</Text>
-    </View>
-  )
 }
 
 export default function DiscordScreen() {
@@ -71,7 +56,7 @@ export default function DiscordScreen() {
     <View
       style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 48 }]}
     >
-      {/* Header with title and logo */}
+      {/* Header */}
       <View style={styles.titleContainer}>
         <SelectableThemedText style={[styles.title, { color: colors.primary }]}>
           Discord
@@ -87,74 +72,41 @@ export default function DiscordScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Discord Icon Card */}
+      {/* Content */}
+      <View style={styles.content}>
         <View style={styles.iconCard}>
           <View style={styles.iconWrapper}>
             <Ionicons name="logo-discord" size={64} color={COLORS.lime} />
           </View>
         </View>
 
-        {/* Description Section */}
-        <View style={styles.descriptionSection}>
-          <Text style={[styles.heading, { color: colors.primary }]}>Join the Community</Text>
-          <Text style={[styles.description, { color: colors.text }]}>
-            Connect with fellow listeners, chat with DJs, and stay updated on upcoming shows and
-            events.
+        <Text style={[styles.heading, { color: colors.primary }]}>Join the Community</Text>
+        <Text style={[styles.description, { color: colors.text }]}>
+          Chat with DJs and listeners, get show updates, and discover new music.
+        </Text>
+
+        <Pressable
+          onPressIn={() => setButtonPressed(true)}
+          onPressOut={() => setButtonPressed(false)}
+          onPress={joinDiscord}
+          disabled={isLoading}
+          style={[
+            styles.button,
+            buttonPressed && styles.buttonPressed,
+            isLoading && styles.buttonDisabled,
+          ]}
+        >
+          <Ionicons
+            name="logo-discord"
+            size={20}
+            color={buttonPressed ? COLORS.lime : COLORS.eist}
+            style={styles.buttonIcon}
+          />
+          <Text style={[styles.buttonText, buttonPressed && styles.buttonTextPressed]}>
+            {isLoading ? 'Opening...' : 'Join Discord'}
           </Text>
-        </View>
-
-        {/* Divider */}
-        <View style={[styles.divider, { backgroundColor: colors.primary + '25' }]} />
-
-        {/* Features */}
-        <View style={styles.featuresSection}>
-          <Text style={[styles.sectionLabel, { color: colors.primary + '99' }]}>WHAT TO EXPECT</Text>
-          <View style={styles.featuresList}>
-            <FeatureItem icon="chatbubbles-outline" text="Live chat during broadcasts" />
-            <FeatureItem icon="musical-notes-outline" text="Music recommendations & discovery" />
-            <FeatureItem icon="notifications-outline" text="Show announcements & updates" />
-            <FeatureItem icon="people-outline" text="A friendly community of music lovers" />
-          </View>
-        </View>
-
-        {/* Divider */}
-        <View style={[styles.divider, { backgroundColor: colors.primary + '25' }]} />
-
-        {/* Join Button */}
-        <View style={styles.buttonSection}>
-          <Pressable
-            onPressIn={() => setButtonPressed(true)}
-            onPressOut={() => setButtonPressed(false)}
-            onPress={joinDiscord}
-            disabled={isLoading}
-            style={[
-              styles.joinButton,
-              buttonPressed && styles.joinButtonPressed,
-              isLoading && styles.joinButtonDisabled,
-            ]}
-          >
-            <Ionicons
-              name="logo-discord"
-              size={20}
-              color={buttonPressed ? COLORS.lime : COLORS.eist}
-              style={styles.buttonIcon}
-            />
-            <Text
-              style={[styles.buttonText, buttonPressed && styles.buttonTextPressed]}
-            >
-              {isLoading ? 'Opening...' : 'Join the Discord Server'}
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Bottom spacing */}
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
+        </Pressable>
+      </View>
     </View>
   )
 }
@@ -184,14 +136,12 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     padding: 6,
   },
-  scrollView: {
+  content: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 80,
   },
-  scrollContent: {
-    paddingBottom: 24,
-  },
-
-  // Icon Card
   iconCard: {
     alignItems: 'center',
     marginBottom: 32,
@@ -206,71 +156,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
-  // Description Section
-  descriptionSection: {
-    marginBottom: 24,
-  },
   heading: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: '700',
     marginBottom: 12,
-    letterSpacing: -0.3,
+    textAlign: 'center',
   },
   description: {
     fontSize: 16,
     lineHeight: 24,
-    opacity: 0.85,
+    textAlign: 'center',
+    opacity: 0.8,
+    maxWidth: 300,
+    marginBottom: 32,
   },
-
-  // Divider
-  divider: {
-    height: 1,
-    width: '100%',
-    marginVertical: 24,
-  },
-
-  // Features Section
-  featuresSection: {
-    marginBottom: 8,
-  },
-  sectionLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginBottom: 16,
-  },
-  featuresList: {
-    gap: 16,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  featureIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: COLORS.limeSubtle,
-    borderWidth: 1,
-    borderColor: COLORS.limeBorder,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  featureText: {
-    fontSize: 15,
-    fontWeight: '500',
-    flex: 1,
-  },
-
-  // Button Section
-  buttonSection: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  joinButton: {
+  button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -279,14 +179,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     borderRadius: 8,
     width: '100%',
+    maxWidth: 280,
     borderWidth: 1,
     borderColor: COLORS.lime,
   },
-  joinButtonPressed: {
+  buttonPressed: {
     backgroundColor: 'transparent',
     borderColor: COLORS.lime,
   },
-  joinButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.7,
   },
   buttonIcon: {
@@ -300,9 +201,5 @@ const styles = StyleSheet.create({
   },
   buttonTextPressed: {
     color: COLORS.lime,
-  },
-
-  bottomSpacer: {
-    height: 24,
   },
 })
