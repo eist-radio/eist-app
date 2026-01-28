@@ -47,23 +47,32 @@ function normalizeSlug(name: string): string {
     .replace(/-+/g, '-'); // Collapse multiple hyphens
 }
 
+type ArtistShowData = {
+  isActive: boolean;
+  showCount: number;
+};
+
 /**
- * Determine which artists are "active" based on show data.
+ * Compute show data for artists including active status and show counts.
  * An artist is active if:
  * 1. They had a scheduled (non-repeat) show in the past 40 days, OR
  * 2. They have archived shows in the last 3 months, OR
  * 3. They have more than 3 total archived shows
  */
-function computeActiveArtists(shows: ArchiveShow[]): Set<string> {
+function computeArtistShowData(shows: ArchiveShow[]): Map<string, ArtistShowData> {
   const now = new Date();
   const fortyDaysAgo = new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000);
   const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
 
   const artistStats = new Map<string, ArtistStats>();
+  const showCounts = new Map<string, number>();
 
   for (const show of shows) {
     const slug = show.artistSlug;
     if (!slug) continue;
+
+    // Count all shows for each artist (for display purposes)
+    showCounts.set(slug, (showCounts.get(slug) || 0) + 1);
 
     const hasArchive = !!(show.mixcloud_match || show.soundcloud_match);
     const isRepeat = show.title.toLowerCase().includes('ist ar'); // "éist arís" or "eist aris"
@@ -94,25 +103,31 @@ function computeActiveArtists(shows: ArchiveShow[]): Set<string> {
     }
   }
 
-  // Determine active status
-  const activeArtists = new Set<string>();
+  // Build result map with active status and show counts
+  const result = new Map<string, ArtistShowData>();
   for (const [slug, stats] of artistStats) {
+    let isActive = false;
+
     // Rule 1: Scheduled non-repeat show in past 40 days = always active
     if (stats.recent40NonRepeat) {
-      activeArtists.add(slug);
-      continue;
+      isActive = true;
     }
-
     // Rule 2: No recent scheduled shows AND no archived shows in 3 months AND ≤3 total archived = inactive
-    if (!stats.recent3moArchived && stats.totalArchived <= 3) {
-      continue; // inactive
+    else if (!stats.recent3moArchived && stats.totalArchived <= 3) {
+      isActive = false;
+    }
+    // Rule 3: Has archived shows (not caught by rule 2) = active
+    else {
+      isActive = true;
     }
 
-    // Rule 3: Has archived shows (not caught by rule 2) = active
-    activeArtists.add(slug);
+    result.set(slug, {
+      isActive,
+      showCount: showCounts.get(slug) || 0,
+    });
   }
 
-  return activeArtists;
+  return result;
 }
 
 async function fetchArtists(): Promise<DerivedArtist[]> {
@@ -126,21 +141,22 @@ async function fetchArtists(): Promise<DerivedArtist[]> {
 
   const data = (await res.json()) as ArtistsResponse;
 
-  // Get active artists from local shows data
+  // Get artist show data from local shows data
   const shows = localShowsData as ArchiveShow[];
-  const activeArtists = computeActiveArtists(shows);
+  const artistShowData = computeArtistShowData(shows);
 
   return (data.artists || [])
     .filter((artist) => artist.name)
     .map((artist) => {
       const slug = normalizeSlug(artist.name!);
+      const showData = artistShowData.get(slug);
       return {
         id: artist.id,
         slug,
         name: artist.name!,
-        showCount: 0,
+        showCount: showData?.showCount ?? 0,
         imageUrl: getArtistImage(artist.logo),
-        isActive: activeArtists.has(slug),
+        isActive: showData?.isActive ?? false,
       };
     })
     .filter((artist) => artist.isActive) // Only show active artists
