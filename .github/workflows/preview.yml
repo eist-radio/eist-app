@@ -26,6 +26,17 @@ jobs:
 
       - name: Build web app (expo export)
         run: npx expo export --platform web
+        env:
+          API_KEY: ${{ secrets.RADIOCULT_API_KEY }}
+
+      - name: Fix Netlify node_modules exclusion
+        run: |
+          # Netlify ignores node_modules folders, rename to vendor
+          if [ -d "dist/assets/node_modules" ]; then
+            mv dist/assets/node_modules dist/assets/vendor
+            # Update all HTML files to reference vendor instead of node_modules
+            find dist -name "*.html" -exec sed -i 's|/assets/node_modules/|/assets/vendor/|g' {} +
+          fi
 
       - name: Deploy to Netlify Preview (nwtgck/actions-netlify@v3.0)
         uses: nwtgck/actions-netlify@v3.0
