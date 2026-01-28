@@ -12,10 +12,10 @@ jobs:
   preview:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
+      - name: Checkout code (actions/checkout@v4)
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 20 (actions/setup-node@v4)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -27,7 +27,7 @@ jobs:
       - name: Build web app (expo export)
         run: npx expo export --platform web
 
-      - name: Deploy to Netlify Preview
+      - name: Deploy to Netlify Preview (nwtgck/actions-netlify@v3.0)
         uses: nwtgck/actions-netlify@v3.0
         with:
           publish-dir: dist
