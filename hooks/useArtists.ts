@@ -145,20 +145,37 @@ async function fetchArtists(): Promise<DerivedArtist[]> {
   const shows = localShowsData as ArchiveShow[];
   const artistShowData = computeArtistShowData(shows);
 
-  return (data.artists || [])
-    .filter((artist) => artist.name)
-    .map((artist) => {
-      const slug = normalizeSlug(artist.name!);
-      const showData = artistShowData.get(slug);
-      return {
-        id: artist.id,
-        slug,
-        name: artist.name!,
-        showCount: showData?.showCount ?? 0,
-        imageUrl: getArtistImage(artist.logo),
-        isActive: showData?.isActive ?? false,
-      };
-    })
+  // Deduplicate artists by slug, keeping the one with the most complete profile
+  const artistsBySlug = new Map<string, DerivedArtist>();
+
+  for (const artist of data.artists || []) {
+    if (!artist.name) continue;
+
+    const slug = normalizeSlug(artist.name);
+    const showData = artistShowData.get(slug);
+    const imageUrl = getArtistImage(artist.logo);
+
+    const derived: DerivedArtist = {
+      id: artist.id,
+      slug,
+      name: artist.name,
+      showCount: showData?.showCount ?? 0,
+      imageUrl,
+      isActive: showData?.isActive ?? false,
+    };
+
+    const existing = artistsBySlug.get(slug);
+    if (!existing) {
+      artistsBySlug.set(slug, derived);
+    } else {
+      // Keep the artist with more data (prefer one with image)
+      if (!existing.imageUrl && derived.imageUrl) {
+        artistsBySlug.set(slug, derived);
+      }
+    }
+  }
+
+  return Array.from(artistsBySlug.values())
     .filter((artist) => artist.isActive) // Only show active artists
     .sort((a, b) => a.name.localeCompare(b.name));
 }
