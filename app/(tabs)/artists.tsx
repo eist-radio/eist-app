@@ -95,8 +95,9 @@ export default function ArtistsScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.loadingScreen, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.primary }]}>Loading artists...</Text>
       </View>
     );
   }
@@ -189,6 +190,16 @@ export default function ArtistsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
+  loadingScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
   title: { fontSize: 28, fontWeight: '700', marginBottom: 8, paddingTop: 10 },
   list: { paddingBottom: 16, paddingTop: 8 },
   row: {

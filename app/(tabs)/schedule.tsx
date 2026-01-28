@@ -377,8 +377,9 @@ export default function ScheduleScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.loadingScreen, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[styles.loadingText, { color: colors.primary }]}>Loading schedule...</Text>
       </View>
     )
   }
@@ -540,6 +541,16 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
  
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: 16 },
+  loadingScreen: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
   title: { fontSize: 28, fontWeight: '700', marginBottom: 8, paddingTop: 10 },
   list: { paddingBottom: 24 },
   titleContainer: {
