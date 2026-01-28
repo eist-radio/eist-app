@@ -30,8 +30,8 @@ const ArtistCardComponent: React.FC<ArtistCardProps> = ({ artist, imageUrl }) =>
   const imageSize = cardWidth - 16;
 
   const handlePress = useCallback(() => {
-    router.push(`/artist/${encodeURIComponent(artist.slug)}`);
-  }, [router, artist.slug]);
+    router.push(`/artist/${encodeURIComponent(artist.slug)}?id=${encodeURIComponent(artist.id)}`);
+  }, [router, artist.slug, artist.id]);
 
   return (
     <Pressable onPress={handlePress} style={[styles.card, { width: cardWidth }]}>

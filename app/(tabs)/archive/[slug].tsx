@@ -70,8 +70,8 @@ function getShowImage(show: any): string | null {
     const pics = show.mixcloud_match.pictures;
     return pics['1024wx1024h'] || pics['768wx768h'] || pics['640wx640h'] || pics.extra_large || null;
   }
-  if (show?.soundcloud_match?.artwork_url) {
-    return show.soundcloud_match.artwork_url.replace('-large', '-t500x500');
+  if (show?.soundcloud_match?.thumbnail) {
+    return show.soundcloud_match.thumbnail;
   }
   return null;
 }
@@ -90,8 +90,8 @@ function getPlayUrl(show: any): string | null {
   if (show?.mixcloud_match?.url) {
     return show.mixcloud_match.url;
   }
-  if (show?.soundcloud_match?.permalink_url) {
-    return show.soundcloud_match.permalink_url;
+  if (show?.soundcloud_match?.url) {
+    return show.soundcloud_match.url;
   }
   return null;
 }

@@ -34,11 +34,11 @@ export type MixcloudMatch = {
 };
 
 export type SoundcloudMatch = {
-  id: number;
+  id: string;
   title: string;
-  permalink_url: string;
-  artwork_url?: string;
-  description?: string;
+  url: string;
+  thumbnail?: string | null;
+  description?: string | null;
   score: number;
 };
 
@@ -59,10 +59,12 @@ export type ArchiveShow = {
 };
 
 export type DerivedArtist = {
+  id: string;
   slug: string;
   name: string;
   showCount: number;
   imageUrl?: string | null;
+  isActive?: boolean;
 };
 
 export type ArchiveSection = {

@@ -99,8 +99,8 @@ function extractTagValue(tags: string[] | undefined, prefix: string): string | u
   return found ? found.replace(prefix, '').toLowerCase() : undefined;
 }
 
-async function fetchArtistBySlug(slug: string): Promise<RawArtist> {
-  const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(slug)}`;
+async function fetchArtistById(id: string): Promise<RawArtist> {
+  const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(id)}`;
   const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
   if (!res.ok) throw new Error(`Artist fetch failed: ${res.statusText}`);
   const json = (await res.json()) as { artist?: RawArtist };
@@ -109,15 +109,15 @@ async function fetchArtistBySlug(slug: string): Promise<RawArtist> {
 }
 
 export default function ArtistScreen() {
-  const { slug } = useLocalSearchParams<{ slug?: string }>();
+  const { slug, id } = useLocalSearchParams<{ slug?: string; id?: string }>();
   const { colors } = useTheme();
   const router = useRouter();
 
   // Move all hooks to the top before any conditional returns
   const { data: artist } = useQuery({
-    queryKey: ['artist', slug],
-    queryFn: () => fetchArtistBySlug(slug || ''),
-    enabled: !!slug, // Only run query if slug exists
+    queryKey: ['artist', id],
+    queryFn: () => fetchArtistById(id || ''),
+    enabled: !!id, // Only run query if id exists
   });
 
   // Fetch archived shows for this artist
@@ -249,7 +249,7 @@ export default function ArtistScreen() {
     }
   }, [router]);
 
-  if (!slug) {
+  if (!id) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         <Text style={{ color: colors.notification }}>

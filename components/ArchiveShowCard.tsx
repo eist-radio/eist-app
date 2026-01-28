@@ -22,9 +22,8 @@ function getShowImage(show: ArchiveShow): string | null {
     return pics['640wx640h'] || pics.extra_large || pics.large || pics.medium || null;
   }
   // Fallback to SoundCloud
-  if (show.soundcloud_match?.artwork_url) {
-    // SoundCloud returns small images by default, try to get larger
-    return show.soundcloud_match.artwork_url.replace('-large', '-t500x500');
+  if (show.soundcloud_match?.thumbnail) {
+    return show.soundcloud_match.thumbnail;
   }
   return null;
 }
