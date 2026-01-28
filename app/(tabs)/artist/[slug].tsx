@@ -135,6 +135,9 @@ type RawArtist = {
 };
 
 // Social icon button component
+// Brand icons that need the 'brand' prop in FontAwesome5
+const FA5_BRAND_ICONS = ['instagram', 'soundcloud', 'mixcloud', 'twitter', 'facebook'];
+
 const SocialButton = ({
   icon,
   iconPack = 'ionicons',
@@ -147,6 +150,7 @@ const SocialButton = ({
   label: string;
 }) => {
   const [pressed, setPressed] = useState(false);
+  const isBrandIcon = FA5_BRAND_ICONS.includes(icon);
 
   return (
     <Pressable
@@ -161,6 +165,7 @@ const SocialButton = ({
           name={icon}
           size={16}
           color={pressed ? COLORS.eist : COLORS.lime}
+          brand={isBrandIcon}
         />
       ) : (
         <Ionicons
