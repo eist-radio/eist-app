@@ -6,6 +6,7 @@ import { useArchiveShowsByArtist } from '@/hooks/useArchiveShows';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,8 +14,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  FlatList,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -202,14 +201,14 @@ const ShowCard = ({
   }, [animatedValue, index]);
 
   const getShowImage = () => {
-    if (show.mixcloud_match?.pictures) {
-      const pics = show.mixcloud_match.pictures;
-      return (
-        pics['640wx640h'] || pics.extra_large || pics.large || pics.medium
-      );
-    }
+    // Try SoundCloud thumbnail first
     if (show.soundcloud_match?.thumbnail) {
       return show.soundcloud_match.thumbnail;
+    }
+    // Try Mixcloud pictures
+    if (show.mixcloud_match?.pictures) {
+      const pics = show.mixcloud_match.pictures;
+      return pics['640wx640h'] || pics.extra_large || pics.large || pics.medium || null;
     }
     return null;
   };
@@ -258,7 +257,7 @@ const ShowCard = ({
                 : require('../../../assets/images/eist_online.png')
             }
             style={styles.showImage}
-            resizeMode="cover"
+            contentFit="cover"
             onError={() => setImageFailed(true)}
           />
           <LinearGradient
@@ -498,7 +497,7 @@ export default function ArtistScreen() {
                       key={`${artist.id}-${preloadedImageUrl || 'fallback'}`}
                       source={imageSource}
                       style={styles.heroImage}
-                      resizeMode="cover"
+                      contentFit="cover"
                       onError={() => {
                         setImageFailed(true);
                         setPreloadedImageUrl(null);

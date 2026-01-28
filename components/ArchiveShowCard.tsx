@@ -2,9 +2,10 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ArchiveShow } from '../types/archive';
 import { FormattedShowTitle } from './FormattedShowTitle';
 
@@ -16,14 +17,14 @@ interface ArchiveShowCardProps {
 }
 
 function getShowImage(show: ArchiveShow): string | null {
-  // Prefer Mixcloud images
+  // Try SoundCloud thumbnail first (more reliable)
+  if (show.soundcloud_match?.thumbnail) {
+    return show.soundcloud_match.thumbnail;
+  }
+  // Try Mixcloud pictures
   if (show.mixcloud_match?.pictures) {
     const pics = show.mixcloud_match.pictures;
     return pics['640wx640h'] || pics.extra_large || pics.large || pics.medium || null;
-  }
-  // Fallback to SoundCloud
-  if (show.soundcloud_match?.thumbnail) {
-    return show.soundcloud_match.thumbnail;
   }
   return null;
 }
@@ -53,8 +54,7 @@ const ArchiveShowCardComponent: React.FC<ArchiveShowCardProps> = ({ show, compac
     router.push(`/archive/${encodeURIComponent(show.slug)}`);
   }, [router, show.slug]);
 
-  const imageSource =
-    imageUrl && !imageFailed ? { uri: imageUrl } : fallbackImage;
+  const imageSource = imageUrl && !imageFailed ? imageUrl : fallbackImage;
 
   const screenWidth = Dimensions.get('window').width;
   const cardWidth = compact ? (screenWidth - 48) / 2 : screenWidth - 32;
@@ -65,8 +65,9 @@ const ArchiveShowCardComponent: React.FC<ArchiveShowCardProps> = ({ show, compac
       <Pressable onPress={handlePress} style={[styles.compactCard, { width: cardWidth }]}>
         <Image
           source={imageSource}
+          placeholder={fallbackImage}
           style={[styles.compactImage, { width: imageSize, height: imageSize }]}
-          resizeMode="cover"
+          contentFit="cover"
           onError={handleImageError}
         />
         <View style={styles.compactContent}>
@@ -98,8 +99,9 @@ const ArchiveShowCardComponent: React.FC<ArchiveShowCardProps> = ({ show, compac
     <Pressable onPress={handlePress} style={styles.card}>
       <Image
         source={imageSource}
+        placeholder={fallbackImage}
         style={styles.image}
-        resizeMode="cover"
+        contentFit="cover"
         onError={handleImageError}
       />
       <View style={styles.content}>

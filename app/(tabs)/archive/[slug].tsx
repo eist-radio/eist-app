@@ -3,6 +3,7 @@
 import { SelectableText } from '@/components/SelectableText';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -10,7 +11,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -196,14 +196,14 @@ const RelatedShowCard = ({
   }, [animatedValue, index]);
 
   const getShowImage = () => {
-    if (show.mixcloud_match?.pictures) {
-      const pics = show.mixcloud_match.pictures;
-      return (
-        pics['640wx640h'] || pics.extra_large || pics.large || pics.medium
-      );
-    }
+    // Try SoundCloud thumbnail first
     if (show.soundcloud_match?.thumbnail) {
       return show.soundcloud_match.thumbnail;
+    }
+    // Try Mixcloud pictures
+    if (show.mixcloud_match?.pictures) {
+      const pics = show.mixcloud_match.pictures;
+      return pics['640wx640h'] || pics.extra_large || pics.large || pics.medium || null;
     }
     return null;
   };
@@ -252,7 +252,7 @@ const RelatedShowCard = ({
                 : fallbackImage
             }
             style={styles.relatedImage}
-            resizeMode="cover"
+            contentFit="cover"
             onError={() => setImageFailed(true)}
           />
           <LinearGradient
@@ -277,18 +277,14 @@ const RelatedShowCard = ({
 };
 
 function getShowImage(show: any): string | null {
-  if (show?.mixcloud_match?.pictures) {
-    const pics = show.mixcloud_match.pictures;
-    return (
-      pics['1024wx1024h'] ||
-      pics['768wx768h'] ||
-      pics['640wx640h'] ||
-      pics.extra_large ||
-      null
-    );
-  }
+  // Try SoundCloud thumbnail first
   if (show?.soundcloud_match?.thumbnail) {
     return show.soundcloud_match.thumbnail;
+  }
+  // Try Mixcloud pictures (prefer larger sizes for hero)
+  if (show?.mixcloud_match?.pictures) {
+    const pics = show.mixcloud_match.pictures;
+    return pics['1024wx1024h'] || pics['768wx768h'] || pics['640wx640h'] || pics.extra_large || null;
   }
   return null;
 }
@@ -445,7 +441,7 @@ export default function ArchiveShowScreen() {
                     <Image
                       source={imageSource}
                       style={styles.heroImage}
-                      resizeMode="cover"
+                      contentFit="cover"
                       onError={() => setImageFailed(true)}
                     />
                     <LinearGradient

@@ -7,9 +7,73 @@ import { ArchiveSection, ArchiveShow } from '../types/archive';
 // TODO: Switch to remote fetch when shows.json is hosted
 import localShowsData from '../assets/data/shows.json';
 
+// Archive start date - exclude shows before this date (matching website)
+const ARCHIVE_START_DATE = '2025-02-01';
+
+// Test broadcast titles to exclude (matching website)
+const TEST_BROADCAST_TITLES = [
+  'box test',
+  'box test 2',
+  'playlisting test',
+  'mensajito_eist_test',
+  'mystery test broadcast',
+  'stay tuned...',
+];
+
+// Check if show title indicates a repeat broadcast
+function isRepeatBroadcast(title: string): boolean {
+  if (!title) return false;
+  const titleLower = title.toLowerCase();
+  const patterns = [
+    'éist arís',
+    'eist aris',
+    'rebroadcast',
+    'replay',
+    'repeat',
+    'from the archives',
+  ];
+  return patterns.some((p) => titleLower.includes(p));
+}
+
+// Check if a show has archived content (Mixcloud or SoundCloud)
+function hasArchivedContent(show: ArchiveShow): boolean {
+  return !!(show.mixcloud_match || show.soundcloud_match);
+}
+
+// Check if a show should be excluded from the archive
+function shouldExcludeShow(show: ArchiveShow): boolean {
+  const title = show.title || '';
+
+  // Exclude repeat broadcasts
+  if (isRepeatBroadcast(title)) {
+    return true;
+  }
+
+  // Exclude test broadcasts
+  if (TEST_BROADCAST_TITLES.includes(title.toLowerCase())) {
+    return true;
+  }
+
+  // Exclude shows before archive start date
+  if (show.start) {
+    const showDate = show.start.slice(0, 10); // Extract YYYY-MM-DD
+    if (showDate < ARCHIVE_START_DATE) {
+      return true;
+    }
+  }
+
+  // Exclude shows without archived content (matching website default behavior)
+  if (!hasArchivedContent(show)) {
+    return true;
+  }
+
+  return false;
+}
+
 async function fetchArchiveShows(): Promise<ArchiveShow[]> {
-  // Use bundled local data for now
-  return localShowsData as ArchiveShow[];
+  // Use bundled local data and filter according to website rules
+  const allShows = localShowsData as ArchiveShow[];
+  return allShows.filter((show) => !shouldExcludeShow(show));
 }
 
 function groupShowsByMonth(shows: ArchiveShow[]): ArchiveSection[] {
