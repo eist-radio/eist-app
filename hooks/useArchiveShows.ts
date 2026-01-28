@@ -4,7 +4,34 @@ import { useQuery } from '@tanstack/react-query';
 import { ArchiveSection, ArchiveShow } from '../types/archive';
 
 // For local development, import bundled data
-// TODO: Switch to remote fetch when shows.json is hosted
+// TODO: Before production deploy, switch to remote fetch:
+//
+// 1. WEBSITE (../eist/.github/workflows/deploy.yml):
+//    Add step after "Generate show cache" to copy shows.json to static folder:
+//      - name: Copy shows.json to static for API access
+//        run: mkdir -p static/data && cp data/shows.json static/data/
+//    This serves it at https://eist.radio/data/shows.json (or use obscured path)
+//
+// 2. APP (this file):
+//    Update fetchArchiveShows() to fetch from remote URL with local fallback:
+//      const SHOWS_URL = 'https://eist.radio/data/shows.json';
+//      async function fetchArchiveShows(): Promise<ArchiveShow[]> {
+//        try {
+//          const res = await fetch(SHOWS_URL);
+//          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+//          const allShows = await res.json();
+//          return allShows.filter((show) => !shouldExcludeShow(show));
+//        } catch (error) {
+//          console.warn('Failed to fetch remote shows, using bundled data:', error);
+//          return (localShowsData as ArchiveShow[]).filter((show) => !shouldExcludeShow(show));
+//        }
+//      }
+//
+// 3. CONSIDER: shows.json is ~2.9MB raw (~550KB gzipped). May want to:
+//    - Increase staleTime (currently 10 min) to reduce fetches
+//    - Trim unused fields (e.g., Mixcloud pictures has 10 sizes, app only needs 1-2)
+//    - Add If-Modified-Since/ETag support to avoid re-downloading unchanged data
+//
 import localShowsData from '../assets/data/shows.json';
 
 // Archive start date - exclude shows before this date (matching website)
