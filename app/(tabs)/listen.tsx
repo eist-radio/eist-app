@@ -3,6 +3,7 @@
 import { SelectableText } from '@/components/SelectableText'
 import { Ionicons } from '@expo/vector-icons'
 import { useFocusEffect, useTheme } from '@react-navigation/native'
+import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -12,7 +13,7 @@ import {
     Animated,
     AppState,
     Dimensions,
-    Image,
+    Image as RNImage,
     Linking,
     Platform,
     RefreshControl,
@@ -196,8 +197,8 @@ export default function ListenScreen() {
         }
       } else {
         // React Native environment
-        if (typeof Image.prefetch === 'function') {
-          Image.prefetch(uri)
+        if (typeof RNImage.prefetch === 'function') {
+          RNImage.prefetch(uri)
             .then(() => {
               resolve(true)
             })
@@ -689,7 +690,7 @@ export default function ListenScreen() {
             key={`${artistId}-${remoteImageUrl || 'fallback'}`}
             source={getImageSource()}
             style={styles.heroImage}
-            resizeMode="cover"
+            contentFit="cover"
             onError={handleImageError}
           />
 
@@ -724,7 +725,7 @@ export default function ListenScreen() {
             <Image
               source={logoImage}
               style={styles.logo}
-              resizeMode="contain"
+              contentFit="contain"
             />
           </TouchableOpacity>
 
