@@ -1,42 +1,69 @@
 // app/(tabs)/_layout.tsx
 
 import { Ionicons } from '@expo/vector-icons'
-import { faMixcloud, faSoundcloud } from '@fortawesome/free-brands-svg-icons'
-import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome'
 import { useTheme } from '@react-navigation/native'
 import { Tabs, useRouter } from 'expo-router'
 import React, { useRef, useState } from 'react'
-import { Platform, View } from 'react-native'
+import { Platform, StyleSheet, Text, View } from 'react-native'
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler'
+
+// Custom tab bar icon with label - inspired by NTS's clean approach
+const TabIcon = ({
+  name,
+  label,
+  color,
+  focused
+}: {
+  name: keyof typeof Ionicons.glyphMap
+  label: string
+  color: string
+  focused: boolean
+}) => (
+  <View style={styles.tabIconContainer}>
+    <Ionicons
+      name={name}
+      size={22}
+      color={color}
+      style={focused ? styles.iconActive : styles.iconInactive}
+    />
+    <Text
+      style={[
+        styles.tabLabel,
+        { color },
+        focused && styles.tabLabelActive
+      ]}
+    >
+      {label}
+    </Text>
+  </View>
+)
 
 export default function TabLayout() {
   const { colors } = useTheme()
   const router = useRouter()
   const ACTIVE = colors.primary
-  const INACTIVE = 'rgba(175, 252, 65, 0.5)'
-  
-  // Tab order for navigation
-  const tabOrder = ['listen', 'schedule', 'archive', 'artists', 'discord', 'instagram', 'soundcloud', 'mixcloud']
+  const INACTIVE = 'rgba(175, 252, 65, 0.4)'
+
+  // Tab order for navigation - 6 main tabs
+  const tabOrder = ['listen', 'schedule', 'archive', 'artists', 'social', 'support']
   const [currentTab, setCurrentTab] = useState<string>('listen')
   const gestureStartX = useRef<number>(0)
-  
+
   const handleSwipeGesture = (event: any) => {
     const { translationX, velocityX, state, absoluteX, translationY } = event.nativeEvent
-    
+
     if (state === State.BEGAN) {
       gestureStartX.current = absoluteX
     }
-    
+
     if (state === State.END) {
-      const edgeThreshold = Platform.OS === 'ios' ? 30 : 20 // Larger threshold on iOS
-      const swipeThreshold = Platform.OS === 'ios' ? 120 : 100 // Higher threshold on iOS
-      
-      // Only handle horizontal swipes, ignore vertical scrolls
+      const edgeThreshold = Platform.OS === 'ios' ? 30 : 20
+      const swipeThreshold = Platform.OS === 'ios' ? 120 : 100
+
       if (Math.abs(translationX) > Math.abs(translationY)) {
-        // Check if gesture started from left edge and moved right
         const isSwipeFromEdge = gestureStartX.current < edgeThreshold
         const isSwipeRight = translationX > swipeThreshold && velocityX > (Platform.OS === 'ios' ? 400 : 300)
-        
+
         if (isSwipeFromEdge && isSwipeRight) {
           const currentIndex = tabOrder.indexOf(currentTab)
           if (currentIndex > 0) {
@@ -68,10 +95,16 @@ export default function TabLayout() {
               tabBarInactiveTintColor: INACTIVE,
               tabBarStyle: {
                 backgroundColor: colors.card,
-                marginTop: 12,
-                borderTopWidth: 0,
+                borderTopWidth: 1,
+                borderTopColor: 'rgba(175, 252, 65, 0.1)',
+                height: Platform.OS === 'ios' ? 84 : 64,
+                paddingTop: 8,
+                paddingBottom: Platform.OS === 'ios' ? 28 : 8,
                 elevation: 0,
                 shadowOpacity: 0,
+              },
+              tabBarItemStyle: {
+                paddingVertical: 4,
               },
             }}
             screenListeners={{
@@ -86,11 +119,12 @@ export default function TabLayout() {
             <Tabs.Screen
               name="listen"
               options={{
-                tabBarIcon: ({ color, size }) => (
-                  <Ionicons
-                    name="radio-outline"
-                    size={(size ?? 26) * 1.2}
+                tabBarIcon: ({ color, focused }) => (
+                  <TabIcon
+                    name={focused ? "radio" : "radio-outline"}
+                    label="LIVE"
                     color={color}
+                    focused={focused}
                   />
                 ),
               }}
@@ -99,11 +133,12 @@ export default function TabLayout() {
             <Tabs.Screen
               name="schedule"
               options={{
-                tabBarIcon: ({ color, size }) => (
-                  <Ionicons
-                    name="calendar-outline"
-                    size={(size ?? 26) * 1.2}
+                tabBarIcon: ({ color, focused }) => (
+                  <TabIcon
+                    name={focused ? "calendar" : "calendar-outline"}
+                    label="SCHEDULE"
                     color={color}
+                    focused={focused}
                   />
                 ),
               }}
@@ -112,11 +147,12 @@ export default function TabLayout() {
             <Tabs.Screen
               name="archive"
               options={{
-                tabBarIcon: ({ color, size }) => (
-                  <Ionicons
-                    name="library-outline"
-                    size={(size ?? 26) * 1.2}
+                tabBarIcon: ({ color, focused }) => (
+                  <TabIcon
+                    name={focused ? "library" : "library-outline"}
+                    label="ARCHIVE"
                     color={color}
+                    focused={focused}
                   />
                 ),
               }}
@@ -125,68 +161,74 @@ export default function TabLayout() {
             <Tabs.Screen
               name="artists"
               options={{
-                tabBarIcon: ({ color, size }) => (
-                  <Ionicons
-                    name="people-outline"
-                    size={(size ?? 26) * 1.2}
+                tabBarIcon: ({ color, focused }) => (
+                  <TabIcon
+                    name={focused ? "people" : "people-outline"}
+                    label="ARTISTS"
                     color={color}
+                    focused={focused}
                   />
                 ),
               }}
             />
 
+            <Tabs.Screen
+              name="social"
+              options={{
+                tabBarIcon: ({ color, focused }) => (
+                  <TabIcon
+                    name={focused ? "chatbubbles" : "chatbubbles-outline"}
+                    label="SOCIAL"
+                    color={color}
+                    focused={focused}
+                  />
+                ),
+              }}
+            />
+
+            <Tabs.Screen
+              name="support"
+              options={{
+                tabBarIcon: ({ color, focused }) => (
+                  <TabIcon
+                    name={focused ? "heart" : "heart-outline"}
+                    label="SUPPORT"
+                    color={color}
+                    focused={focused}
+                  />
+                ),
+              }}
+            />
+
+            {/* Hidden screens - still accessible via navigation but not in tab bar */}
             <Tabs.Screen
               name="discord"
               options={{
-                tabBarIcon: ({ color, size }) => (
-                  <Ionicons
-                    name="logo-discord"
-                    size={(size ?? 26) * 1.2}
-                    color={color}
-                  />
-                ),
+                tabBarButton: () => null,
+                tabBarItemStyle: { display: 'none' },
               }}
             />
-
             <Tabs.Screen
               name="instagram"
               options={{
-                tabBarIcon: ({ color, size }) => (
-                  <Ionicons
-                    name="logo-instagram"
-                    size={(size ?? 26) * 1.2}
-                    color={color}
-                  />
-                ),
+                tabBarButton: () => null,
+                tabBarItemStyle: { display: 'none' },
               }}
             />
-
             <Tabs.Screen
               name="soundcloud"
               options={{
-                tabBarIcon: ({ color, size }) => (
-                  <FontAwesomeIcon
-                    icon={faSoundcloud}
-                    size={(size ?? 24) * 1.4}
-                    color={color}
-                  />
-                ),
+                tabBarButton: () => null,
+                tabBarItemStyle: { display: 'none' },
               }}
             />
-
             <Tabs.Screen
               name="mixcloud"
               options={{
-                tabBarIcon: ({ color, size }) => (
-                  <FontAwesomeIcon
-                    icon={faMixcloud}
-                    size={(size ?? 24) * 1.4}
-                    color={color}
-                  />
-                ),
+                tabBarButton: () => null,
+                tabBarItemStyle: { display: 'none' },
               }}
             />
-
             <Tabs.Screen
               name="artist/[slug]"
               options={{
@@ -214,3 +256,26 @@ export default function TabLayout() {
     </GestureHandlerRootView>
   )
 }
+
+const styles = StyleSheet.create({
+  tabIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  iconActive: {
+    opacity: 1,
+  },
+  iconInactive: {
+    opacity: 0.85,
+  },
+  tabLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  tabLabelActive: {
+    fontWeight: '700',
+  },
+})
