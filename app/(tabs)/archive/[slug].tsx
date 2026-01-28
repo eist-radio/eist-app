@@ -63,7 +63,7 @@ const BackToTopButton = ({
   useEffect(() => {
     Animated.spring(animatedValue, {
       toValue: visible ? 1 : 0,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       tension: 50,
       friction: 7,
     }).start();
@@ -83,9 +83,9 @@ const BackToTopButton = ({
               }),
             },
           ],
+          pointerEvents: visible ? 'auto' : 'none',
         },
       ]}
-      pointerEvents={visible ? 'auto' : 'none'}
     >
       <TouchableOpacity
         onPress={onPress}
@@ -191,7 +191,7 @@ const RelatedShowCard = ({
       toValue: 1,
       duration: 350,
       delay: index * 60,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [animatedValue, index]);
 
@@ -317,7 +317,7 @@ export default function ArchiveShowScreen() {
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 400,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     }
   }, [show, fadeAnim]);
@@ -731,9 +731,13 @@ const styles = StyleSheet.create({
   showTitle: {
     fontWeight: '700',
     marginBottom: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    ...(Platform.OS === 'web'
+      ? { textShadow: '0px 2px 4px rgba(0, 0, 0, 0.3)' }
+      : {
+          textShadowColor: 'rgba(0, 0, 0, 0.3)',
+          textShadowOffset: { width: 0, height: 2 },
+          textShadowRadius: 4,
+        }),
   },
   artistLink: {
     flexDirection: 'row',

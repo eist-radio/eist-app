@@ -37,7 +37,7 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
     Animated.timing(animatedValue, {
       toValue: visible ? 1 : 0,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start()
   }, [visible, animatedValue])
   

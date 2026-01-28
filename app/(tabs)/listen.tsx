@@ -48,8 +48,8 @@ const LiveIndicator = () => {
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: Platform.OS !== 'web' }),
       ])
     )
     pulse.start()
@@ -71,7 +71,7 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
     Animated.timing(animatedValue, {
       toValue: visible ? 1 : 0,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start()
   }, [visible, animatedValue])
 
@@ -915,9 +915,13 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontWeight: '700',
     lineHeight: 32,
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 30,
+    ...(Platform.OS === 'web'
+      ? { textShadow: '0px 4px 30px rgba(0, 0, 0, 0.4)' }
+      : {
+          textShadowColor: 'rgba(0, 0, 0, 0.4)',
+          textShadowOffset: { width: 0, height: 4 },
+          textShadowRadius: 30,
+        }),
   },
   loadingContainer: {
     position: 'absolute',

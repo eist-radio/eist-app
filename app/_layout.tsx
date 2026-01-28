@@ -11,6 +11,7 @@ import {
     ActivityIndicator,
     Animated,
     Image,
+    Platform,
     StyleSheet,
     View,
 } from 'react-native';
@@ -47,12 +48,12 @@ export default function RootLayout() {
         Animated.timing(appOpacity, {
           toValue: 1,
           duration: 500,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
         Animated.timing(splashOpacity, {
           toValue: 0,
           duration: 3200,
-          useNativeDriver: true,
+          useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start(() => {
         setIsSplashHidden(true);

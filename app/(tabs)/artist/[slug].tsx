@@ -55,7 +55,7 @@ const BackToTopButton = ({
   React.useEffect(() => {
     Animated.spring(animatedValue, {
       toValue: visible ? 1 : 0,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
       tension: 50,
       friction: 7,
     }).start();
@@ -75,9 +75,9 @@ const BackToTopButton = ({
               }),
             },
           ],
+          pointerEvents: visible ? 'auto' : 'none',
         },
       ]}
-      pointerEvents={visible ? 'auto' : 'none'}
     >
       <TouchableOpacity
         onPress={onPress}
@@ -196,7 +196,7 @@ const ShowCard = ({
       toValue: 1,
       duration: 400,
       delay: index * 80,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start();
   }, [animatedValue, index]);
 
@@ -714,9 +714,13 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     letterSpacing: -0.5,
     marginBottom: 12,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    ...(Platform.OS === 'web'
+      ? { textShadow: '0px 2px 4px rgba(0, 0, 0, 0.3)' }
+      : {
+          textShadowColor: 'rgba(0, 0, 0, 0.3)',
+          textShadowOffset: { width: 0, height: 2 },
+          textShadowRadius: 4,
+        }),
   },
 
   // Genre Pills

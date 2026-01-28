@@ -9,6 +9,7 @@ import {
   AppState,
   Image,
   Linking,
+  Platform,
   RefreshControl,
   SectionList,
   SectionListData,
@@ -88,7 +89,7 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
     Animated.timing(animatedValue, {
       toValue: visible ? 1 : 0,
       duration: 200,
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start()
   }, [visible, animatedValue])
 
@@ -123,8 +124,8 @@ const LiveIndicator = () => {
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.4, duration: 1000, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: Platform.OS !== 'web' }),
       ])
     )
     pulse.start()
@@ -337,8 +338,8 @@ export default function ScheduleScreen() {
   // pulse the "current" row briefly when it changes
   useEffect(() => {
     Animated.sequence([
-      Animated.timing(fadeAnim, { toValue: 0.6, duration: 150, useNativeDriver: true }),
-      Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 0.6, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
     ]).start()
   }, [currentShowId, fadeAnim])
 
