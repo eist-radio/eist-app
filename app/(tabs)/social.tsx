@@ -24,6 +24,10 @@ const COLORS = {
   lime: '#AFFC41',
   limeSubtle: 'rgba(175, 252, 65, 0.06)',
   limeBorder: 'rgba(175, 252, 65, 0.15)',
+  // Discord card - sophisticated dark treatment
+  discordBg: '#1a1a2e',
+  discordBgLight: '#252542',
+  discordAccent: 'rgba(175, 252, 65, 0.9)',
 }
 
 type SocialCardProps = {
@@ -54,6 +58,56 @@ const SocialCard = ({ icon, title, subtitle, onPress }: SocialCardProps) => {
       <Text style={[styles.socialSubtitle, { color: colors.text }]}>{subtitle}</Text>
       <View style={styles.externalIcon}>
         <Ionicons name="open-outline" size={14} color={colors.primary} style={{ opacity: 0.4 }} />
+      </View>
+    </Pressable>
+  )
+}
+
+type DiscordHeroProps = {
+  onPress: () => void
+}
+
+const DiscordHero = ({ onPress }: DiscordHeroProps) => {
+  const [pressed, setPressed] = useState(false)
+
+  return (
+    <Pressable
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      onPress={onPress}
+      style={[
+        styles.discordHero,
+        pressed && styles.discordHeroPressed,
+      ]}
+    >
+      {/* Subtle gradient overlay */}
+      <View style={styles.discordGradientOverlay} />
+
+      {/* Decorative accent line */}
+      <View style={styles.discordAccentLine} />
+
+      {/* Content */}
+      <View style={styles.discordContent}>
+        <View style={styles.discordHeader}>
+          <View style={styles.discordIconContainer}>
+            <Ionicons name="logo-discord" size={32} color={COLORS.lime} />
+          </View>
+          <View style={styles.discordExternalIcon}>
+            <Ionicons name="open-outline" size={14} color="rgba(255,255,255,0.35)" />
+          </View>
+        </View>
+
+        <View style={styles.discordTextContainer}>
+          <Text style={styles.discordTitle}>Join the éist community</Text>
+          <Text style={styles.discordSubtitle}>
+            Chat with DJs and listeners, get show alerts, and discover new music
+          </Text>
+        </View>
+
+        <View style={styles.discordCta}>
+          <Text style={styles.discordCtaText}>Open Discord</Text>
+          <Ionicons name="arrow-forward" size={14} color={COLORS.discordBg} />
+        </View>
       </View>
     </Pressable>
   )
@@ -102,48 +156,35 @@ export default function SocialScreen() {
           </Pressable>
         </View>
 
-        {/* Connect Section */}
+        {/* Discord Hero Section */}
+        <View style={styles.heroSection}>
+          <DiscordHero onPress={() => openUrl('https://discord.gg/4eHnAAUmFN', 'Discord')} />
+        </View>
+
+        {/* Other Platforms */}
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.primary }]}>CONNECT</Text>
+          <Text style={[styles.sectionLabel, { color: colors.primary }]}>ALSO FIND US ON</Text>
           <View style={styles.cardsRow}>
-            <SocialCard
-              icon={<Ionicons name="logo-discord" size={28} color={COLORS.lime} />}
-              title="Discord"
-              subtitle="Join the chat"
-              onPress={() => openUrl('https://discord.gg/4eHnAAUmFN', 'Discord')}
-            />
             <SocialCard
               icon={<Ionicons name="logo-instagram" size={28} color={COLORS.lime} />}
               title="Instagram"
               subtitle="@eistradio"
               onPress={() => openUrl('https://www.instagram.com/eistradio', 'Instagram')}
             />
-          </View>
-        </View>
-
-        {/* Listen Section */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.primary }]}>LISTEN</Text>
-          <View style={styles.cardsRow}>
             <SocialCard
               icon={<FontAwesomeIcon icon={faMixcloud} size={26} color={COLORS.lime} />}
               title="Mixcloud"
-              subtitle="Past shows"
+              subtitle="@eistcork"
               onPress={() => openUrl('https://www.mixcloud.com/eistcork/', 'Mixcloud')}
             />
             <SocialCard
               icon={<FontAwesomeIcon icon={faSoundcloud} size={24} color={COLORS.lime} />}
               title="SoundCloud"
-              subtitle="Tracks"
+              subtitle="@eistcork"
               onPress={() => openUrl('https://soundcloud.com/eistcork', 'SoundCloud')}
             />
           </View>
         </View>
-
-        {/* Footer */}
-        <Text style={[styles.footerText, { color: colors.text }]}>
-          Connect with DJs and listeners, get show updates, and discover new music.
-        </Text>
       </ScrollView>
     </View>
   )
@@ -179,6 +220,98 @@ const styles = StyleSheet.create({
     height: 52,
   },
 
+  // Discord Hero
+  heroSection: {
+    marginBottom: 32,
+  },
+  discordHero: {
+    position: 'relative',
+    backgroundColor: COLORS.discordBg,
+    borderRadius: 16,
+    padding: 20,
+    overflow: 'hidden',
+    minHeight: 170,
+    borderWidth: 1,
+    borderColor: 'rgba(175, 252, 65, 0.12)',
+  },
+  discordHeroPressed: {
+    transform: [{ scale: 0.98 }],
+    opacity: 0.95,
+    backgroundColor: COLORS.discordBgLight,
+  },
+  discordGradientOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: '60%',
+    height: '100%',
+    backgroundColor: 'rgba(175, 252, 65, 0.03)',
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  discordAccentLine: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: COLORS.lime,
+    borderTopLeftRadius: 16,
+    borderBottomLeftRadius: 16,
+  },
+  discordContent: {
+    position: 'relative',
+    zIndex: 1,
+  },
+  discordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 14,
+  },
+  discordIconContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: 'rgba(175, 252, 65, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discordTextContainer: {
+    marginBottom: 16,
+  },
+  discordTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 6,
+    letterSpacing: -0.3,
+  },
+  discordSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.55)',
+    lineHeight: 20,
+  },
+  discordCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.lime,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  discordCtaText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: COLORS.discordBg,
+    letterSpacing: -0.2,
+  },
+  discordExternalIcon: {
+    padding: 4,
+  },
+
   // Sections
   section: {
     marginBottom: 24,
@@ -192,17 +325,17 @@ const styles = StyleSheet.create({
   },
   cardsRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
 
-  // Cards
+  // Cards (smaller for secondary items)
   socialCard: {
     flex: 1,
     backgroundColor: COLORS.limeSubtle,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.limeBorder,
-    padding: 18,
+    padding: 14,
     alignItems: 'center',
   },
   socialCardPressed: {
@@ -210,36 +343,26 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.98 }],
   },
   socialIconWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(175, 252, 65, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   socialTitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   socialSubtitle: {
-    fontSize: 12,
+    fontSize: 10,
     opacity: 0.55,
   },
   externalIcon: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-  },
-
-  // Footer
-  footerText: {
-    fontSize: 13,
-    lineHeight: 19,
-    textAlign: 'center',
-    opacity: 0.45,
-    paddingHorizontal: 24,
-    marginTop: 8,
+    top: 8,
+    right: 8,
   },
 })
