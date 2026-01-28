@@ -16,14 +16,19 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-router",
     "expo-web-browser",
     "expo-font",
-    "expo-video"
+    "expo-video",
+    ["expo-notifications", {
+      icon: "./assets/images/notification-icon.png",
+      color: "#AFFC41"
+    }]
   ],
   ios: {
     ...config.ios,
     infoPlist: {
       ...config.ios?.infoPlist,
       UIBackgroundModes: [
-        "audio"
+        "audio",
+        "remote-notification"
       ],
       NSMicrophoneUsageDescription: "This app streams audio and does not record you, but a library we use requires an infoPlist entry to work.",
       ITSAppUsesNonExemptEncryption: false,
@@ -82,7 +87,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "android.permission.MODIFY_AUDIO_SETTINGS",
       "android.permission.ACCESS_NETWORK_STATE",
       "android.permission.BLUETOOTH",
-      "android.permission.BLUETOOTH_CONNECT"
+      "android.permission.BLUETOOTH_CONNECT",
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.SCHEDULE_EXACT_ALARM",
+      "android.permission.RECEIVE_BOOT_COMPLETED"
     ]
   },
   // Disable new architecture for problematic packages

@@ -1,5 +1,6 @@
 // app/(tabs)/show/[slug].tsx
 
+import { ReminderButton } from '@/components/ReminderButton';
 import { SelectableText } from '@/components/SelectableText';
 import { ThemedText } from '@/components/ThemedText';
 import { Ionicons } from '@expo/vector-icons';
@@ -565,7 +566,7 @@ export default function ShowScreen() {
 
             <View style={styles.shareableTitle}>
               <View style={[
-                styles.titleRow, 
+                styles.titleRow,
                 hideShareButton && { justifyContent: 'flex-start' }
               ]}>
                 <FormattedShowTitle
@@ -575,20 +576,29 @@ export default function ShowScreen() {
                   style={styles.header}
                 />
                 {!hideShareButton && (
-                  <TouchableOpacity 
-                    onPress={shareShow} 
-                    style={styles.shareButtonInline}
-                    disabled={isSharing}
-                    accessibilityLabel="Share show"
-                    accessibilityHint="Share this show information as an image"
-                    accessibilityRole="button"
-                  >
-                    {isSharing ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Ionicons name="share-outline" size={28} color={colors.primary} />
-                    )}
-                  </TouchableOpacity>
+                  <View style={styles.actionButtons}>
+                    <ReminderButton
+                      showId={event.id}
+                      showTitle={event.title}
+                      artistName={hosts[0]?.name}
+                      startDateUtc={event.startDateUtc}
+                      size={24}
+                    />
+                    <TouchableOpacity
+                      onPress={shareShow}
+                      style={styles.shareButtonInline}
+                      disabled={isSharing}
+                      accessibilityLabel="Share show"
+                      accessibilityHint="Share this show information as an image"
+                      accessibilityRole="button"
+                    >
+                      {isSharing ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Ionicons name="share-outline" size={28} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+                  </View>
                 )}
               </View>
             </View>
@@ -777,6 +787,10 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 
+  actionButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   shareButtonInline: {
     width: 44,
     height: 44,
@@ -784,7 +798,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
+    marginLeft: 4,
   },
 
   loadingOverlay: {
