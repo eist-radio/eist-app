@@ -1,6 +1,7 @@
 // app/_layout.tsx
 
 import { useColorScheme } from '@/hooks/useColorScheme';
+import { Ionicons } from '@expo/vector-icons';
 import { ThemeProvider } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
@@ -25,6 +26,7 @@ const splashImage = require('../assets/images/eist.png');
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     FunnelSans: require('../assets/fonts/FunnelSans-VariableFont_wght.ttf'),
+    ...Ionicons.font,
   });
 
   const [isAppReady, setIsAppReady] = useState(false);
