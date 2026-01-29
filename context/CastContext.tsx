@@ -47,7 +47,7 @@ export type CastContextType = {
   castDeviceName: string | null
   castSessionState: CastSessionState
   isCastPlaying: boolean
-  castPlay: (title: string, artist: string, artworkUrl?: string) => Promise<void>
+  castPlay: (title: string, artist: string, artworkUrl?: string) => Promise<boolean>
   castStop: () => Promise<void>
   updateCastMetadata: (
     title: string,
@@ -65,7 +65,7 @@ const disabledCastContext: CastContextType = {
   castDeviceName: null,
   castSessionState: 'no_devices',
   isCastPlaying: false,
-  castPlay: async () => {},
+  castPlay: async () => false,
   castStop: async () => {},
   updateCastMetadata: async () => {},
 }
@@ -202,12 +202,9 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
   }, [isCastConnected, isWeb])
 
   const castPlay = useCallback(
-    async (title: string, artist: string, artworkUrl?: string) => {
-      if (!isCastConnected) {
-        console.log('Cannot cast - not connected')
-        return
-      }
-
+    async (title: string, artist: string, artworkUrl?: string): Promise<boolean> => {
+      // Don't rely on isCastConnected state - loadMediaOnCast does its own session check
+      // This avoids race conditions where state hasn't updated yet but session exists
       currentMetadata.current = { title, artist, artworkUrl }
 
       console.log('Loading media on cast device...')
@@ -215,11 +212,13 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
       if (success) {
         console.log('Cast playback started')
         setIsCastPlaying(true)
+        return true
       } else {
         console.log('Failed to start cast playback')
+        return false
       }
     },
-    [isCastConnected]
+    []
   )
 
   const castStop = useCallback(async () => {

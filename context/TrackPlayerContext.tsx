@@ -453,11 +453,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // If casting, route playback to cast device instead of local
     if (shouldCast) {
       try {
-        await castPlay(showTitle || 'éist', showArtist || '', showArtworkUrl)
-        setIsPlaying(true)
-        await storeLastPlayedState(true)
-        console.log('Started playback on cast device')
-        return
+        const castSuccess = await castPlay(showTitle || 'éist', showArtist || '', showArtworkUrl)
+        if (castSuccess) {
+          setIsPlaying(true)
+          await storeLastPlayedState(true)
+          console.log('Started playback on cast device')
+          return
+        }
+        console.log('Cast play returned false, falling back to local playback')
+        // Fall through to local playback
       } catch (err) {
         console.error('Cast play failed, falling back to local:', err)
         // Fall through to local playback

@@ -1,0 +1,8 @@
+name = "eist-cast-receiver"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Custom domain (configure after first deploy)
+# routes = [
+#   { pattern = "cast.eist.radio", custom_domain = true }
+# ]
