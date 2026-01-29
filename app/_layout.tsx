@@ -55,7 +55,7 @@ export default function RootLayout() {
         }),
         Animated.timing(splashOpacity, {
           toValue: 0,
-          duration: 3200,
+          duration: 1700,
           useNativeDriver: Platform.OS !== 'web',
         }),
       ]).start(() => {

@@ -1,0 +1,14 @@
+# Private/internal files
+AGENTS.md
+docs/
+workers/
+
+# Build artifacts
+*.apk
+*.aab
+
+# Credentials
+google-service-account.json
+
+# Let EAS regenerate native folders
+android/

@@ -32,6 +32,15 @@
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
         "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
       }
+    },
+    "production-local": {
+      "node": "20.18.1",
+      "autoIncrement": true,
+      "distribution": "store",
+      "env": {
+        "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
+        "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
+      }
     }
   },
   "submit": {
