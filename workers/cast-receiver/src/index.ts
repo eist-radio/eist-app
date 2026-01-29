@@ -35,18 +35,34 @@ export default {
   },
 };
 
-// Styled media receiver - minimal code, just branding
+// Styled media receiver with éist branding
 const RECEIVER_HTML = `<!DOCTYPE html>
 <html>
 <head>
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <style>
+    @font-face {
+      font-family: 'Funnel Sans';
+      src: url('https://eist.radio/fonts/FunnelSans-VariableFont_wght.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+
     cast-media-player {
+      /* Dark background matching playback screen */
+      --background-color: #0D0D14;
       --splash-image: none;
-      --background-color: #4733FF;
-      --playback-logo-image: url('https://eist.ie/images/eist-logo.png');
+      --playback-logo-image: url('https://eist.radio/eist-logo-small.png');
       --theme-hue: 250;
       --progress-color: #AFFC41;
+      /* Subtle loading - dark with muted spinner */
+      --splash-color: #0D0D14;
+      --splash-spinner-color: #AFFC41;
+      --spinner-color: #AFFC41;
+      --font-family: 'Funnel Sans', sans-serif;
+      /* Text colors */
+      --logo-color: #AFFC41;
     }
   </style>
 </head>

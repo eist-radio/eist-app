@@ -28,6 +28,24 @@ export type CastMediaInfo = {
 }
 
 /**
+ * Format title for Cast display - replace "(éist arís)" with repeat symbol
+ * Matches the behavior of FormattedShowTitle component in the app
+ * Uses Unicode ↻ (U+21BB) which renders as a simple text glyph
+ */
+function formatCastTitle(title: string): string {
+  if (!title) return 'éist'
+  // Replace variations of "éist arís" with repeat symbol (↻)
+  // Using a simple Unicode arrow that blends with text, not a colorful emoji
+  return title
+    .replace(/\(éist arís\)/gi, '↻')
+    .replace(/\(eist aris\)/gi, '↻')
+    .replace(/\(éíst arís\)/gi, '↻')
+    .replace(/\(éist aris\)/gi, '↻')
+    .replace(/\(eist arís\)/gi, '↻')
+    .trim()
+}
+
+/**
  * Build MediaInfo object for casting the live radio stream
  */
 export function buildCastMediaInfo(
@@ -36,6 +54,7 @@ export function buildCastMediaInfo(
   artworkUrl?: string
 ): CastMediaInfo {
   const images = artworkUrl ? [{ url: artworkUrl }] : []
+  const formattedTitle = formatCastTitle(title)
 
   return {
     contentUrl: STREAM_URL,
@@ -43,7 +62,7 @@ export function buildCastMediaInfo(
     streamType: 'live',
     metadata: {
       type: 'musicTrack',
-      title: title || 'éist',
+      title: formattedTitle,
       subtitle: artist || 'éist · live',
       studio: 'éist',
       images,
