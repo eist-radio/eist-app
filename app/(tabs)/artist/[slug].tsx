@@ -405,7 +405,8 @@ const ShowCard = ({
 };
 
 export default function ArtistScreen() {
-  const { slug, id } = useLocalSearchParams<{ slug?: string; id?: string }>();
+  const { slug, id: queryId } = useLocalSearchParams<{ slug?: string; id?: string }>();
+  const id = queryId ?? slug;
   const { colors } = useTheme();
   const router = useRouter();
   const currentTimezone = useTimezoneChange();

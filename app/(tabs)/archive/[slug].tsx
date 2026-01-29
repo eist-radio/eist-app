@@ -483,8 +483,12 @@ export default function ArchiveShowScreen() {
                     <Pressable
                       style={styles.artistLink}
                       onPress={() => {
-                        // Need to get artist ID - for now just navigate to artists page
-                        router.push('/artists');
+                        const artistId = show.artistIds?.[0];
+                        if (artistId) {
+                          router.push(`/artist/${show.artistSlug}?id=${artistId}`);
+                        } else {
+                          router.push(`/artist/${show.artistSlug}`);
+                        }
                       }}
                     >
                       <Text style={styles.artistLinkLabel}>by</Text>
@@ -566,7 +570,14 @@ export default function ArchiveShowScreen() {
                         More from {show.artistName}
                       </Text>
                       <TouchableOpacity
-                        onPress={() => router.push('/artists')}
+                        onPress={() => {
+                          const artistId = show.artistIds?.[0];
+                          if (artistId) {
+                            router.push(`/artist/${show.artistSlug}?id=${artistId}`);
+                          } else {
+                            router.push(`/artist/${show.artistSlug}`);
+                          }
+                        }}
                         style={styles.viewAllLink}
                       >
                         <Text style={styles.viewAllText}>View Artist</Text>
@@ -599,7 +610,14 @@ export default function ArchiveShowScreen() {
                 <View style={styles.navSection}>
                   <TouchableOpacity
                     style={styles.backToArtistButton}
-                    onPress={() => router.push('/artists')}
+                    onPress={() => {
+                      const artistId = show.artistIds?.[0];
+                      if (artistId) {
+                        router.push(`/artist/${show.artistSlug}?id=${artistId}`);
+                      } else {
+                        router.push(`/artist/${show.artistSlug}`);
+                      }
+                    }}
                   >
                     <Ionicons name="arrow-back" size={16} color={COLORS.lime} />
                     <Text style={styles.backToArtistText}>
