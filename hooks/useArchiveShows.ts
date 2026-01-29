@@ -1,106 +1,50 @@
 // hooks/useArchiveShows.ts
 
-import { useQuery } from '@tanstack/react-query';
-import { ArchiveSection, ArchiveShow } from '../types/archive';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
+import { EIST_API_ENDPOINTS } from '../config';
+import { ArchiveSection, ArchiveShow, ShowsApiResponse } from '../types/archive';
 
-// For local development, import bundled data
-// TODO: Before production deploy, switch to remote fetch:
-//
-// 1. WEBSITE (../eist/.github/workflows/deploy.yml):
-//    Add step after "Generate show cache" to copy shows.json to static folder:
-//      - name: Copy shows.json to static for API access
-//        run: mkdir -p static/data && cp data/shows.json static/data/
-//    This serves it at https://eist.radio/data/shows.json (or use obscured path)
-//
-// 2. APP (this file):
-//    Update fetchArchiveShows() to fetch from remote URL with local fallback:
-//      const SHOWS_URL = 'https://eist.radio/data/shows.json';
-//      async function fetchArchiveShows(): Promise<ArchiveShow[]> {
-//        try {
-//          const res = await fetch(SHOWS_URL);
-//          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-//          const allShows = await res.json();
-//          return allShows.filter((show) => !shouldExcludeShow(show));
-//        } catch (error) {
-//          console.warn('Failed to fetch remote shows, using bundled data:', error);
-//          return (localShowsData as ArchiveShow[]).filter((show) => !shouldExcludeShow(show));
-//        }
-//      }
-//
-// 3. CONSIDER: shows.json is ~2.9MB raw (~550KB gzipped). May want to:
-//    - Increase staleTime (currently 10 min) to reduce fetches
-//    - Trim unused fields (e.g., Mixcloud pictures has 10 sizes, app only needs 1-2)
-//    - Add If-Modified-Since/ETag support to avoid re-downloading unchanged data
-//
-import localShowsData from '../assets/data/shows.json';
+const INITIAL_LIMIT = 75;
+const LOAD_MORE_LIMIT = 50;
 
-// Archive start date - exclude shows before this date (matching website)
-const ARCHIVE_START_DATE = '2025-02-01';
+async function fetchArchiveShowsPage(limit: number, offset: number): Promise<ShowsApiResponse> {
+  const response = await fetch(
+    `${EIST_API_ENDPOINTS.shows}?hasArchive=true&limit=${limit}&offset=${offset}`
+  );
 
-// Test broadcast titles to exclude (matching website)
-const TEST_BROADCAST_TITLES = [
-  'box test',
-  'box test 2',
-  'playlisting test',
-  'mensajito_eist_test',
-  'mystery test broadcast',
-  'stay tuned...',
-];
+  if (!response.ok) {
+    throw new Error(`Failed to fetch archive shows: ${response.status} ${response.statusText}`);
+  }
 
-// Check if show title indicates a repeat broadcast
-function isRepeatBroadcast(title: string): boolean {
-  if (!title) return false;
-  const titleLower = title.toLowerCase();
-  const patterns = [
-    'éist arís',
-    'eist aris',
-    'rebroadcast',
-    'replay',
-    'repeat',
-    'from the archives',
-  ];
-  return patterns.some((p) => titleLower.includes(p));
+  return response.json();
 }
 
-// Check if a show has archived content (Mixcloud or SoundCloud)
-function hasArchivedContent(show: ArchiveShow): boolean {
-  return !!(show.mixcloud_match || show.soundcloud_match);
+async function fetchShowBySlug(slug: string): Promise<ArchiveShow | null> {
+  const response = await fetch(EIST_API_ENDPOINTS.showBySlug(slug));
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch show: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
 }
 
-// Check if a show should be excluded from the archive
-function shouldExcludeShow(show: ArchiveShow): boolean {
-  const title = show.title || '';
+async function fetchShowsByArtist(artistSlug: string): Promise<ArchiveShow[]> {
+  const response = await fetch(
+    `${EIST_API_ENDPOINTS.shows}?hasArchive=true&artistSlug=${encodeURIComponent(artistSlug)}`
+  );
 
-  // Exclude repeat broadcasts
-  if (isRepeatBroadcast(title)) {
-    return true;
+  if (!response.ok) {
+    throw new Error(`Failed to fetch artist shows: ${response.status} ${response.statusText}`);
   }
 
-  // Exclude test broadcasts
-  if (TEST_BROADCAST_TITLES.includes(title.toLowerCase())) {
-    return true;
-  }
-
-  // Exclude shows before archive start date
-  if (show.start) {
-    const showDate = show.start.slice(0, 10); // Extract YYYY-MM-DD
-    if (showDate < ARCHIVE_START_DATE) {
-      return true;
-    }
-  }
-
-  // Exclude shows without archived content (matching website default behavior)
-  if (!hasArchivedContent(show)) {
-    return true;
-  }
-
-  return false;
-}
-
-async function fetchArchiveShows(): Promise<ArchiveShow[]> {
-  // Use bundled local data and filter according to website rules
-  const allShows = localShowsData as ArchiveShow[];
-  return allShows.filter((show) => !shouldExcludeShow(show));
+  const data: ShowsApiResponse = await response.json();
+  return data.shows;
 }
 
 function groupShowsByMonth(shows: ArchiveShow[]): ArchiveSection[] {
@@ -128,42 +72,87 @@ function groupShowsByMonth(shows: ArchiveShow[]): ArchiveSection[] {
 }
 
 export function useArchiveShows() {
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: ['archiveShows'],
-    queryFn: fetchArchiveShows,
+    queryFn: ({ pageParam }) => {
+      const offset = pageParam ?? 0;
+      const limit = offset === 0 ? INITIAL_LIMIT : LOAD_MORE_LIMIT;
+      return fetchArchiveShowsPage(limit, offset);
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.pagination.hasMore) return undefined;
+      return lastPage.pagination.offset + lastPage.pagination.limit;
+    },
     staleTime: 10 * 60 * 1000, // 10 minutes
-    gcTime: 30 * 60 * 1000, // 30 minutes (formerly cacheTime)
+    gcTime: 30 * 60 * 1000, // 30 minutes
   });
+
+  // Flatten all pages into a single array
+  const shows = useMemo(() => {
+    return query.data?.pages.flatMap((page) => page.shows) ?? [];
+  }, [query.data]);
+
+  // Get pagination info from the last page
+  const lastPage = query.data?.pages[query.data.pages.length - 1];
+  const total = lastPage?.pagination.total ?? 0;
+  const hasMore = lastPage?.pagination.hasMore ?? false;
+
+  const loadMore = useCallback(() => {
+    if (hasMore && !query.isFetchingNextPage) {
+      query.fetchNextPage();
+    }
+  }, [hasMore, query]);
+
+  return {
+    shows,
+    total,
+    hasMore,
+    loadMore,
+    isLoading: query.isLoading,
+    isLoadingMore: query.isFetchingNextPage,
+    error: query.error,
+    refetch: query.refetch,
+    isRefetching: query.isRefetching,
+  };
 }
 
 export function useArchiveShowsByMonth() {
-  const query = useArchiveShows();
+  const { shows, total, hasMore, loadMore, isLoadingMore, ...rest } = useArchiveShows();
 
   return {
-    ...query,
-    sections: query.data ? groupShowsByMonth(query.data) : [],
+    ...rest,
+    sections: shows.length > 0 ? groupShowsByMonth(shows) : [],
+    total,
+    loaded: shows.length,
+    hasMore,
+    loadMore,
+    isLoadingMore,
   };
 }
 
 export function useArchiveShowBySlug(slug: string | undefined) {
-  const query = useArchiveShows();
-
-  return {
-    ...query,
-    show: slug ? query.data?.find((s) => s.slug === slug) : undefined,
-  };
+  return useQuery({
+    queryKey: ['archiveShow', slug],
+    queryFn: () => fetchShowBySlug(slug!),
+    enabled: !!slug,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
 }
 
 export function useArchiveShowsByArtist(artistSlug: string | undefined, limit?: number) {
-  const query = useArchiveShows();
-
-  const shows = artistSlug
-    ? query.data?.filter((s) => s.artistSlug === artistSlug) ?? []
-    : [];
+  const query = useQuery({
+    queryKey: ['archiveShowsByArtist', artistSlug],
+    queryFn: () => fetchShowsByArtist(artistSlug!),
+    enabled: !!artistSlug,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
 
   return {
     ...query,
-    shows: limit ? shows.slice(0, limit) : shows,
+    shows: limit ? (query.data?.slice(0, limit) ?? []) : (query.data ?? []),
   };
 }
 

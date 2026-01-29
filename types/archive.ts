@@ -72,3 +72,29 @@ export type ArchiveSection = {
   title: string; // "January 2025"
   data: ArchiveShow[];
 };
+
+// API Response types
+export type ShowsApiResponse = {
+  shows: ArchiveShow[];
+  pagination: {
+    total: number;
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+};
+
+export type ArtistMapping = {
+  [artistId: string]: {
+    name: string;
+    slug: string;
+  };
+};
+
+export type ArtistStat = {
+  name: string;
+  slug: string;
+  totalShows: number;
+  showsWithArchive: number;
+  latestShow: string; // ISO date
+};

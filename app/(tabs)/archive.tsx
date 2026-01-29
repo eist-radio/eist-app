@@ -65,7 +65,18 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
 export default function ArchiveScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { sections, isLoading, error, refetch, isRefetching } = useArchiveShowsByMonth();
+  const {
+    sections,
+    isLoading,
+    error,
+    refetch,
+    isRefetching,
+    total,
+    loaded,
+    hasMore,
+    loadMore,
+    isLoadingMore,
+  } = useArchiveShowsByMonth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -249,6 +260,31 @@ export default function ArchiveScreen() {
             </Text>
           </View>
         }
+        ListFooterComponent={
+          hasMore && !searchQuery && !selectedMonth ? (
+            <View style={styles.loadMoreContainer}>
+              <Text style={[styles.loadedCount, { color: colors.text }]}>
+                Showing {loaded} of {total} shows
+              </Text>
+              <TouchableOpacity
+                style={[styles.loadMoreButton, { borderColor: colors.primary }]}
+                onPress={loadMore}
+                disabled={isLoadingMore}
+              >
+                {isLoadingMore ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                    <Text style={[styles.loadMoreText, { color: colors.primary }]}>
+                      Load More Shows
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          ) : null
+        }
       />
 
       <BackToTopButton onPress={scrollToTop} visible={showBackToTop && isScrollable} />
@@ -426,5 +462,31 @@ const styles = StyleSheet.create({
   },
   monthOptionText: {
     fontSize: 16,
+  },
+  loadMoreContainer: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    paddingBottom: 40,
+    gap: 12,
+  },
+  loadedCount: {
+    fontSize: 14,
+    opacity: 0.6,
+  },
+  loadMoreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderRadius: 8,
+    minWidth: 180,
+    minHeight: 48,
+  },
+  loadMoreText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

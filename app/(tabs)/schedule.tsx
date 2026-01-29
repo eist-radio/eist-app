@@ -20,9 +20,9 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import localShowsData from '../../assets/data/shows.json'
 import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
+import { useArtistMapping } from '../../hooks/useArtists'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
 
 const logoImage = require('../../assets/images/eist-logo-header.png')
@@ -66,23 +66,6 @@ type SectionData = {
   dateLabel: string // "27 January"
   data: SectionRow[]
 }
-
-// Build artist ID to name mapping from local shows data
-function buildArtistIdToNameMap(): Record<string, string> {
-  const map: Record<string, string> = {}
-  ;(localShowsData as any[]).forEach((show) => {
-    if (show.artistIds && show.artistName) {
-      show.artistIds.forEach((id: string) => {
-        if (!map[id]) {
-          map[id] = show.artistName
-        }
-      })
-    }
-  })
-  return map
-}
-
-const artistIdToNameMap = buildArtistIdToNameMap()
 
 const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
   const animatedValue = React.useRef(new Animated.Value(0)).current
@@ -146,6 +129,9 @@ export default function ScheduleScreen() {
   const { colors } = useTheme()
   const currentTimezone = useTimezoneChange()
   const insets = useSafeAreaInsets()
+
+  // Fetch artist mapping from API
+  const { data: artistMapping } = useArtistMapping()
 
   const [sections, setSections] = useState<SectionData[]>([])
   const [loading, setLoading] = useState(true)
@@ -274,7 +260,7 @@ export default function ScheduleScreen() {
     ({ item }: { item: SectionRow }) => {
       const isCurrent = item.id === currentShowId
       const artistId = item.artistIds?.[0]
-      const artistName = artistId ? artistIdToNameMap[artistId] : undefined
+      const artistName = artistId ? artistMapping?.[artistId]?.name : undefined
 
       return (
         <Animated.View
@@ -347,7 +333,7 @@ export default function ScheduleScreen() {
         </Animated.View>
       )
     },
-    [currentShowId, colors.text, colors.primary, fadeAnim]
+    [currentShowId, colors.text, colors.primary, fadeAnim, artistMapping]
   )
 
   // pulse the "current" row briefly when it changes
