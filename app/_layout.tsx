@@ -16,6 +16,7 @@ import {
     StyleSheet,
     View,
 } from 'react-native';
+import { CastProvider } from '../context/CastContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { TrackPlayerProvider } from '../context/TrackPlayerContext';
 import { EistDarkTheme, EistLightTheme } from '../themes';
@@ -82,8 +83,9 @@ export default function RootLayout() {
           ]}
         >
           <QueryClientProvider client={queryClient}>
-            <TrackPlayerProvider>
-              <NotificationProvider>
+            <CastProvider>
+              <TrackPlayerProvider>
+                <NotificationProvider>
                 <Suspense
                   fallback={
                     <View style={styles.loader}>
@@ -104,7 +106,8 @@ export default function RootLayout() {
                   </ThemeProvider>
                 </Suspense>
               </NotificationProvider>
-            </TrackPlayerProvider>
+              </TrackPlayerProvider>
+            </CastProvider>
           </QueryClientProvider>
         </Animated.View>
 

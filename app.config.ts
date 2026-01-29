@@ -20,6 +20,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ["expo-notifications", {
       icon: "./assets/images/notification-icon.png",
       color: "#AFFC41"
+    }],
+    ["react-native-google-cast", {
+      receiverAppId: "CC1AD845",
+      iosStartDiscoveryAfterFirstTapOnCastButton: false,
+      iosSuspendSessionsWhenBackgrounded: false
     }]
   ],
   ios: {
@@ -30,6 +35,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         "audio",
         "remote-notification"
       ],
+      NSLocalNetworkUsageDescription: "éist uses the local network to discover Cast devices.",
+      NSBonjourServices: ["_googlecast._tcp", "_CC1AD845._googlecast._tcp"],
       NSMicrophoneUsageDescription: "This app streams audio and does not record you, but a library we use requires an infoPlist entry to work.",
       ITSAppUsesNonExemptEncryption: false,
       // iOS audio session configuration

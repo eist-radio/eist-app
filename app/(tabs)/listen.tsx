@@ -24,6 +24,7 @@ import {
     View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { CastButton } from '../../components/CastButton'
 import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
@@ -121,6 +122,8 @@ export default function ListenScreen() {
     isPlaying,
     togglePlayStop,
     updateMetadata,
+    isCastConnected,
+    castDeviceName,
   } = useTrackPlayer()
   const { width, height } = Dimensions.get('window')
   const router = useRouter()
@@ -760,14 +763,21 @@ export default function ListenScreen() {
             >
               <Ionicons
                 name={iconName}
-                size={52}
-                color={colors.text}
+                size={56}
+                color={colors.primary}
               />
             </TouchableOpacity>
 
             <View style={styles.statusContainer}>
-              {broadcastStatus === 'schedule' ? (
-                <View style={styles.liveStatusRow}>
+              {isCastConnected ? (
+                <View style={styles.castStatusRow}>
+                  <Ionicons name="tv-outline" size={16} color={colors.primary} />
+                  <Text style={[styles.castStatusText, { color: colors.primary }]}>
+                    Casting to {castDeviceName || 'device'}
+                  </Text>
+                </View>
+              ) : broadcastStatus === 'schedule' ? (
+                <View style={styles.liveStatusColumn}>
                   <LiveIndicator />
                   <TouchableOpacity
                     onPress={() => artistId && router.push(`/artist/${artistId}`)}
@@ -788,18 +798,9 @@ export default function ListenScreen() {
                 </Text>
               )}
             </View>
-          </View>
 
-          {/* Description */}
-          {showDescription ? (
-            <View style={styles.descriptionContainer}>
-              <SelectableText
-                text={showDescription}
-                style={[styles.showDescription, { color: colors.text }]}
-                linkStyle={{ color: colors.primary }}
-              />
-            </View>
-          ) : null}
+            <CastButton style={styles.castButton} tintColor={colors.text} />
+          </View>
 
           {/* Divider */}
           <View style={[styles.divider, { backgroundColor: colors.primary + '25' }]} />
@@ -953,36 +954,52 @@ const styles = StyleSheet.create({
   // Player row
   playerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   playButton: {
-    padding: 4,
+    padding: 0,
+    marginTop: -2,
+  },
+  castButton: {
+    width: 28,
+    height: 28,
+    marginTop: 4,
+    opacity: 0.7,
   },
   statusContainer: {
     flex: 1,
     minWidth: 0,
   },
-  liveStatusRow: {
+  liveStatusColumn: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  castStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap',
+    gap: 8,
+  },
+  castStatusText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   artistNameContainer: {
-    flex: 1,
-    minWidth: 0,
+    width: '100%',
   },
   artistName: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.4,
+    lineHeight: 32,
   },
   offAirText: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '600',
     opacity: 0.8,
+    lineHeight: 32,
   },
 
   // Live indicator (matches schedule page and website)
@@ -1006,15 +1023,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#AFFC41',
     letterSpacing: 0.8,
-  },
-
-  // Description
-  descriptionContainer: {
-    marginBottom: 16,
-  },
-  showDescription: {
-    fontSize: 15,
-    lineHeight: 22,
   },
 
   // Divider (matches schedule page style)

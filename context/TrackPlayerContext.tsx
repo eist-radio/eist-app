@@ -10,6 +10,7 @@ import {
   useState
 } from 'react';
 import { AppState, Platform } from 'react-native';
+import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
 import { setupTrackPlayer } from '../utils/trackPlayerSetup';
@@ -47,6 +48,10 @@ type TrackPlayerContextType = {
   showTitle: string;
   showArtist: string;
   showArtworkUrl: string | undefined;
+  // Cast-related state (exposed from CastContext for convenience)
+  isCastConnected: boolean;
+  isCastPlaying: boolean;
+  castDeviceName: string | null;
 }
 
 const TrackPlayerContext = createContext<TrackPlayerContextType | undefined>(
@@ -61,6 +66,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isWeb = Platform.OS === 'web'
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayerReady, setIsPlayerReady] = useState(false)
+
+  // Cast context for Chromecast integration
+  const {
+    isCastConnected,
+    isCastPlaying,
+    castDeviceName,
+    castPlay,
+    castStop,
+    updateCastMetadata,
+  } = useCast()
 
   // Store the latest show metadata in state
   const [showTitle, setShowTitle] = useState<string>('éist');
@@ -418,6 +433,37 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // Set user intent first
     userPlay.current = true
 
+    // Check if casting - either via state or by checking for active session
+    let shouldCast = isCastConnected
+
+    // Double-check for active cast session in case state hasn't updated yet
+    if (!shouldCast && Platform.OS !== 'web') {
+      try {
+        const GoogleCast = require('react-native-google-cast').default
+        const sessionManager = GoogleCast.getSessionManager()
+        const session = await sessionManager.getCurrentCastSession()
+        if (session) {
+          shouldCast = true
+        }
+      } catch (e) {
+        // Ignore errors - just means no cast session
+      }
+    }
+
+    // If casting, route playback to cast device instead of local
+    if (shouldCast) {
+      try {
+        await castPlay(showTitle || 'éist', showArtist || '', showArtworkUrl)
+        setIsPlaying(true)
+        await storeLastPlayedState(true)
+        console.log('Started playback on cast device')
+        return
+      } catch (err) {
+        console.error('Cast play failed, falling back to local:', err)
+        // Fall through to local playback
+      }
+    }
+
     if (isWeb) {
       // Clean reset for web
       if (audioRef.current) {
@@ -488,7 +534,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       console.log('Play failed, attempting restart...')
       await attemptStreamRestart('play-error')
     }
-  }, [isPlayerReady, isWeb, setupPlayer, attemptStreamRestart, cleanResetPlayer, fetchAndUpdateShowMetadata])
+  }, [isPlayerReady, isWeb, setupPlayer, attemptStreamRestart, cleanResetPlayer, fetchAndUpdateShowMetadata, isCastConnected, castPlay, showTitle, showArtist, showArtworkUrl])
 
   const stop = useCallback(async () => {
     // Clear user intent when manually stopping
@@ -498,6 +544,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (retryTimeout.current) {
       clearTimeout(retryTimeout.current)
       retryTimeout.current = null
+    }
+
+    // If casting, stop cast playback
+    if (isCastConnected || isCastPlaying) {
+      try {
+        await castStop()
+        console.log('Stopped cast playback')
+      } catch (err) {
+        console.error('Cast stop failed:', err)
+      }
     }
 
     if (isWeb) {
@@ -531,7 +587,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setIsPlaying(false)
       await storeLastPlayedState(false)
     }
-  }, [isWeb, ensureTrackForDisplay])
+  }, [isWeb, ensureTrackForDisplay, isCastConnected, isCastPlaying, castStop])
 
   const togglePlayStop = async () => {
     if (isPlaying) {
@@ -554,6 +610,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     artist: string,
     artworkUrl?: string
   ) => {
+    // Also update cast metadata if casting
+    if (isCastConnected || isCastPlaying) {
+      try {
+        await updateCastMetadata(title, artist, artworkUrl)
+      } catch (err) {
+        console.error('Failed to update cast metadata:', err)
+      }
+    }
+
     if (!isPlayerReady || isWeb) return
 
     try {
@@ -755,10 +820,41 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  // Sync isPlaying state with cast playing state
+  useEffect(() => {
+    if (isCastConnected && isCastPlaying && !isPlaying) {
+      setIsPlaying(true)
+    } else if (isCastConnected && !isCastPlaying && isPlaying && userPlay.current) {
+      // Cast stopped but user wanted to play - might need to resume locally
+      // For now just sync state; user can press play again
+      setIsPlaying(false)
+    }
+  }, [isCastConnected, isCastPlaying, isPlaying])
+
+  // Handle cast disconnection - resume local playback if user was playing
+  const previousCastConnected = useRef(isCastConnected)
+  useEffect(() => {
+    if (previousCastConnected.current && !isCastConnected && userPlay.current) {
+      // Cast disconnected while user wanted to play - resume locally
+      console.log('Cast disconnected, resuming local playback')
+      // Small delay to let cast session fully end
+      setTimeout(async () => {
+        if (userPlay.current && !isPlayingRef.current) {
+          try {
+            await play()
+          } catch (err) {
+            console.error('Failed to resume local playback after cast disconnect:', err)
+          }
+        }
+      }, 1000)
+    }
+    previousCastConnected.current = isCastConnected
+  }, [isCastConnected, play])
+
   return (
     <TrackPlayerContext.Provider
       value={{
-        isPlaying,
+        isPlaying: isPlaying || isCastPlaying,
         isPlayerReady,
         play,
         stop,
@@ -771,6 +867,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         showTitle,
         showArtist,
         showArtworkUrl,
+        isCastConnected,
+        isCastPlaying,
+        castDeviceName,
       }}
     >
       {children}
