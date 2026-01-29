@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>éist · live radio</title>
+  <style>
+    /* éist Design System */
+    :root {
+      --eist-purple: #4733FF;
+      --eist-green: #AFFC41;
+      --eist-purple-dark: #3527CC;
+      --eist-purple-light: #5A4AFF;
+    }
+
+    @font-face {
+      font-family: 'Funnel Sans';
+      src: url('https://eist.radio/fonts/FunnelSans-VariableFont_wght.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Funnel Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--eist-purple);
+      color: var(--eist-green);
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Animated background */
+    .background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+    }
+
+    .background::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at 30% 40%, var(--eist-purple-light) 0%, transparent 40%),
+                  radial-gradient(circle at 70% 60%, var(--eist-purple-dark) 0%, transparent 35%),
+                  radial-gradient(circle at 50% 80%, var(--eist-purple-light) 0%, transparent 30%);
+      animation: gradientShift 20s ease-in-out infinite;
+    }
+
+    @keyframes gradientShift {
+      0%, 100% { transform: translate(0, 0) rotate(0deg); }
+      25% { transform: translate(2%, -2%) rotate(1deg); }
+      50% { transform: translate(-1%, 3%) rotate(-1deg); }
+      75% { transform: translate(-2%, -1%) rotate(0.5deg); }
+    }
+
+    /* Main container */
+    .receiver {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      padding: 80px;
+      width: 100%;
+      height: 100%;
+      align-items: center;
+    }
+
+    /* Left side - Info */
+    .info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 32px;
+    }
+
+    .logo {
+      width: 180px;
+      height: auto;
+      opacity: 0.95;
+      filter: drop-shadow(0 4px 20px rgba(0, 0, 0, 0.3));
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(175, 252, 65, 0.15);
+      border: 2px solid var(--eist-green);
+      border-radius: 50px;
+      padding: 12px 28px;
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      width: fit-content;
+    }
+
+    .live-dot {
+      width: 16px;
+      height: 16px;
+      background: var(--eist-green);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+      box-shadow: 0 0 20px var(--eist-green);
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .metadata {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .title {
+      font-size: 72px;
+      font-weight: 700;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+      max-width: 100%;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+    }
+
+    .artist {
+      font-size: 36px;
+      font-weight: 400;
+      opacity: 0.8;
+      text-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Right side - Artwork */
+    .artwork-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .artwork-frame {
+      position: relative;
+      width: 100%;
+      max-width: 600px;
+      aspect-ratio: 1;
+    }
+
+    .artwork {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 24px;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5),
+                  0 0 0 4px rgba(175, 252, 65, 0.2);
+    }
+
+    .artwork-placeholder {
+      width: 100%;
+      height: 100%;
+      border-radius: 24px;
+      background: linear-gradient(135deg, var(--eist-purple-light) 0%, var(--eist-purple-dark) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 40px 100px rgba(0, 0, 0, 0.5),
+                  0 0 0 4px rgba(175, 252, 65, 0.2);
+    }
+
+    .artwork-placeholder .logo-large {
+      width: 60%;
+      opacity: 0.6;
+    }
+
+    /* Playback indicator */
+    .playback-indicator {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(0, 0, 0, 0.3);
+      backdrop-filter: blur(20px);
+      padding: 20px 40px;
+      border-radius: 100px;
+      border: 1px solid rgba(175, 252, 65, 0.2);
+    }
+
+    .bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 28px;
+    }
+
+    .bar {
+      width: 6px;
+      background: var(--eist-green);
+      border-radius: 3px;
+      animation: soundBars 1s ease-in-out infinite;
+    }
+
+    .bar:nth-child(1) { height: 40%; animation-delay: 0s; }
+    .bar:nth-child(2) { height: 70%; animation-delay: 0.1s; }
+    .bar:nth-child(3) { height: 100%; animation-delay: 0.2s; }
+    .bar:nth-child(4) { height: 60%; animation-delay: 0.3s; }
+    .bar:nth-child(5) { height: 80%; animation-delay: 0.4s; }
+
+    @keyframes soundBars {
+      0%, 100% { transform: scaleY(1); }
+      50% { transform: scaleY(0.4); }
+    }
+
+    .bars.paused .bar {
+      animation: none;
+      transform: scaleY(0.3);
+      opacity: 0.5;
+    }
+
+    .playback-text {
+      font-size: 20px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* Idle state */
+    .receiver.idle .metadata,
+    .receiver.idle .live-badge,
+    .receiver.idle .playback-indicator {
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .receiver.idle .artwork-container {
+      grid-column: span 2;
+      justify-self: center;
+    }
+
+    .receiver.idle .info {
+      display: none;
+    }
+
+    /* Buffering state */
+    .receiver.buffering .bars .bar {
+      animation: bufferingBars 0.6s ease-in-out infinite;
+    }
+
+    @keyframes bufferingBars {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    /* Screen saver / idle animation */
+    .screensaver {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: var(--eist-purple);
+      z-index: 100;
+    }
+
+    .screensaver.active {
+      display: flex;
+    }
+
+    .screensaver .floating-logo {
+      width: 300px;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0); }
+      25% { transform: translate(100px, -50px); }
+      50% { transform: translate(-50px, 50px); }
+      75% { transform: translate(-100px, -30px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="background"></div>
+
+  <div class="receiver" id="receiver">
+    <div class="info">
+      <svg class="logo" viewBox="0 0 200 60" fill="currentColor">
+        <text x="0" y="48" font-family="'Funnel Sans', sans-serif" font-size="56" font-weight="700">éist</text>
+      </svg>
+
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span>Live</span>
+      </div>
+
+      <div class="metadata">
+        <div class="title" id="title">éist · live radio</div>
+        <div class="artist" id="artist"></div>
+      </div>
+    </div>
+
+    <div class="artwork-container">
+      <div class="artwork-frame">
+        <div class="artwork-placeholder" id="artwork-placeholder">
+          <svg class="logo-large" viewBox="0 0 200 60" fill="currentColor">
+            <text x="20" y="48" font-family="'Funnel Sans', sans-serif" font-size="56" font-weight="700">éist</text>
+          </svg>
+        </div>
+        <img class="artwork" id="artwork" style="display: none;" alt="Show artwork">
+      </div>
+    </div>
+  </div>
+
+  <div class="playback-indicator" id="playback-indicator">
+    <div class="bars" id="bars">
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+      <div class="bar"></div>
+    </div>
+    <span class="playback-text" id="playback-text">Now Playing</span>
+  </div>
+
+  <div class="screensaver" id="screensaver">
+    <svg class="floating-logo" viewBox="0 0 200 60" fill="currentColor">
+      <text x="20" y="48" font-family="'Funnel Sans', sans-serif" font-size="56" font-weight="700">éist</text>
+    </svg>
+  </div>
+
+  <!-- Cast Receiver Framework -->
+  <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+
+  <script>
+    const context = cast.framework.CastReceiverContext.getInstance();
+    const playerManager = context.getPlayerManager();
+
+    const receiverEl = document.getElementById('receiver');
+    const titleEl = document.getElementById('title');
+    const artistEl = document.getElementById('artist');
+    const artworkEl = document.getElementById('artwork');
+    const artworkPlaceholderEl = document.getElementById('artwork-placeholder');
+    const barsEl = document.getElementById('bars');
+    const playbackTextEl = document.getElementById('playback-text');
+    const screensaverEl = document.getElementById('screensaver');
+
+    let idleTimeout = null;
+
+    // Update UI with media metadata
+    function updateMetadata(mediaInformation) {
+      if (!mediaInformation || !mediaInformation.metadata) {
+        showIdle();
+        return;
+      }
+
+      const metadata = mediaInformation.metadata;
+
+      // Update title
+      titleEl.textContent = metadata.title || 'éist · live radio';
+
+      // Update artist/subtitle
+      if (metadata.subtitle || metadata.artist) {
+        artistEl.textContent = metadata.subtitle || metadata.artist;
+        artistEl.style.display = 'block';
+      } else {
+        artistEl.style.display = 'none';
+      }
+
+      // Update artwork
+      if (metadata.images && metadata.images.length > 0) {
+        const imageUrl = metadata.images[0].url;
+        artworkEl.src = imageUrl;
+        artworkEl.style.display = 'block';
+        artworkPlaceholderEl.style.display = 'none';
+      } else {
+        artworkEl.style.display = 'none';
+        artworkPlaceholderEl.style.display = 'flex';
+      }
+
+      hideScreensaver();
+      receiverEl.classList.remove('idle');
+    }
+
+    // Update playback state UI
+    function updatePlaybackState(state) {
+      clearIdleTimeout();
+
+      switch (state) {
+        case cast.framework.messages.PlayerState.PLAYING:
+          barsEl.classList.remove('paused');
+          receiverEl.classList.remove('buffering');
+          playbackTextEl.textContent = 'Now Playing';
+          hideScreensaver();
+          break;
+        case cast.framework.messages.PlayerState.PAUSED:
+          barsEl.classList.add('paused');
+          receiverEl.classList.remove('buffering');
+          playbackTextEl.textContent = 'Paused';
+          startIdleTimeout();
+          break;
+        case cast.framework.messages.PlayerState.BUFFERING:
+          barsEl.classList.remove('paused');
+          receiverEl.classList.add('buffering');
+          playbackTextEl.textContent = 'Loading';
+          break;
+        case cast.framework.messages.PlayerState.IDLE:
+          showIdle();
+          break;
+      }
+    }
+
+    function showIdle() {
+      receiverEl.classList.add('idle');
+      barsEl.classList.add('paused');
+      startIdleTimeout();
+    }
+
+    function hideScreensaver() {
+      screensaverEl.classList.remove('active');
+    }
+
+    function showScreensaver() {
+      screensaverEl.classList.add('active');
+    }
+
+    function startIdleTimeout() {
+      clearIdleTimeout();
+      idleTimeout = setTimeout(() => {
+        showScreensaver();
+      }, 60000); // Show screensaver after 1 minute of idle
+    }
+
+    function clearIdleTimeout() {
+      if (idleTimeout) {
+        clearTimeout(idleTimeout);
+        idleTimeout = null;
+      }
+    }
+
+    // Event listeners
+    playerManager.addEventListener(
+      cast.framework.events.EventType.PLAYER_LOAD_COMPLETE,
+      (event) => {
+        const mediaInformation = playerManager.getMediaInformation();
+        updateMetadata(mediaInformation);
+      }
+    );
+
+    playerManager.addEventListener(
+      cast.framework.events.EventType.MEDIA_STATUS,
+      (event) => {
+        const mediaInformation = playerManager.getMediaInformation();
+        updateMetadata(mediaInformation);
+        updatePlaybackState(event.mediaStatus?.playerState);
+      }
+    );
+
+    playerManager.addEventListener(
+      cast.framework.events.EventType.PLAYER_STATE_CHANGED,
+      (event) => {
+        updatePlaybackState(event.field);
+      }
+    );
+
+    // Handle metadata updates for live streams
+    playerManager.setMessageInterceptor(
+      cast.framework.messages.MessageType.LOAD,
+      (loadRequestData) => {
+        const mediaInformation = loadRequestData.media;
+        updateMetadata(mediaInformation);
+        return loadRequestData;
+      }
+    );
+
+    // Configure player options
+    const playbackConfig = new cast.framework.PlaybackConfig();
+    playbackConfig.autoResumeDuration = 5;
+
+    // Start the receiver
+    context.start({
+      playbackConfig: playbackConfig,
+      supportedCommands:
+        cast.framework.messages.Command.PAUSE |
+        cast.framework.messages.Command.SEEK |
+        cast.framework.messages.Command.STREAM_VOLUME |
+        cast.framework.messages.Command.STREAM_MUTE
+    });
+
+    console.log('éist Cast Receiver initialized');
+  </script>
+</body>
+</html>
