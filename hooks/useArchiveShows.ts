@@ -1,19 +1,23 @@
 // hooks/useArchiveShows.ts
 
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo } from 'react';
 import { EIST_API_ENDPOINTS } from '../config';
 import { ArchiveSection, ArchiveShow, ShowsApiResponse } from '../types/archive';
 
-async function fetchArchiveShows(): Promise<ArchiveShow[]> {
-  // Fetch from éist API - the API already filters for archived shows
-  const response = await fetch(`${EIST_API_ENDPOINTS.shows}?hasArchive=true`);
+const INITIAL_LIMIT = 75;
+const LOAD_MORE_LIMIT = 50;
+
+async function fetchArchiveShowsPage(limit: number, offset: number): Promise<ShowsApiResponse> {
+  const response = await fetch(
+    `${EIST_API_ENDPOINTS.shows}?hasArchive=true&limit=${limit}&offset=${offset}`
+  );
 
   if (!response.ok) {
     throw new Error(`Failed to fetch archive shows: ${response.status} ${response.statusText}`);
   }
 
-  const data: ShowsApiResponse = await response.json();
-  return data.shows;
+  return response.json();
 }
 
 async function fetchShowBySlug(slug: string): Promise<ArchiveShow | null> {
@@ -68,20 +72,62 @@ function groupShowsByMonth(shows: ArchiveShow[]): ArchiveSection[] {
 }
 
 export function useArchiveShows() {
-  return useQuery({
+  const query = useInfiniteQuery({
     queryKey: ['archiveShows'],
-    queryFn: fetchArchiveShows,
+    queryFn: ({ pageParam }) => {
+      const offset = pageParam ?? 0;
+      const limit = offset === 0 ? INITIAL_LIMIT : LOAD_MORE_LIMIT;
+      return fetchArchiveShowsPage(limit, offset);
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage.pagination.hasMore) return undefined;
+      return lastPage.pagination.offset + lastPage.pagination.limit;
+    },
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
   });
+
+  // Flatten all pages into a single array
+  const shows = useMemo(() => {
+    return query.data?.pages.flatMap((page) => page.shows) ?? [];
+  }, [query.data]);
+
+  // Get pagination info from the last page
+  const lastPage = query.data?.pages[query.data.pages.length - 1];
+  const total = lastPage?.pagination.total ?? 0;
+  const hasMore = lastPage?.pagination.hasMore ?? false;
+
+  const loadMore = useCallback(() => {
+    if (hasMore && !query.isFetchingNextPage) {
+      query.fetchNextPage();
+    }
+  }, [hasMore, query]);
+
+  return {
+    shows,
+    total,
+    hasMore,
+    loadMore,
+    isLoading: query.isLoading,
+    isLoadingMore: query.isFetchingNextPage,
+    error: query.error,
+    refetch: query.refetch,
+    isRefetching: query.isRefetching,
+  };
 }
 
 export function useArchiveShowsByMonth() {
-  const query = useArchiveShows();
+  const { shows, total, hasMore, loadMore, isLoadingMore, ...rest } = useArchiveShows();
 
   return {
-    ...query,
-    sections: query.data ? groupShowsByMonth(query.data) : [],
+    ...rest,
+    sections: shows.length > 0 ? groupShowsByMonth(shows) : [],
+    total,
+    loaded: shows.length,
+    hasMore,
+    loadMore,
+    isLoadingMore,
   };
 }
 
