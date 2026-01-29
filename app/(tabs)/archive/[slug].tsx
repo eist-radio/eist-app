@@ -303,7 +303,7 @@ export default function ArchiveShowScreen() {
   const { colors } = useTheme();
   const router = useRouter();
 
-  const { show, isLoading } = useArchiveShowBySlug(slug);
+  const { data: show, isLoading } = useArchiveShowBySlug(slug);
   const { shows: relatedShows } = useArchiveShowsByArtist(show?.artistSlug, 5);
 
   const [imageFailed, setImageFailed] = useState(false);

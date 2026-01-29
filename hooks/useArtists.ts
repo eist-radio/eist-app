@@ -2,9 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import localShowsData from '../assets/data/shows.json';
-import { apiKey } from '../config';
-import { ArchiveShow, DerivedArtist } from '../types/archive';
+import { apiKey, EIST_API_ENDPOINTS } from '../config';
+import { ArtistMapping, ArtistStat, DerivedArtist } from '../types/archive';
 
 const STATION_ID = 'eist-radio';
 const ARTISTS_URL = `https://api.radiocult.fm/api/station/${STATION_ID}/artists`;
@@ -26,12 +25,6 @@ type ArtistsResponse = {
   artists: ApiArtist[];
 };
 
-type ArtistStats = {
-  totalArchived: number;
-  recent40NonRepeat: boolean;
-  recent3moArchived: boolean;
-};
-
 function getArtistImage(logo?: ApiArtistLogo): string | null {
   if (!logo) return null;
   return logo['1024x1024'] || logo['512x512'] || logo['256x256'] || logo.default || null;
@@ -47,103 +40,62 @@ function normalizeSlug(name: string): string {
     .replace(/-+/g, '-'); // Collapse multiple hyphens
 }
 
-type ArtistShowData = {
-  isActive: boolean;
-  showCount: number;
-};
-
 /**
- * Compute show data for artists including active status and show counts.
+ * Determine if an artist is "active" based on their stats.
  * An artist is active if:
- * 1. They had a scheduled (non-repeat) show in the past 40 days, OR
- * 2. They have archived shows in the last 3 months, OR
- * 3. They have more than 3 total archived shows
+ * - They have a show within the last 40 days, OR
+ * - They have more than 3 archived shows
  */
-function computeArtistShowData(shows: ArchiveShow[]): Map<string, ArtistShowData> {
+function isArtistActive(stat: ArtistStat): boolean {
   const now = new Date();
   const fortyDaysAgo = new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000);
-  const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const latestShowDate = new Date(stat.latestShow);
 
-  const artistStats = new Map<string, ArtistStats>();
-  const showCounts = new Map<string, number>();
-
-  for (const show of shows) {
-    const slug = show.artistSlug;
-    if (!slug) continue;
-
-    // Count all shows for each artist (for display purposes)
-    showCounts.set(slug, (showCounts.get(slug) || 0) + 1);
-
-    const hasArchive = !!(show.mixcloud_match || show.soundcloud_match);
-    const isRepeat = show.title.toLowerCase().includes('ist ar'); // "éist arís" or "eist aris"
-
-    let stats = artistStats.get(slug);
-    if (!stats) {
-      stats = { totalArchived: 0, recent40NonRepeat: false, recent3moArchived: false };
-      artistStats.set(slug, stats);
-    }
-
-    // Count archived shows
-    if (hasArchive) {
-      stats.totalArchived += 1;
-      if (show.start) {
-        const showDate = new Date(show.start);
-        if (showDate > threeMonthsAgo) {
-          stats.recent3moArchived = true;
-        }
-      }
-    }
-
-    // Check for recent non-repeat scheduled shows
-    if (show.start && !isRepeat) {
-      const showDate = new Date(show.start);
-      if (showDate > fortyDaysAgo) {
-        stats.recent40NonRepeat = true;
-      }
-    }
+  // Rule 1: Had a show in the past 40 days
+  if (latestShowDate > fortyDaysAgo) {
+    return true;
   }
 
-  // Build result map with active status and show counts
-  const result = new Map<string, ArtistShowData>();
-  for (const [slug, stats] of artistStats) {
-    let isActive = false;
-
-    // Rule 1: Scheduled non-repeat show in past 40 days = always active
-    if (stats.recent40NonRepeat) {
-      isActive = true;
-    }
-    // Rule 2: No recent scheduled shows AND no archived shows in 3 months AND ≤3 total archived = inactive
-    else if (!stats.recent3moArchived && stats.totalArchived <= 3) {
-      isActive = false;
-    }
-    // Rule 3: Has archived shows (not caught by rule 2) = active
-    else {
-      isActive = true;
-    }
-
-    result.set(slug, {
-      isActive,
-      showCount: showCounts.get(slug) || 0,
-    });
+  // Rule 2: Has more than 3 archived shows
+  if (stat.showsWithArchive > 3) {
+    return true;
   }
 
-  return result;
+  return false;
+}
+
+async function fetchArtistStats(): Promise<Map<string, ArtistStat>> {
+  const response = await fetch(EIST_API_ENDPOINTS.artistsStats);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch artist stats: ${response.status} ${response.statusText}`);
+  }
+
+  const stats: ArtistStat[] = await response.json();
+
+  // Convert array to map by slug for easy lookup
+  const statsMap = new Map<string, ArtistStat>();
+  for (const stat of stats) {
+    statsMap.set(stat.slug, stat);
+  }
+
+  return statsMap;
 }
 
 async function fetchArtists(): Promise<DerivedArtist[]> {
-  const res = await fetch(ARTISTS_URL, {
-    headers: { 'x-api-key': apiKey },
-  });
+  // Fetch both RadioCult artist profiles and éist API stats in parallel
+  const [artistsRes, statsMap] = await Promise.all([
+    fetch(ARTISTS_URL, {
+      headers: { 'x-api-key': apiKey },
+    }),
+    fetchArtistStats(),
+  ]);
 
-  if (!res.ok) {
-    throw new Error(`Failed to fetch artists: ${res.statusText}`);
+  if (!artistsRes.ok) {
+    throw new Error(`Failed to fetch artists: ${artistsRes.statusText}`);
   }
 
-  const data = (await res.json()) as ArtistsResponse;
-
-  // Get artist show data from local shows data
-  const shows = localShowsData as ArchiveShow[];
-  const artistShowData = computeArtistShowData(shows);
+  const data = (await artistsRes.json()) as ArtistsResponse;
 
   // Deduplicate artists by slug, keeping the one with the most complete profile
   const artistsBySlug = new Map<string, DerivedArtist>();
@@ -152,16 +104,16 @@ async function fetchArtists(): Promise<DerivedArtist[]> {
     if (!artist.name) continue;
 
     const slug = normalizeSlug(artist.name);
-    const showData = artistShowData.get(slug);
+    const stat = statsMap.get(slug);
     const imageUrl = getArtistImage(artist.logo);
 
     const derived: DerivedArtist = {
       id: artist.id,
       slug,
       name: artist.name,
-      showCount: showData?.showCount ?? 0,
+      showCount: stat?.totalShows ?? 0,
       imageUrl,
-      isActive: showData?.isActive ?? false,
+      isActive: stat ? isArtistActive(stat) : false,
     };
 
     const existing = artistsBySlug.get(slug);
@@ -209,4 +161,24 @@ export function useFilteredArtists(searchQuery: string) {
     ...queryRest,
     artists: filtered,
   };
+}
+
+// Fetch artist ID to name/slug mapping for schedule display
+async function fetchArtistMapping(): Promise<ArtistMapping> {
+  const response = await fetch(EIST_API_ENDPOINTS.artistsMapping);
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch artist mapping: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export function useArtistMapping() {
+  return useQuery({
+    queryKey: ['artistMapping'],
+    queryFn: fetchArtistMapping,
+    staleTime: 30 * 60 * 1000, // 30 minutes - rarely changes
+    gcTime: 60 * 60 * 1000, // 1 hour
+  });
 }
