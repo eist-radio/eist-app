@@ -39,6 +39,11 @@
       justify-content: center;
     }
 
+    body.state-idle,
+    body.state-buffering {
+      --eist-green: #E6E3FF;
+    }
+
     /* Animated background */
     .background {
       position: fixed;
@@ -368,8 +373,22 @@
     const barsEl = document.getElementById('bars');
     const playbackTextEl = document.getElementById('playback-text');
     const screensaverEl = document.getElementById('screensaver');
+    const bodyEl = document.body;
 
     let idleTimeout = null;
+    const stateClasses = [
+      'state-playing',
+      'state-paused',
+      'state-buffering',
+      'state-idle',
+    ];
+
+    function setUiState(state) {
+      stateClasses.forEach((name) => bodyEl.classList.remove(name));
+      bodyEl.classList.add(`state-${state}`);
+    }
+
+    setUiState('idle');
 
     // Update UI with media metadata
     function updateMetadata(mediaInformation) {
@@ -416,17 +435,20 @@
           receiverEl.classList.remove('buffering');
           playbackTextEl.textContent = 'Now Playing';
           hideScreensaver();
+          setUiState('playing');
           break;
         case cast.framework.messages.PlayerState.PAUSED:
           barsEl.classList.add('paused');
           receiverEl.classList.remove('buffering');
           playbackTextEl.textContent = 'Paused';
           startIdleTimeout();
+          setUiState('paused');
           break;
         case cast.framework.messages.PlayerState.BUFFERING:
           barsEl.classList.remove('paused');
           receiverEl.classList.add('buffering');
           playbackTextEl.textContent = 'Loading';
+          setUiState('buffering');
           break;
         case cast.framework.messages.PlayerState.IDLE:
           showIdle();
@@ -438,6 +460,7 @@
       receiverEl.classList.add('idle');
       barsEl.classList.add('paused');
       startIdleTimeout();
+      setUiState('idle');
     }
 
     function hideScreensaver() {

@@ -55,14 +55,14 @@ const RECEIVER_HTML = `<!DOCTYPE html>
       --splash-image: none;
       --playback-logo-image: url('https://eist.radio/eist-logo-small.png');
       --theme-hue: 250;
-      --progress-color: #AFFC41;
+      --progress-color: #CFCBFF;
       /* Subtle loading - dark with muted spinner */
       --splash-color: #0D0D14;
-      --splash-spinner-color: #AFFC41;
-      --spinner-color: #AFFC41;
+      --splash-spinner-color: #CFCBFF;
+      --spinner-color: #CFCBFF;
       --font-family: 'Funnel Sans', sans-serif;
       /* Text colors */
-      --logo-color: #AFFC41;
+      --logo-color: #E6E3FF;
     }
   </style>
 </head>
