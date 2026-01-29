@@ -616,18 +616,20 @@ const styles = StyleSheet.create({
 
   // Time column
   timeColumn: {
-    width: 70,
+    width: 80,
     marginRight: 12,
   },
   startTime: {
     fontSize: 15,
     fontWeight: '600',
     letterSpacing: -0.3,
+    flexWrap: 'nowrap',
   },
   endTime: {
     fontSize: 12,
     opacity: 0.5,
     marginTop: 2,
+    flexWrap: 'nowrap',
   },
 
   // Content column
