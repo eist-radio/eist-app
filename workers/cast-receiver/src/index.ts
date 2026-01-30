@@ -84,7 +84,7 @@ const RECEIVER_HTML = `<!DOCTYPE html>
       --progress-color: #CFCBFF;
       --spinner-color: #CFCBFF;
       --splash-spinner-color: #CFCBFF;
-      --logo-color: #E6E3FF;
+      --logo-color: #0D0D14; /* This colour shows on loading */
       position: absolute !important;
       inset: 0;
       width: 100%;
