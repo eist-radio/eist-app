@@ -735,18 +735,22 @@ export default function ListenScreen() {
           {/* Hero content at bottom - show title over image */}
           <View style={styles.heroContent}>
             {broadcastStatus === 'schedule' && showTitle && (
-              <TouchableOpacity
-                onPress={() => currentShowId && router.push(`/show/${currentShowId}`)}
-                disabled={!currentShowId}
-                activeOpacity={0.8}
-              >
-                <FormattedShowTitle
-                  title={showTitle}
-                  color={colors.primary}
-                  size={28}
-                  style={styles.heroTitle}
-                />
-              </TouchableOpacity>
+              <View style={styles.showTitleRow}>
+                <TouchableOpacity
+                  onPress={() => currentShowId && router.push(`/show/${currentShowId}`)}
+                  disabled={!currentShowId}
+                  activeOpacity={0.8}
+                  style={styles.showTitleTouchable}
+                >
+                  <FormattedShowTitle
+                    title={showTitle}
+                    color={colors.primary}
+                    size={28}
+                    style={styles.heroTitle}
+                  />
+                </TouchableOpacity>
+                <LiveIndicator />
+              </View>
             )}
           </View>
         </View>
@@ -769,16 +773,8 @@ export default function ListenScreen() {
             </TouchableOpacity>
 
             <View style={styles.statusContainer}>
-              {isCastConnected ? (
-                <View style={styles.castStatusRow}>
-                  <Ionicons name="tv-outline" size={16} color={colors.primary} />
-                  <Text style={[styles.castStatusText, { color: colors.primary }]}>
-                    Casting to {castDeviceName || 'device'}
-                  </Text>
-                </View>
-              ) : broadcastStatus === 'schedule' ? (
+              {broadcastStatus === 'schedule' ? (
                 <View style={styles.liveStatusColumn}>
-                  <LiveIndicator />
                   <TouchableOpacity
                     onPress={() => artistId && router.push(`/artist/${artistId}`)}
                     disabled={!artistId}
@@ -791,11 +787,29 @@ export default function ListenScreen() {
                       {artistName}
                     </Text>
                   </TouchableOpacity>
+                  {isCastConnected && (
+                    <View style={styles.castStatusRow}>
+                      <Ionicons name="tv-outline" size={14} color={colors.primary} />
+                      <Text style={[styles.castStatusText, { color: colors.primary }]}>
+                        Casting to {castDeviceName || 'device'}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               ) : (
-                <Text style={[styles.offAirText, { color: colors.text }]}>
-                  {artistName}
-                </Text>
+                <View style={styles.liveStatusColumn}>
+                  <Text style={[styles.offAirText, { color: colors.text }]}>
+                    {artistName}
+                  </Text>
+                  {isCastConnected && (
+                    <View style={styles.castStatusRow}>
+                      <Ionicons name="tv-outline" size={14} color={colors.primary} />
+                      <Text style={[styles.castStatusText, { color: colors.primary }]}>
+                        Casting to {castDeviceName || 'device'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               )}
             </View>
 
@@ -924,6 +938,16 @@ const styles = StyleSheet.create({
           textShadowOffset: { width: 0, height: 4 },
           textShadowRadius: 30,
         }),
+  },
+  showTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  showTitleTouchable: {
+    flex: 1,
+    minWidth: 0,
   },
   loadingContainer: {
     position: 'absolute',
