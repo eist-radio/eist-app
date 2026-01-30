@@ -4,6 +4,7 @@ import { ArchiveShowCard } from '@/components/ArchiveShowCard';
 import { ArtistNotifyButton } from '@/components/ArtistNotifyButton';
 import { SelectableText } from '@/components/SelectableText';
 import { useArchiveShowsByArtist } from '@/hooks/useArchiveShows';
+import { useArtistMapping } from '@/hooks/useArtists';
 import { FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
@@ -115,6 +116,7 @@ type ScheduleItem = {
 
 type RawArtist = {
   id: string;
+  slug?: string;
   name?: string;
   description?: { content?: any[] };
   logo?: {
@@ -247,6 +249,16 @@ function extractTagValue(
   if (!tags) return undefined;
   const found = tags.find((t) => t.startsWith(prefix));
   return found ? found.replace(prefix, '').toLowerCase() : undefined;
+}
+
+function normalizeSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
+    .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
+    .replace(/^-+|-+$/g, '') // Remove leading/trailing hyphens
+    .replace(/-+/g, '-'); // Collapse multiple hyphens
 }
 
 async function fetchArtistById(id: string): Promise<RawArtist> {
@@ -407,11 +419,10 @@ const ShowCard = ({
 export default function ArtistScreen() {
   const { slug, id: queryId } = useLocalSearchParams<{ slug?: string; id?: string }>();
   const id = queryId ?? slug;
-  // Archive API expects an artist slug; many routes pass an artist ID instead.
-  const archiveArtistSlug = artist?.slug ?? (queryId ? slug : undefined);
   const { colors } = useTheme();
   const router = useRouter();
   const currentTimezone = useTimezoneChange();
+  const { data: artistMapping } = useArtistMapping();
 
   const { data: artist } = useQuery({
     queryKey: ['artist', id],
@@ -425,6 +436,14 @@ export default function ArtistScreen() {
     enabled: !!id,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Archive API expects a slug; avoid sending a raw artist ID from ID-based routes.
+  const routeSlug =
+    queryId || (artist && slug && slug !== artist.id) ? slug : undefined;
+  const mappedSlug = id ? artistMapping?.[id]?.slug : undefined;
+  const nameSlug = artist?.name ? normalizeSlug(artist.name) : undefined;
+  const archiveArtistSlug =
+    artist?.slug ?? routeSlug ?? mappedSlug ?? nameSlug;
 
   const { shows: archivedShows } = useArchiveShowsByArtist(archiveArtistSlug, 12);
 
