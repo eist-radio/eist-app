@@ -23,8 +23,10 @@ export type CastMediaInfo = {
     title: string
     subtitle?: string
     studio?: string
+    artist?: string
     images?: Array<{ url: string }>
   }
+  customData?: Record<string, any>
 }
 
 /**
@@ -51,22 +53,29 @@ function formatCastTitle(title: string): string {
 export function buildCastMediaInfo(
   title: string,
   artist: string,
-  artworkUrl?: string
+  artworkUrl?: string,
+  showTime?: string,
+  customData?: Record<string, any>
 ): CastMediaInfo {
   const images = artworkUrl ? [{ url: artworkUrl }] : []
   const formattedTitle = formatCastTitle(title)
+  const subtitleParts = []
+  if (artist) subtitleParts.push(`with ${artist}`)
+  if (showTime) subtitleParts.push(showTime)
+  const subtitle = subtitleParts.join(' · ')
 
   return {
     contentUrl: STREAM_URL,
     contentType: 'audio/mpeg',
     streamType: 'live',
     metadata: {
-      type: 'musicTrack',
+      type: 'generic',
       title: formattedTitle,
-      subtitle: artist || 'éist · live',
-      studio: 'éist',
+      subtitle: subtitle || 'éist · live',
+      artist: artist || 'éist',
       images,
     },
+    customData,
   }
 }
 
@@ -76,7 +85,8 @@ export function buildCastMediaInfo(
 export async function loadMediaOnCast(
   title: string,
   artist: string,
-  artworkUrl?: string
+  artworkUrl?: string,
+  showTime?: string
 ): Promise<boolean> {
   if (Platform.OS === 'web' || !GoogleCast) {
     console.log('Cast not available on this platform')
@@ -99,12 +109,33 @@ export async function loadMediaOnCast(
       return false
     }
 
-    const mediaInfo = buildCastMediaInfo(title, artist, artworkUrl)
+    const formattedTitle = formatCastTitle(title)
+    const mediaInfo = buildCastMediaInfo(
+      title,
+      artist,
+      artworkUrl,
+      showTime || '',
+      {
+        showTime: showTime || '',
+        djName: artist || '',
+      }
+    )
 
     await client.loadMedia({
       mediaInfo,
       autoplay: true,
     })
+
+    try {
+      await sendCastMetadataMessage({
+        type: 'metadata',
+        title: formattedTitle,
+        showTime: showTime || '',
+        djName: artist || '',
+      })
+    } catch (messageError) {
+      console.warn('Failed to send cast metadata message:', messageError)
+    }
 
     console.log('Media loaded on cast device')
     return true
@@ -120,39 +151,64 @@ export async function loadMediaOnCast(
 export async function updateCastMediaMetadata(
   title: string,
   artist: string,
-  artworkUrl?: string
+  _artworkUrl?: string,
+  showTime?: string
 ): Promise<boolean> {
   if (Platform.OS === 'web' || !GoogleCast) {
     return false
   }
 
   try {
-    const sessionManager = GoogleCast.getSessionManager()
-    const session = await sessionManager.getCurrentCastSession()
-
-    if (!session) {
-      return false
-    }
-
-    const client = session.getClient()
-    if (!client) {
-      return false
-    }
-
-    // For live streams, we need to reload the media to update metadata
-    const mediaInfo = buildCastMediaInfo(title, artist, artworkUrl)
-
-    const mediaStatus = await client.getMediaStatus()
-    if (mediaStatus?.playerState === 'playing' || mediaStatus?.playerState === 'buffering') {
-      await client.loadMedia({
-        mediaInfo,
-        autoplay: true,
-      })
-    }
-
-    return true
+    const formattedTitle = formatCastTitle(title)
+    return await sendCastMetadataMessage({
+      type: 'metadata',
+      title: formattedTitle,
+      showTime: showTime || '',
+      djName: artist || '',
+    })
   } catch (error) {
     console.error('Failed to update cast metadata:', error)
+    return false
+  }
+}
+
+const CAST_METADATA_NAMESPACE = 'urn:x-cast:com.eist.metadata'
+let castChannel: { sessionId?: string; channel?: any } = {}
+
+async function getCastChannel() {
+  if (Platform.OS === 'web' || !GoogleCast) return null
+
+  const sessionManager = GoogleCast.getSessionManager()
+  const session = await sessionManager.getCurrentCastSession()
+  if (!session) return null
+
+  const sessionId = session.id
+  if (castChannel.channel && castChannel.sessionId === sessionId) {
+    return castChannel.channel
+  }
+
+  if (castChannel.channel) {
+    try {
+      await castChannel.channel.remove()
+    } catch {
+      // Ignore channel cleanup errors
+    }
+  }
+
+  const channel = await session.addChannel(CAST_METADATA_NAMESPACE)
+  castChannel = { sessionId, channel }
+  return channel
+}
+
+async function sendCastMetadataMessage(payload: Record<string, any>) {
+  const channel = await getCastChannel()
+  if (!channel) return false
+
+  try {
+    await channel.sendMessage(payload)
+    return true
+  } catch (error) {
+    console.warn('Failed to send cast metadata message:', error)
     return false
   }
 }

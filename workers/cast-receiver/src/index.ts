@@ -41,11 +41,19 @@ const RECEIVER_HTML = `<!DOCTYPE html>
 <head>
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <style>
-    /* Prevent flash of wrong color before CSS loads */
-    html, body {
-      background: #0D0D14 !important;
+    html,
+    body {
+      width: 100%;
+      height: 100%;
       margin: 0;
-      padding: 0;
+      background: #0D0D14;
+    }
+
+    body {
+      font-family: 'Funnel Sans', sans-serif;
+      color: #E6E3FF;
+      overflow: hidden;
+      position: relative;
     }
 
     @font-face {
@@ -73,18 +81,119 @@ const RECEIVER_HTML = `<!DOCTYPE html>
       --theme-hue: 250;
 
       /* Accent colors - subtle on splash */
-      --progress-color: #AFFC41;
-      --spinner-color: #2a2a3a;
-      --splash-spinner-color: #2a2a3a;
-      --logo-color: #0D0D14; /* This colour shows on loading */
+      --progress-color: #CFCBFF;
+      --spinner-color: #CFCBFF;
+      --splash-spinner-color: #CFCBFF;
+      --logo-color: #E6E3FF;
+      position: absolute !important;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      z-index: 0 !important;
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .metadata-version {
+      position: absolute;
+      right: 24px;
+      bottom: 18px;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      opacity: 0.35;
+      color: #FFFFFF;
     }
   </style>
 </head>
-<body style="background:#0D0D14">
+<body>
+  <div class="metadata-version">v2026.01.30-6</div>
   <cast-media-player></cast-media-player>
   <script>
-    const ctx = cast.framework.CastReceiverContext.getInstance();
-    ctx.start();
+    const CUSTOM_NAMESPACE = 'urn:x-cast:com.eist.metadata';
+
+    if (!window.cast || !cast.framework) {
+      console.warn('Cast framework unavailable; metadata sync disabled.');
+    } else {
+      const ctx = cast.framework.CastReceiverContext.getInstance();
+      const playerManager = ctx.getPlayerManager();
+
+      function formatTitle(rawTitle) {
+        if (!rawTitle) return 'éist';
+        return String(rawTitle)
+          .replace(/\(éist arís\)/gi, '↻')
+          .replace(/\(eist aris\)/gi, '↻')
+          .replace(/\(éíst arís\)/gi, '↻')
+          .replace(/\(éist aris\)/gi, '↻')
+          .replace(/\(eist arís\)/gi, '↻')
+          .trim();
+      }
+
+      function applyMetadataToPlayer(payload) {
+        if (!payload || typeof payload !== 'object') return;
+        const mediaInfo = playerManager.getMediaInformation();
+        if (!mediaInfo) return;
+
+        const metadata = mediaInfo.metadata || { type: 'generic' };
+        if (!metadata.type) {
+          metadata.type = 'generic';
+        }
+
+        if (payload.title) {
+          metadata.title = formatTitle(payload.title);
+        }
+        if (payload.djName) {
+          metadata.artist = payload.djName;
+        }
+        const subtitleParts = [];
+        if (payload.djName) subtitleParts.push(payload.djName);
+        if (payload.showTime) subtitleParts.push(payload.showTime);
+        if (subtitleParts.length > 0) {
+          metadata.subtitle = subtitleParts.join(' · ');
+        }
+
+        mediaInfo.metadata = metadata;
+
+        if (typeof playerManager.setMediaInformation === 'function') {
+          playerManager.setMediaInformation(mediaInfo);
+        } else if (typeof playerManager.setMediaMetadata === 'function') {
+          playerManager.setMediaMetadata(metadata);
+        } else if (typeof playerManager.broadcastStatus === 'function') {
+          playerManager.broadcastStatus(true);
+        }
+      }
+
+      function syncCustomDataToMetadata() {
+        const mediaInfo = playerManager.getMediaInformation();
+        if (!mediaInfo) return;
+
+        const customData = mediaInfo.customData || {};
+        applyMetadataToPlayer({
+          title: mediaInfo.metadata?.title,
+          showTime: customData.showTime,
+          djName: customData.djName,
+        });
+      }
+
+      playerManager.addEventListener(
+        cast.framework.events.EventType.PLAYER_LOAD_COMPLETE,
+        syncCustomDataToMetadata
+      );
+
+      ctx.addCustomMessageListener(CUSTOM_NAMESPACE, (event) => {
+        if (event?.data && typeof event.data === 'object') {
+          applyMetadataToPlayer(event.data);
+        }
+      });
+
+      const options = new cast.framework.CastReceiverOptions();
+      options.customNamespaces = {
+        [CUSTOM_NAMESPACE]: cast.framework.system.MessageType.JSON
+      };
+
+      ctx.start(options);
+    }
   </script>
 </body>
 </html>`;

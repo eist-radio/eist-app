@@ -14,6 +14,7 @@ import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
 import { setupTrackPlayer } from '../utils/trackPlayerSetup';
+import { getLiveShowInfo } from '../utils/liveShowInfo';
 
 // Only import TrackPlayer on mobile platforms
 let TrackPlayer: any, Event: any, State: any;
@@ -40,7 +41,8 @@ type TrackPlayerContextType = {
   updateMetadata: (
     title: string,
     artist: string,
-    artworkUrl?: string
+    artworkUrl?: string,
+    showTime?: string
   ) => Promise<void>
   recoverAudioSession: () => Promise<void>
   forcePlayerReset: () => Promise<void>
@@ -81,6 +83,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const [showTitle, setShowTitle] = useState<string>('éist');
   const [showArtist, setShowArtist] = useState<string>('');
   const [showArtworkUrl, setShowArtworkUrl] = useState<string | undefined>(undefined);
+  const showTimeRef = useRef<string>('');
 
   const hasInitialized = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -361,19 +364,22 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // Fetch the latest show metadata from the radiocult API and update state/metadata
   const fetchAndUpdateShowMetadata = async () => {
     try {
-      const response = await fetch('https://api.radiocult.fm/api/station/eist/schedule/live')
-      if (!response.ok) throw new Error('Failed to fetch show metadata')
+      const liveInfo = await getLiveShowInfo()
+      if (!liveInfo) {
+        throw new Error('No live show info available')
+      }
 
-      const data = await response.json()
-      const title = data?.title || 'éist'
-      const artist = data?.artist || ''
-      let artworkUrl = data?.artworkUrl || undefined
+      const title = liveInfo.title || 'éist'
+      const artist = liveInfo.djName || ''
+      let artworkUrl = liveInfo.artworkUrl || undefined
+      const showTime = liveInfo.showTime || ''
 
       // Check if metadata has actually changed
       const hasMetadataChanged = 
-        title !== showTitle || 
-        artist !== showArtist || 
-        artworkUrl !== showArtworkUrl
+        title !== showTitle ||
+        artist !== showArtist ||
+        artworkUrl !== showArtworkUrl ||
+        showTime !== showTimeRef.current
 
       if (!hasMetadataChanged) {
         console.log('Metadata unchanged, skipping update')
@@ -403,26 +409,27 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setShowTitle(title)
       setShowArtist(artist)
       setShowArtworkUrl(artworkUrl)
+      showTimeRef.current = showTime
 
       // First update metadata with current state (might use fallback image for Android)
-      await updateMetadata(title, artist, artworkUrl)
+      await updateMetadata(title, artist, artworkUrl, showTime)
 
       // Then preload the lock screen image for Android and update metadata again if successful
       if (Platform.OS === 'android' && artworkUrl) {
         const imagePreloaded = await preloadLockScreenImage(artworkUrl)
         if (imagePreloaded) {
           // Update metadata again with the validated artwork
-          await updateMetadata(title, artist, artworkUrl)
+          await updateMetadata(title, artist, artworkUrl, showTime)
           console.log('Lock screen image updated after preload validation')
         }
       }
       
-      console.log('Metadata updated successfully:', { title, artist, artworkUrl })
+      console.log('Metadata updated successfully:', { title, artist, artworkUrl, showTime })
     } catch (err) {
       console.error('Failed to fetch or update show metadata:', err)
       // Fallback to previous state/metadata
       try {
-        await updateMetadata(showTitle, showArtist, showArtworkUrl)
+        await updateMetadata(showTitle, showArtist, showArtworkUrl, showTimeRef.current)
       } catch (fallbackErr) {
         console.error('Failed to update fallback metadata:', fallbackErr)
       }
@@ -453,7 +460,36 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // If casting, route playback to cast device instead of local
     if (shouldCast) {
       try {
-        const castSuccess = await castPlay(showTitle || 'éist', showArtist || '', showArtworkUrl)
+        let castTitle = showTitle || 'éist'
+        let castArtist = showArtist || ''
+        let castArtwork = showArtworkUrl
+        let castShowTime = showTimeRef.current
+
+        try {
+          const liveInfo = await getLiveShowInfo()
+          if (liveInfo) {
+            castTitle = liveInfo.title || castTitle
+            castArtist = liveInfo.djName || castArtist
+            castArtwork = liveInfo.artworkUrl || castArtwork
+            castShowTime = liveInfo.showTime || castShowTime
+
+            setShowTitle(castTitle)
+            setShowArtist(castArtist)
+            setShowArtworkUrl(castArtwork)
+            if (castShowTime) {
+              showTimeRef.current = castShowTime
+            }
+          }
+        } catch (liveErr) {
+          console.warn('Failed to prefetch live show info for cast:', liveErr)
+        }
+
+        const castSuccess = await castPlay(
+          castTitle,
+          castArtist,
+          castArtwork,
+          castShowTime
+        )
         if (castSuccess) {
           setIsPlaying(true)
           await storeLastPlayedState(true)
@@ -612,12 +648,18 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const updateMetadata = async (
     title: string,
     artist: string,
-    artworkUrl?: string
+    artworkUrl?: string,
+    showTime?: string
   ) => {
+    if (showTime !== undefined) {
+      showTimeRef.current = showTime
+    }
+    const resolvedShowTime = showTime ?? showTimeRef.current
+
     // Also update cast metadata if casting
     if (isCastConnected || isCastPlaying) {
       try {
-        await updateCastMetadata(title, artist, artworkUrl)
+        await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
       } catch (err) {
         console.error('Failed to update cast metadata:', err)
       }

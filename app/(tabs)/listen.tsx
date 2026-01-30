@@ -29,6 +29,7 @@ import { FormattedShowTitle } from '../../components/FormattedShowTitle'
 import { apiKey } from '../../config'
 import { useTrackPlayer } from '../../context/TrackPlayerContext'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
+import { formatShowTimeRange } from '../../utils/liveShowInfo'
 
 // Only import TrackPlayer on mobile platforms
 let TrackPlayer: any, Event: any;
@@ -257,7 +258,7 @@ export default function ListenScreen() {
     // Don't clear next show info - it should be preserved when station is off air
     setIsContentLoading(false)
     try {
-      await updateMetadata('éist · off air', '', undefined)
+      await updateMetadata('éist · off air', '', undefined, '')
     } catch {
       // Don't let errors propagate - just log them
     }
@@ -313,6 +314,11 @@ export default function ListenScreen() {
         const newShowTitle = content.title || ''
         const newCurrentShowId = content.id || null
         const newArtistId = content.artistIds?.[0] ?? null
+        const showTimeRange = formatShowTimeRange(
+          content.startDateUtc,
+          content.endDateUtc,
+          currentTimezone
+        )
 
         // Prepare description
         let desc = parseDescription(content.description?.content || [])
@@ -343,16 +349,16 @@ export default function ListenScreen() {
             if (imageLoaded) {
               setRemoteImageUrl(image.uri)
               setImageFailed(false)
-              await updateMetadata(newShowTitle || 'éist', name, image.uri)
-                  } else {
-        setRemoteImageUrl(null)
-        setImageFailed(true)
-        await updateMetadata(newShowTitle || 'éist', name, undefined)
-      }
+              await updateMetadata(newShowTitle || 'éist', name, image.uri, showTimeRange)
+            } else {
+              setRemoteImageUrl(null)
+              setImageFailed(true)
+              await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
+            }
           } else {
             setRemoteImageUrl(null)
             setImageFailed(false)
-            await updateMetadata(newShowTitle || 'éist', name, undefined)
+            await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
           }
 
           setIsContentLoading(false)
@@ -360,9 +366,14 @@ export default function ListenScreen() {
           // Artist ID hasn't changed, just update metadata with current artist info
           if (artistId && artistCache[artistId]) {
             const cachedArtist = artistCache[artistId]
-            await updateMetadata(newShowTitle || 'éist', cachedArtist.name, cachedArtist.image?.uri || undefined)
+            await updateMetadata(
+              newShowTitle || 'éist',
+              cachedArtist.name,
+              cachedArtist.image?.uri || undefined,
+              showTimeRange
+            )
           } else {
-            await updateMetadata(newShowTitle || 'éist', artistName, remoteImageUrl || undefined)
+            await updateMetadata(newShowTitle || 'éist', artistName, remoteImageUrl || undefined, showTimeRange)
           }
         }
       }
@@ -370,7 +381,7 @@ export default function ListenScreen() {
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime])
+  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime, currentTimezone])
 
   const fetchNowPlayingWithArtist = useCallback(async () => {
 
@@ -421,6 +432,11 @@ export default function ListenScreen() {
       const newShowTitle = content.title || ''
       const newCurrentShowId = content.id || null
       const newArtistId = content.artistIds?.[0] ?? null
+      const showTimeRange = formatShowTimeRange(
+        content.startDateUtc,
+        content.endDateUtc,
+        currentTimezone
+      )
 
       const { name, image } = await getArtistDetails(newArtistId)
 
@@ -447,16 +463,16 @@ export default function ListenScreen() {
         if (imageLoaded) {
           setRemoteImageUrl(image.uri)
           setImageFailed(false)
-          await updateMetadata(newShowTitle || 'éist', name, image.uri)
+          await updateMetadata(newShowTitle || 'éist', name, image.uri, showTimeRange)
         } else {
           setRemoteImageUrl(null)
           setImageFailed(true)
-          await updateMetadata(newShowTitle || 'éist', name, undefined)
+          await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
         }
       } else {
         setRemoteImageUrl(null)
         setImageFailed(false)
-        await updateMetadata(newShowTitle || 'éist', name, placeholderArtistImage)
+        await updateMetadata(newShowTitle || 'éist', name, placeholderArtistImage, showTimeRange)
       }
 
       // Mark loading as finished
@@ -465,7 +481,7 @@ export default function ListenScreen() {
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime])
+  }, [getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime, currentTimezone])
 
   // Function to calculate time until next 1 minute past the hour
   const getTimeUntilNextRefresh = () => {

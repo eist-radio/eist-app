@@ -47,12 +47,13 @@ export type CastContextType = {
   castDeviceName: string | null
   castSessionState: CastSessionState
   isCastPlaying: boolean
-  castPlay: (title: string, artist: string, artworkUrl?: string) => Promise<boolean>
+  castPlay: (title: string, artist: string, artworkUrl?: string, showTime?: string) => Promise<boolean>
   castStop: () => Promise<void>
   updateCastMetadata: (
     title: string,
     artist: string,
-    artworkUrl?: string
+    artworkUrl?: string,
+    showTime?: string
   ) => Promise<void>
 }
 
@@ -81,6 +82,7 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     title: string
     artist: string
     artworkUrl?: string
+    showTime?: string
   }>({
     title: 'éist',
     artist: '',
@@ -202,13 +204,13 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
   }, [isCastConnected, isWeb])
 
   const castPlay = useCallback(
-    async (title: string, artist: string, artworkUrl?: string): Promise<boolean> => {
+    async (title: string, artist: string, artworkUrl?: string, showTime?: string): Promise<boolean> => {
       // Don't rely on isCastConnected state - loadMediaOnCast does its own session check
       // This avoids race conditions where state hasn't updated yet but session exists
-      currentMetadata.current = { title, artist, artworkUrl }
+      currentMetadata.current = { title, artist, artworkUrl, showTime }
 
       console.log('Loading media on cast device...')
-      const success = await loadMediaOnCast(title, artist, artworkUrl)
+      const success = await loadMediaOnCast(title, artist, artworkUrl, showTime)
       if (success) {
         console.log('Cast playback started')
         setIsCastPlaying(true)
@@ -229,15 +231,15 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
   }, [])
 
   const updateCastMetadataFn = useCallback(
-    async (title: string, artist: string, artworkUrl?: string) => {
+    async (title: string, artist: string, artworkUrl?: string, showTime?: string) => {
       if (!isCastConnected || !isCastPlaying) {
         // Just store metadata for when cast starts
-        currentMetadata.current = { title, artist, artworkUrl }
+        currentMetadata.current = { title, artist, artworkUrl, showTime }
         return
       }
 
-      currentMetadata.current = { title, artist, artworkUrl }
-      await updateCastMediaMetadata(title, artist, artworkUrl)
+      currentMetadata.current = { title, artist, artworkUrl, showTime }
+      await updateCastMediaMetadata(title, artist, artworkUrl, showTime)
     },
     [isCastConnected, isCastPlaying]
   )
