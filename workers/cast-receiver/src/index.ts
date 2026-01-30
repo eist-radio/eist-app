@@ -41,6 +41,13 @@ const RECEIVER_HTML = `<!DOCTYPE html>
 <head>
   <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
   <style>
+    /* Prevent flash of wrong color before CSS loads */
+    html, body {
+      background: #0D0D14 !important;
+      margin: 0;
+      padding: 0;
+    }
+
     @font-face {
       font-family: 'Funnel Sans';
       src: url('https://eist.radio/fonts/FunnelSans-VariableFont_wght.woff2') format('woff2');
@@ -50,23 +57,30 @@ const RECEIVER_HTML = `<!DOCTYPE html>
     }
 
     cast-media-player {
-      /* Dark background matching playback screen */
+      /* Dark background for ALL states */
       --background-color: #0D0D14;
-      --splash-image: none;
-      --playback-logo-image: url('https://eist.radio/eist-logo-small.png');
-      --theme-hue: 250;
-      --progress-color: #CFCBFF;
-      /* Subtle loading - dark with muted spinner */
+      --background: #0D0D14;
       --splash-color: #0D0D14;
-      --splash-spinner-color: #CFCBFF;
-      --spinner-color: #CFCBFF;
+      --splash-background: #0D0D14;
+      --splash-image: none;
+      --logo-background: transparent;
+      --watermark-color: transparent;
+      --watermark-background: transparent;
+
+      /* Branding */
+      --playback-logo-image: url('https://eist.radio/eist-logo-small.png');
       --font-family: 'Funnel Sans', sans-serif;
-      /* Text colors */
-      --logo-color: #E6E3FF;
+      --theme-hue: 250;
+
+      /* Accent colors - subtle on splash */
+      --progress-color: #AFFC41;
+      --spinner-color: #2a2a3a;
+      --splash-spinner-color: #2a2a3a;
+      --logo-color: #0D0D14; /* This colour shows on loading */
     }
   </style>
 </head>
-<body>
+<body style="background:#0D0D14">
   <cast-media-player></cast-media-player>
   <script>
     const ctx = cast.framework.CastReceiverContext.getInstance();
