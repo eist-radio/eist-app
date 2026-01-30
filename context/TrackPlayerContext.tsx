@@ -34,7 +34,7 @@ const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
 type TrackPlayerContextType = {
   isPlaying: boolean
   isPlayerReady: boolean
-  play: () => Promise<void>
+  play: (options?: { castOnly?: boolean }) => Promise<void>
   stop: () => Promise<void>
   togglePlayStop: () => Promise<void>
   setupPlayer: () => Promise<void>
@@ -454,9 +454,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const play = useCallback(async () => {
+  const play = useCallback(async (options?: { castOnly?: boolean }) => {
     // Set user intent first
     userPlay.current = true
+    const castOnly = options?.castOnly === true
 
     // Check if casting - either via state or by checking for active session
     let shouldCast = isCastConnected
@@ -513,6 +514,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           setIsPlaying(true)
           await storeLastPlayedState(true)
           console.log('Started playback on cast device')
+          return
+        }
+        if (castOnly) {
+          console.log('Cast-only play requested; not falling back to local')
+          setIsPlaying(false)
+          await storeLastPlayedState(false)
           return
         }
         console.log('Cast play returned false, falling back to local playback')
@@ -901,11 +908,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const wasConnected = previousCastConnected.current
 
-    if (!wasConnected && isCastConnected && userPlay.current && !isCastPlaying) {
-      console.log('Cast connected while playing, moving playback to cast')
+    if (!wasConnected && isCastConnected && !isCastPlaying) {
+      const castOnly = !userPlay.current && !isPlayingRef.current
+      console.log(
+        castOnly
+          ? 'Cast connected; starting playback on cast'
+          : 'Cast connected while playing, moving playback to cast'
+      )
       ;(async () => {
         try {
-          await play()
+          await play({ castOnly })
         } catch (err) {
           console.error('Failed to start cast playback after connect:', err)
         }
