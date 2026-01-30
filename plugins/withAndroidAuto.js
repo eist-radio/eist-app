@@ -16,6 +16,8 @@ import android.os.IBinder
 import android.os.Looper
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaDescriptionCompat
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
@@ -40,6 +42,8 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
     private var isBound = false
     private val handler = Handler(Looper.getMainLooper())
     private var retryCount = 0
+    private var mediaController: MediaControllerCompat? = null
+    private var metadataCallback: MediaControllerCompat.Callback? = null
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -73,6 +77,18 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         super.onDestroy()
         Log.d(TAG, "MediaBrowserService destroyed")
         handler.removeCallbacksAndMessages(null)
+
+        // Unregister metadata callback
+        metadataCallback?.let { callback ->
+            try {
+                mediaController?.unregisterCallback(callback)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error unregistering metadata callback", e)
+            }
+        }
+        metadataCallback = null
+        mediaController = null
+
         if (isBound) {
             try {
                 unbindService(serviceConnection)
@@ -184,6 +200,36 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
             Log.d(TAG, "Got MediaSession, setting session token")
             sessionToken = mediaSession.sessionToken
             Log.i(TAG, "Session token set successfully!")
+
+            // Register metadata callback to fix DISPLAY_SUBTITLE for Android Auto
+            // Android Auto uses DISPLAY_SUBTITLE for the second line, but kotlin-audio
+            // only sets METADATA_KEY_ARTIST. We intercept and copy artist to display_subtitle.
+            try {
+                mediaController = MediaControllerCompat(this, mediaSession.sessionToken)
+                metadataCallback = object : MediaControllerCompat.Callback() {
+                    override fun onMetadataChanged(metadata: MediaMetadataCompat?) {
+                        if (metadata == null) return
+
+                        val displaySubtitle = metadata.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE)
+                        val artist = metadata.getString(MediaMetadataCompat.METADATA_KEY_ARTIST)
+
+                        Log.d(TAG, "Metadata changed - artist: \$artist, displaySubtitle: \$displaySubtitle")
+
+                        // If display subtitle is missing but artist exists, fix the metadata
+                        if (displaySubtitle.isNullOrEmpty() && !artist.isNullOrEmpty()) {
+                            Log.d(TAG, "Fixing metadata: copying artist to DISPLAY_SUBTITLE")
+                            val fixedMetadata = MediaMetadataCompat.Builder(metadata)
+                                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+                                .build()
+                            mediaSession.setMetadata(fixedMetadata)
+                        }
+                    }
+                }
+                mediaController?.registerCallback(metadataCallback!!)
+                Log.i(TAG, "Metadata callback registered for Android Auto fix")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error registering metadata callback", e)
+            }
 
         } catch (e: NoSuchFieldException) {
             Log.e(TAG, "Field not found - track-player internals may have changed", e)

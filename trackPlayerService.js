@@ -24,7 +24,8 @@ const startFreshStream = async () => {
       id: 'radio-stream-' + Date.now(), // Unique ID for fresh track
       url: STREAM_URL,
       title: currentTrack?.title || 'éist',
-      artist: currentTrack?.artist || 'éist',
+      artist: currentTrack?.artist || '',
+      album: 'éist',
       artwork: currentTrack?.artwork || require('./assets/images/eist-logo.png'),
       isLiveStream: true,
     };

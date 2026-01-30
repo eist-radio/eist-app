@@ -140,7 +140,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   // Clean reset of the stream while preserving metadata display
-  const cleanResetPlayer = async () => {
+  // Optional metadata parameter allows passing freshly fetched metadata directly
+  // (since React setState is async and state may not be updated yet)
+  const cleanResetPlayer = async (metadata?: { title: string; artist: string; artworkUrl?: string }) => {
     if (isWeb) {
       // Clean reset for web audio
       if (audioRef.current) {
@@ -166,21 +168,26 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Small delay to ensure cleanup
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Re-add fresh stream track with preserved metadata if available
-      let artwork = currentTrack?.artwork || showArtworkUrl || require('../assets/images/eist-logo.png')
-      
+      // Use passed metadata first, then current track, then state fallbacks
+      const trackTitle = metadata?.title || currentTrack?.title || showTitle || 'éist'
+      const trackArtist = metadata?.artist || currentTrack?.artist || showArtist || ''
+      let artwork = metadata?.artworkUrl || currentTrack?.artwork || showArtworkUrl || require('../assets/images/eist-logo.png')
+
       // Use the lock screen image utility for proper Android handling
       artwork = getLockScreenImage(artwork)
-      
+
       const trackToAdd = {
         id: 'radio-stream-' + Date.now(), // Unique ID for fresh track
         url: STREAM_URL,
-        title: currentTrack?.title || showTitle || 'éist',
-        artist: currentTrack?.artist || (showArtist ? `${showArtist} · éist` : 'éist'),
+        title: trackTitle,
+        artist: trackArtist,
+        album: 'éist',
         artwork: artwork,
         isLiveStream: true,
       }
-      
+
+      console.log('Creating track with metadata:', { title: trackTitle, artist: trackArtist })
+
       try {
         await TrackPlayer.add(trackToAdd)
       } catch (addError) {
@@ -231,7 +238,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           id: 'radio-display-' + Date.now(),
           url: STREAM_URL,
           title: showTitle || 'éist',
-          artist: showArtist ? `${showArtist} · éist` : 'éist',
+          artist: showArtist || '',
+          album: 'éist',
           artwork: artwork,
           isLiveStream: true,
           duration: -1, // Live stream indicator
@@ -380,7 +388,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   // Fetch the latest show metadata from the radiocult API and update state/metadata
-  const fetchAndUpdateShowMetadata = async () => {
+  // Returns the fetched metadata for immediate use (since setState is async)
+  const fetchAndUpdateShowMetadata = async (): Promise<{ title: string; artist: string; artworkUrl?: string; showTime: string } | null> => {
     try {
       const liveInfo = await getLiveShowInfo()
       if (!liveInfo) {
@@ -393,16 +402,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const showTime = liveInfo.showTime || ''
 
       // Check if metadata has actually changed
-      const hasMetadataChanged = 
+      const hasMetadataChanged =
         title !== showTitle ||
         artist !== showArtist ||
         artworkUrl !== showArtworkUrl ||
         showTime !== showTimeRef.current
-
-      if (!hasMetadataChanged) {
-        console.log('Metadata unchanged, skipping update')
-        return
-      }
 
       // For Android, invalidate previous artwork cache if URL changed
       if (Platform.OS === 'android' && showArtworkUrl && showArtworkUrl !== artworkUrl) {
@@ -429,20 +433,26 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setShowArtworkUrl(artworkUrl)
       showTimeRef.current = showTime
 
-      // First update metadata with current state (might use fallback image for Android)
-      await updateMetadata(title, artist, artworkUrl, showTime)
+      // Update track metadata if it changed
+      if (hasMetadataChanged) {
+        // First update metadata with current state (might use fallback image for Android)
+        await updateMetadata(title, artist, artworkUrl, showTime)
 
-      // Then preload the lock screen image for Android and update metadata again if successful
-      if (Platform.OS === 'android' && artworkUrl) {
-        const imagePreloaded = await preloadLockScreenImage(artworkUrl)
-        if (imagePreloaded) {
-          // Update metadata again with the validated artwork
-          await updateMetadata(title, artist, artworkUrl, showTime)
-          console.log('Lock screen image updated after preload validation')
+        // Then preload the lock screen image for Android and update metadata again if successful
+        if (Platform.OS === 'android' && artworkUrl) {
+          const imagePreloaded = await preloadLockScreenImage(artworkUrl)
+          if (imagePreloaded) {
+            // Update metadata again with the validated artwork
+            await updateMetadata(title, artist, artworkUrl, showTime)
+            console.log('Lock screen image updated after preload validation')
+          }
         }
+
+        console.log('Metadata updated successfully:', { title, artist, artworkUrl, showTime })
       }
-      
-      console.log('Metadata updated successfully:', { title, artist, artworkUrl, showTime })
+
+      // Return the metadata for immediate use
+      return { title, artist, artworkUrl, showTime }
     } catch (err) {
       console.error('Failed to fetch or update show metadata:', err)
       // Fallback to previous state/metadata
@@ -451,6 +461,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       } catch (fallbackErr) {
         console.error('Failed to update fallback metadata:', fallbackErr)
       }
+      return null
     }
   }
 
@@ -565,11 +576,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // Always perform clean reset before playing
-      await cleanResetPlayer()
+      // Fetch fresh metadata FIRST and pass directly to cleanResetPlayer
+      // (React setState is async so state won't be updated yet)
+      const metadata = await fetchAndUpdateShowMetadata()
 
-      // Fetch fresh metadata before starting playback
-      await fetchAndUpdateShowMetadata()
+      // Now perform clean reset with fresh metadata passed directly
+      await cleanResetPlayer(metadata || undefined)
 
       // Start playback with muted volume to allow buffering without glitch
       await TrackPlayer.setVolume(0)
@@ -703,7 +715,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const trackIndex = 0
 
       const isDeadAir = title.trim().length === 0
-      const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
 
       // Use appropriate artwork for Android lock screen and Android Auto compatibility
       let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
@@ -713,7 +724,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       const metadata = {
         title,
-        artist: isDeadAir ? '' : metadataArtist,
+        artist: isDeadAir ? '' : (artist || ''),
+        album: 'éist',
         artwork: artworkToUse,
         // Enhanced metadata for Android Auto and car OS compatibility
         duration: -1, // Live stream indicator
