@@ -407,6 +407,8 @@ const ShowCard = ({
 export default function ArtistScreen() {
   const { slug, id: queryId } = useLocalSearchParams<{ slug?: string; id?: string }>();
   const id = queryId ?? slug;
+  // Archive API expects an artist slug; many routes pass an artist ID instead.
+  const archiveArtistSlug = artist?.slug ?? (queryId ? slug : undefined);
   const { colors } = useTheme();
   const router = useRouter();
   const currentTimezone = useTimezoneChange();
@@ -424,7 +426,7 @@ export default function ArtistScreen() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { shows: archivedShows } = useArchiveShowsByArtist(slug, 12);
+  const { shows: archivedShows } = useArchiveShowsByArtist(archiveArtistSlug, 12);
 
   const fallbackImage = require('../../../assets/images/eist_online.png');
   const [imageFailed, setImageFailed] = useState(false);
@@ -729,12 +731,12 @@ export default function ArtistScreen() {
                   )}
 
                   {/* Notify Button */}
-                  {artist.id && slug && (
+                  {artist.id && archiveArtistSlug && (
                     <View style={styles.notifyButtonContainer}>
                       <ArtistNotifyButton
                         artistId={artist.id}
                         artistName={artist.name || 'Unnamed Artist'}
-                        artistSlug={slug}
+                        artistSlug={archiveArtistSlug}
                       />
                     </View>
                   )}
