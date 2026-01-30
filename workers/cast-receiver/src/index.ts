@@ -108,7 +108,7 @@ const RECEIVER_HTML = `<!DOCTYPE html>
   </style>
 </head>
 <body>
-  <div class="metadata-version">v2026.01.30-6</div>
+  <div class="metadata-version">v2026.01.30-7</div>
   <cast-media-player></cast-media-player>
   <script>
     const CUSTOM_NAMESPACE = 'urn:x-cast:com.eist.metadata';
@@ -152,6 +152,9 @@ const RECEIVER_HTML = `<!DOCTYPE html>
         if (subtitleParts.length > 0) {
           metadata.subtitle = subtitleParts.join(' · ');
         }
+        if (payload.artworkUrl) {
+          metadata.images = [{ url: payload.artworkUrl }];
+        }
 
         mediaInfo.metadata = metadata;
 
@@ -173,6 +176,7 @@ const RECEIVER_HTML = `<!DOCTYPE html>
           title: mediaInfo.metadata?.title,
           showTime: customData.showTime,
           djName: customData.djName,
+          artworkUrl: customData.artworkUrl,
         });
       }
 

@@ -118,6 +118,7 @@ export async function loadMediaOnCast(
       {
         showTime: showTime || '',
         djName: artist || '',
+        artworkUrl: artworkUrl || '',
       }
     )
 
@@ -132,6 +133,7 @@ export async function loadMediaOnCast(
         title: formattedTitle,
         showTime: showTime || '',
         djName: artist || '',
+        artworkUrl: artworkUrl || '',
       })
     } catch (messageError) {
       console.warn('Failed to send cast metadata message:', messageError)
@@ -151,7 +153,7 @@ export async function loadMediaOnCast(
 export async function updateCastMediaMetadata(
   title: string,
   artist: string,
-  _artworkUrl?: string,
+  artworkUrl?: string,
   showTime?: string
 ): Promise<boolean> {
   if (Platform.OS === 'web' || !GoogleCast) {
@@ -165,6 +167,7 @@ export async function updateCastMediaMetadata(
       title: formattedTitle,
       showTime: showTime || '',
       djName: artist || '',
+      artworkUrl: artworkUrl || '',
     })
   } catch (error) {
     console.error('Failed to update cast metadata:', error)
