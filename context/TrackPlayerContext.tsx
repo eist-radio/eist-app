@@ -196,6 +196,24 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const stopLocalPlaybackForCast = async () => {
+    if (isWeb) {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+      setIsPlaying(false)
+      return
+    }
+
+    try {
+      await TrackPlayer.stop()
+    } catch (err) {
+      console.error('Failed to stop local playback for cast:', err)
+    } finally {
+      setIsPlaying(false)
+    }
+  }
+
   // Function to ensure track exists in queue for metadata display
   const ensureTrackForDisplay = async () => {
     if (isWeb) return
@@ -460,6 +478,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // If casting, route playback to cast device instead of local
     if (shouldCast) {
       try {
+        await stopLocalPlaybackForCast()
         let castTitle = showTitle || 'éist'
         let castArtist = showArtist || ''
         let castArtwork = showArtworkUrl
@@ -880,7 +899,20 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // Handle cast disconnection - resume local playback if user was playing
   const previousCastConnected = useRef(isCastConnected)
   useEffect(() => {
-    if (previousCastConnected.current && !isCastConnected && userPlay.current) {
+    const wasConnected = previousCastConnected.current
+
+    if (!wasConnected && isCastConnected && userPlay.current && !isCastPlaying) {
+      console.log('Cast connected while playing, moving playback to cast')
+      ;(async () => {
+        try {
+          await play()
+        } catch (err) {
+          console.error('Failed to start cast playback after connect:', err)
+        }
+      })()
+    }
+
+    if (wasConnected && !isCastConnected && userPlay.current) {
       // Cast disconnected while user wanted to play - resume locally
       console.log('Cast disconnected, resuming local playback')
       // Small delay to let cast session fully end
@@ -895,7 +927,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }, 1000)
     }
     previousCastConnected.current = isCastConnected
-  }, [isCastConnected, play])
+  }, [isCastConnected, isCastPlaying, play])
 
   return (
     <TrackPlayerContext.Provider
