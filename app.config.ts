@@ -25,7 +25,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       receiverAppId: "7A2782C8",
       iosStartDiscoveryAfterFirstTapOnCastButton: false,
       iosSuspendSessionsWhenBackgrounded: false
-    }]
+    }],
+    "./plugins/withAndroidAuto"
   ],
   ios: {
     ...config.ios,
