@@ -159,13 +159,14 @@ export default function ScheduleScreen() {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000)
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (apiKey) {
+        headers['x-api-key'] = apiKey
+      }
       const res = await fetch(
         `https://api.radiocult.fm/api/station/${STATION_ID}/schedule/live`,
         {
-          headers: {
-            'x-api-key': apiKey,
-            'Content-Type': 'application/json',
-          },
+          headers,
           signal: controller.signal,
         }
       )
@@ -458,8 +459,12 @@ async function fetchSchedule(startDate: string, endDate: string, currentTimezone
   const timeoutId = setTimeout(() => controller.abort(), 10000)
 
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (apiKey) {
+      headers['x-api-key'] = apiKey
+    }
     const res = await fetch(url, {
-      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      headers,
       signal: controller.signal,
     })
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)

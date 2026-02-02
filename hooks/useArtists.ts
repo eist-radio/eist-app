@@ -84,10 +84,12 @@ async function fetchArtistStats(): Promise<Map<string, ArtistStat>> {
 
 async function fetchArtists(): Promise<DerivedArtist[]> {
   // Fetch both RadioCult artist profiles and éist API stats in parallel
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
+  }
   const [artistsRes, statsMap] = await Promise.all([
-    fetch(ARTISTS_URL, {
-      headers: { 'x-api-key': apiKey },
-    }),
+    fetch(ARTISTS_URL, { headers }),
     fetchArtistStats(),
   ]);
 

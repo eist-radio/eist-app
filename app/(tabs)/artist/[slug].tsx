@@ -263,7 +263,11 @@ function normalizeSlug(name: string): string {
 
 async function fetchArtistById(id: string): Promise<RawArtist> {
   const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(id)}`;
-  const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
+  }
+  const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`Artist fetch failed: ${res.statusText}`);
   const json = (await res.json()) as { artist?: RawArtist };
   if (!json.artist) throw new Error('Artist not found');
@@ -287,9 +291,11 @@ async function fetchNextShowForArtist(
     `&timeZone=${encodeURIComponent(timezone)}`;
 
   try {
-    const res = await fetch(url, {
-      headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-    });
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiKey) {
+      headers['x-api-key'] = apiKey;
+    }
+    const res = await fetch(url, { headers });
     if (!res.ok) return null;
 
     const json = (await res.json()) as { schedules?: ScheduleItem[] };

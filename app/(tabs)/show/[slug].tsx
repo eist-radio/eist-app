@@ -118,7 +118,11 @@ async function fetchEventById(id: string): Promise<RawScheduleItem> {
   const url =
     `https://api.radiocult.fm/api/station/${STATION_ID}/schedule` +
     `?startDate=${startIso}&endDate=${endIso}`;
-  const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
+  }
+  const res = await fetch(url, { headers });
   const json = await res.json();
   const match = (json.schedules || []).find((e: RawScheduleItem) => e.id === id);
   if (!match) throw new Error('Show not found');
@@ -127,7 +131,11 @@ async function fetchEventById(id: string): Promise<RawScheduleItem> {
 
 async function fetchHostArtist(artistId: string): Promise<Artist> {
   const url = `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${artistId}`;
-  const res = await fetch(url, { headers: { 'x-api-key': apiKey } });
+  const headers: Record<string, string> = {};
+  if (apiKey) {
+    headers['x-api-key'] = apiKey;
+  }
+  const res = await fetch(url, { headers });
   const json = await res.json();
   if (!json.artist) throw new Error('Artist not found');
   return json.artist;

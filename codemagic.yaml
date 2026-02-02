@@ -9,15 +9,20 @@ workflows:
     cache:
       cache_paths:
         - $HOME/.npm
-        - $CM_BUILD_DIR/node_modules
-        - $HOME/.cocoapods
+        - $HOME/Library/Caches/CocoaPods
         - $CM_BUILD_DIR/ios/Pods
     scripts:
       - name: Install dependencies
-        script: npm ci
+        script: npm ci --prefer-offline --no-audit
 
       - name: Generate native project
-        script: npx expo prebuild --platform ios --clean
+        script: npx expo prebuild --platform ios --non-interactive --no-install
+
+      - name: Install pods
+        script: |
+          cd ios
+          # Prefer deterministic install; fall back when lockfile drift requires regeneration.
+          pod install --deployment || pod install
 
       - name: Build iOS Simulator app
         script: |
@@ -31,7 +36,10 @@ workflows:
             -sdk iphonesimulator \
             -derivedDataPath build \
             -destination 'generic/platform=iOS Simulator' \
+            -parallelizeTargets \
             -jobs $(sysctl -n hw.ncpu) \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Prepare artifact
