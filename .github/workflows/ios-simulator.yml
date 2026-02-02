@@ -1,0 +1,68 @@
+name: iOS Simulator Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_to_appetize:
+        description: 'Upload to Appetize.io'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate native project
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Build iOS Simulator app
+        run: |
+          cd ios
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME=$(echo "$WORKSPACE" | sed 's/.xcworkspace//')
+          echo "Building workspace: $WORKSPACE, scheme: $SCHEME"
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Prepare artifact
+        run: |
+          cd ios/build/Build/Products/Release-iphonesimulator
+          APP_NAME=$(ls -d *.app | head -1)
+          zip -r ${{ github.workspace }}/eist-app-simulator.zip "$APP_NAME"
+
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-build
+          path: eist-app-simulator.zip
+          retention-days: 30
+
+      - name: Upload to Appetize.io
+        if: ${{ inputs.upload_to_appetize && secrets.APPETIZE_API_KEY }}
+        run: |
+          response=$(curl -X POST "https://api.appetize.io/v1/apps" \
+            -H "X-API-KEY: ${{ secrets.APPETIZE_API_KEY }}" \
+            -F "file=@eist-app-simulator.zip" \
+            -F "platform=ios")
+          echo "$response"
+          echo "### Appetize.io URL" >> $GITHUB_STEP_SUMMARY
+          echo "$response" | jq -r '.publicURL' >> $GITHUB_STEP_SUMMARY
