@@ -437,13 +437,15 @@ export default function ArtistScreen() {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Archive API expects a slug; avoid sending a raw artist ID from ID-based routes.
+  // Archive API expects a normalized slug (hyphenated, lowercase).
+  // RadioCult's artist.slug is inconsistent (some hyphenated, some not), so we
+  // prefer mappedSlug (from eist-api) or nameSlug (computed with normalizeSlug).
+  // Only use routeSlug if it came from a slug-based route, not an ID-based one.
   const routeSlug =
     queryId || (artist && slug && slug !== artist.id) ? slug : undefined;
   const mappedSlug = id ? artistMapping?.[id]?.slug : undefined;
   const nameSlug = artist?.name ? normalizeSlug(artist.name) : undefined;
-  const archiveArtistSlug =
-    artist?.slug ?? routeSlug ?? mappedSlug ?? nameSlug;
+  const archiveArtistSlug = mappedSlug ?? nameSlug ?? routeSlug;
 
   const { shows: archivedShows } = useArchiveShowsByArtist(archiveArtistSlug, 12);
 
