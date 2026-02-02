@@ -22,6 +22,16 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
       - name: Install dependencies
         run: npm ci
 
@@ -37,15 +47,16 @@ jobs:
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
-            -configuration Release \
+            -configuration Debug \
             -sdk iphonesimulator \
             -derivedDataPath build \
             -destination 'generic/platform=iOS Simulator' \
+            -jobs $(sysctl -n hw.ncpu) \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Prepare artifact
         run: |
-          cd ios/build/Build/Products/Release-iphonesimulator
+          cd ios/build/Build/Products/Debug-iphonesimulator
           APP_NAME=$(ls -d *.app | head -1)
           zip -r ${{ github.workspace }}/eist-app-simulator.zip "$APP_NAME"
 
