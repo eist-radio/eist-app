@@ -1,0 +1,37 @@
+workflows:
+  ios-simulator:
+    name: iOS Simulator Build
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      node: 20
+      xcode: latest
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+
+      - name: Generate native project
+        script: npx expo prebuild --platform ios --clean
+
+      - name: Build iOS Simulator app
+        script: |
+          cd ios
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME=$(echo "$WORKSPACE" | sed 's/.xcworkspace//')
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -derivedDataPath build \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Prepare artifact
+        script: |
+          cd ios/build/Build/Products/Release-iphonesimulator
+          APP_NAME=$(ls -d *.app | head -1)
+          zip -r ~/eist-app-simulator.zip "$APP_NAME"
+
+    artifacts:
+      - ~/eist-app-simulator.zip
