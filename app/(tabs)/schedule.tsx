@@ -272,51 +272,53 @@ export default function ScheduleScreen() {
           ]}
         >
           <View style={styles.showCardRow}>
-            <Link href={`/show/${encodeURIComponent(item.id)}`} style={styles.showCardLink}>
-              <View style={styles.showCardInner}>
-                {/* Time column */}
-                <View style={styles.timeColumn}>
-                  <Text style={[styles.startTime, { color: isCurrent ? colors.primary : colors.text }]}>
-                    {item.startTime}
-                  </Text>
-                  <Text style={[styles.endTime, { color: colors.text }]}>
-                    {item.endTime}
-                  </Text>
-                </View>
-
-                {/* Content column */}
-                <View style={styles.contentColumn}>
-                  <View style={styles.titleRow}>
-                    {isCurrent && <LiveIndicator />}
-                    <FormattedShowTitle
-                      title={item.title}
-                      color={colors.primary}
-                      size={17}
-                      style={[
-                        styles.showTitle,
-                        isCurrent && styles.showTitleCurrent,
-                      ]}
-                      numberOfLines={2}
-                    />
-                  </View>
-                  {artistName && (
-                    <Text
-                      style={[styles.artistName, { color: colors.text }]}
-                      numberOfLines={1}
-                    >
-                      {artistName}
+            <Link href={`/show/${encodeURIComponent(item.id)}`} asChild>
+              <TouchableOpacity activeOpacity={0.7} style={styles.showCardLink}>
+                <View style={styles.showCardInner}>
+                  {/* Time column */}
+                  <View style={styles.timeColumn}>
+                    <Text style={[styles.startTime, { color: isCurrent ? colors.primary : colors.text }]}>
+                      {item.startTime}
                     </Text>
-                  )}
-                </View>
+                    <Text style={[styles.endTime, { color: colors.text }]}>
+                      {item.endTime}
+                    </Text>
+                  </View>
 
-                {/* Chevron */}
-                <Ionicons
-                  name="chevron-forward"
-                  size={18}
-                  color={colors.text + '60'}
-                  style={styles.rowChevron}
-                />
-              </View>
+                  {/* Content column */}
+                  <View style={styles.contentColumn}>
+                    <View style={styles.titleRow}>
+                      {isCurrent && <LiveIndicator />}
+                      <FormattedShowTitle
+                        title={item.title}
+                        color={colors.primary}
+                        size={17}
+                        style={[
+                          styles.showTitle,
+                          isCurrent && styles.showTitleCurrent,
+                        ]}
+                        numberOfLines={2}
+                      />
+                    </View>
+                    {artistName && (
+                      <Text
+                        style={[styles.artistName, { color: colors.text }]}
+                        numberOfLines={1}
+                      >
+                        {artistName}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Chevron */}
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={colors.text + '60'}
+                    style={styles.rowChevron}
+                  />
+                </View>
+              </TouchableOpacity>
             </Link>
 
             {/* Reminder Button - outside Link to handle its own press */}
