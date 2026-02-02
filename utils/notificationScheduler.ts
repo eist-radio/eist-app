@@ -15,8 +15,8 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Minutes before show start to send notification
-const REMINDER_MINUTES_BEFORE = 5;
+// Minutes before show start to send notification (0 = at show start time)
+const REMINDER_MINUTES_BEFORE = 0;
 
 export async function requestNotificationPermissions(): Promise<NotificationPermissionStatus> {
   if (Platform.OS === 'web') {
@@ -82,12 +82,12 @@ export async function scheduleShowReminder(
 
   try {
     const body = artistName
-      ? `${showTitle} with ${artistName} starts in ${REMINDER_MINUTES_BEFORE} minutes`
-      : `${showTitle} starts in ${REMINDER_MINUTES_BEFORE} minutes`;
+      ? `${showTitle} with ${artistName} is starting now on éist`
+      : `${showTitle} is starting now on éist`;
 
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Show Starting Soon',
+        title: 'Now on éist',
         body,
         data: { showId, type: 'show_reminder' },
         sound: true,
