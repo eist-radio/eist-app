@@ -225,9 +225,11 @@ export default function ListenScreen() {
     }
 
     try {
-      const res = await fetch(`${apiUrl}/artists/${id}`, {
-        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-      })
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (apiKey) {
+        headers['x-api-key'] = apiKey
+      }
+      const res = await fetch(`${apiUrl}/artists/${encodeURIComponent(id)}`, { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const json = await res.json()
       const artist = json.artist || {}
@@ -273,9 +275,11 @@ export default function ListenScreen() {
   const fetchLiveScheduleOnly = useCallback(async () => {
 
     try {
-      const res = await fetch(`${apiUrl}/schedule/live`, {
-        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-      })
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (apiKey) {
+        headers['x-api-key'] = apiKey
+      }
+      const res = await fetch(`${apiUrl}/schedule/live`, { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       const { status, content, metadata } = data.result
@@ -288,11 +292,13 @@ export default function ListenScreen() {
         try {
           const now = new Date().toISOString()
           const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString()
+          const scheduleHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+          if (apiKey) {
+            scheduleHeaders['x-api-key'] = apiKey
+          }
           const nextRes = await fetch(
             `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(weekAhead)}`,
-            {
-              headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-            }
+            { headers: scheduleHeaders }
           )
           if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`)
           const nextJson = await nextRes.json()
@@ -389,9 +395,11 @@ export default function ListenScreen() {
     setIsContentLoading(true)
 
     try {
-      const res = await fetch(`${apiUrl}/schedule/live`, {
-        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-      })
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (apiKey) {
+        headers['x-api-key'] = apiKey
+      }
+      const res = await fetch(`${apiUrl}/schedule/live`, { headers })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       const { status, content, metadata } = data.result
@@ -405,11 +413,13 @@ export default function ListenScreen() {
         try {
           const now = new Date().toISOString()
           const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString()
+          const scheduleHeaders: Record<string, string> = { 'Content-Type': 'application/json' }
+          if (apiKey) {
+            scheduleHeaders['x-api-key'] = apiKey
+          }
           const nextRes = await fetch(
             `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(weekAhead)}`,
-            {
-              headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
-            }
+            { headers: scheduleHeaders }
           )
           if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`)
           const nextJson = await nextRes.json()
