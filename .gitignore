@@ -53,3 +53,6 @@ AGENTS.md
 android/app/release.keystore
 android/keystore.properties
 .wrangler
+
+# Android TV app (separate project)
+eist-tv/
