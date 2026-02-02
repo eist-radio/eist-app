@@ -57,10 +57,12 @@ jobs:
           retention-days: 30
 
       - name: Upload to Appetize.io
-        if: ${{ inputs.upload_to_appetize && secrets.APPETIZE_API_KEY }}
+        if: ${{ inputs.upload_to_appetize }}
+        env:
+          APPETIZE_API_KEY: ${{ secrets.APPETIZE_API_KEY }}
         run: |
           response=$(curl -X POST "https://api.appetize.io/v1/apps" \
-            -H "X-API-KEY: ${{ secrets.APPETIZE_API_KEY }}" \
+            -H "X-API-KEY: $APPETIZE_API_KEY" \
             -F "file=@eist-app-simulator.zip" \
             -F "platform=ios")
           echo "$response"
