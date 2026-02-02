@@ -606,12 +606,14 @@ const styles = StyleSheet.create({
   },
   showCardLink: {
     flex: 1,
+    minWidth: 0,
   },
   showCardInner: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: 12,
     paddingHorizontal: 4,
+    width: '100%',
   },
 
   // Time column
@@ -635,18 +637,24 @@ const styles = StyleSheet.create({
   // Content column
   contentColumn: {
     flex: 1,
-    minWidth: 0,      // Allows flex child to shrink below content size on iOS
-    flexShrink: 1,    // Ensures proper flex calculation on iOS
+    minWidth: 0,
+    flexShrink: 1,
+    flexGrow: 1,
+    flexBasis: 0,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
     gap: 8,
+    flex: 1,
+    minWidth: 0,
   },
   showTitle: {
     fontWeight: '600',
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   showTitleCurrent: {
     fontWeight: '700',
