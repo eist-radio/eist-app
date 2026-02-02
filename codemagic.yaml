@@ -6,6 +6,13 @@ workflows:
     environment:
       node: 20
       xcode: latest
+    cache:
+      cache_paths:
+        - $HOME/.npm
+        - $CM_BUILD_DIR/node_modules
+        - $HOME/.cocoapods
+        - $CM_BUILD_DIR/ios/Pods
+        - $HOME/.ccache
     scripts:
       - name: Install dependencies
         script: npm ci
@@ -13,23 +20,43 @@ workflows:
       - name: Generate native project
         script: npx expo prebuild --platform ios --clean
 
+      - name: Setup ccache
+        script: |
+          brew install ccache
+          ln -s $(which ccache) /usr/local/bin/gcc
+          ln -s $(which ccache) /usr/local/bin/g++
+          ln -s $(which ccache) /usr/local/bin/cc
+          ln -s $(which ccache) /usr/local/bin/c++
+          ln -s $(which ccache) /usr/local/bin/clang
+          ln -s $(which ccache) /usr/local/bin/clang++
+          export PATH="/usr/local/bin:$PATH"
+          ccache --max-size=10G
+          ccache --zero-stats
+
       - name: Build iOS Simulator app
         script: |
+          export PATH="/usr/local/bin:$PATH"
           cd ios
           WORKSPACE=$(ls -d *.xcworkspace | head -1)
           SCHEME=$(echo "$WORKSPACE" | sed 's/.xcworkspace//')
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
-            -configuration Release \
+            -configuration Debug \
             -sdk iphonesimulator \
             -derivedDataPath build \
             -destination 'generic/platform=iOS Simulator' \
+            -jobs $(sysctl -n hw.ncpu) \
+            CC="ccache clang" \
+            CXX="ccache clang++" \
             CODE_SIGNING_ALLOWED=NO
+
+      - name: Show ccache stats
+        script: ccache --show-stats
 
       - name: Prepare artifact
         script: |
-          cd ios/build/Build/Products/Release-iphonesimulator
+          cd ios/build/Build/Products/Debug-iphonesimulator
           APP_NAME=$(ls -d *.app | head -1)
           zip -r ~/eist-app-simulator.zip "$APP_NAME"
 
