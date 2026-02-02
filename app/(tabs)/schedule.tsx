@@ -635,7 +635,6 @@ const styles = StyleSheet.create({
   // Content column
   contentColumn: {
     flex: 1,
-    minWidth: 0,
   },
   titleRow: {
     flexDirection: 'row',
