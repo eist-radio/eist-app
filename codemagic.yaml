@@ -27,7 +27,7 @@ workflows:
           xcodebuild \
             -workspace "$WORKSPACE" \
             -scheme "$SCHEME" \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphonesimulator \
             -derivedDataPath build \
             -destination 'generic/platform=iOS Simulator' \
@@ -36,7 +36,7 @@ workflows:
 
       - name: Prepare artifact
         script: |
-          cd ios/build/Build/Products/Debug-iphonesimulator
+          cd ios/build/Build/Products/Release-iphonesimulator
           APP_NAME=$(ls -d *.app | head -1)
           zip -r ~/eist-app-simulator.zip "$APP_NAME"
 

@@ -56,3 +56,6 @@ android/keystore.properties
 
 # Android TV app (separate project)
 eist-tv/
+
+# Local documentation
+IOS-SIMULATOR-TESTING.md
