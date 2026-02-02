@@ -635,6 +635,8 @@ const styles = StyleSheet.create({
   // Content column
   contentColumn: {
     flex: 1,
+    minWidth: 0,      // Allows flex child to shrink below content size on iOS
+    flexShrink: 1,    // Ensures proper flex calculation on iOS
   },
   titleRow: {
     flexDirection: 'row',
