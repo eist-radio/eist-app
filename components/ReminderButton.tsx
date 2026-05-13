@@ -79,8 +79,8 @@ export const ReminderButton: React.FC<ReminderButtonProps> = ({
     toggleShowReminder,
   ]);
 
-  // Hide on web - notifications not supported
-  if (Platform.OS === 'web') {
+  // Hide on web (notifications not supported) or for shows already started
+  if (Platform.OS === 'web' || hasStarted) {
     return null;
   }
 
