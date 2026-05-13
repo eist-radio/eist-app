@@ -7,7 +7,7 @@ workflows:
       groups:
         - eist_secrets
       node: 20
-      xcode: latest
+      xcode: "16"
     cache:
       cache_paths:
         - $HOME/.npm
