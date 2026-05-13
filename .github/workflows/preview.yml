@@ -12,11 +12,11 @@ jobs:
   preview:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code (actions/checkout@v4)
-        uses: actions/checkout@v4
+      - name: Checkout code (actions/checkout@v6)
+        uses: actions/checkout@v6
 
-      - name: Setup Node.js 20 (actions/setup-node@v4)
-        uses: actions/setup-node@v4
+      - name: Setup Node.js 20 (actions/setup-node@v6)
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'npm'
@@ -38,14 +38,50 @@ jobs:
             find dist -name "*.html" -exec sed -i 's|/assets/node_modules/|/assets/vendor/|g' {} +
           fi
 
-      - name: Deploy to Netlify Preview (nwtgck/actions-netlify@v3.0)
-        uses: nwtgck/actions-netlify@v3.0
-        with:
-          publish-dir: dist
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          deploy-message: "App PR preview (#${{ github.event.pull_request.number }})"
-          alias: app-preview-${{ github.event.pull_request.number }}
-          overwrites-pull-request-comment: true
+      - name: Deploy to Netlify Preview
+        id: deploy
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          npm install -g netlify-cli
+          OUTPUT=$(netlify deploy \
+            --dir=dist \
+            --alias=app-preview-${{ github.event.pull_request.number }} \
+            --message="App PR preview (#${{ github.event.pull_request.number }})" \
+            --json)
+          echo "$OUTPUT"
+          echo "deploy_url=$(echo "$OUTPUT" | jq -r '.deploy_url')" >> $GITHUB_OUTPUT
+
+      - name: Update PR comment (actions/github-script@v9)
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const marker = '<!-- netlify-preview-deploy -->';
+            const url = '${{ steps.deploy.outputs.deploy_url }}';
+            const body = `${marker}\n🚀 Deployed on ${url}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
