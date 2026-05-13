@@ -50,5 +50,16 @@ workflows:
           APP_NAME=$(ls -d *.app | head -1)
           zip -r ~/eist-app-simulator.zip "$APP_NAME"
 
+      - name: Upload to Appetize.io
+        script: |
+          RESPONSE=$(curl -s -X POST \
+            -H "X-API-KEY: $APPETIZE_API_KEY" \
+            -F "file=@$HOME/eist-app-simulator.zip" \
+            -F "platform=ios" \
+            "https://api.appetize.io/v1/apps/obxdfeiujvbclltt4rtklu3jbi")
+          echo "Appetize response: $RESPONSE"
+          PUBLIC_KEY=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('publicKey',''))")
+          echo "Appetize URL: https://appetize.io/app/$PUBLIC_KEY"
+
     artifacts:
       - ~/eist-app-simulator.zip
