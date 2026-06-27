@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>éist</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #6A3DE8;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    cursor: grab;
+    user-select: none;
+  }
+  body.dragging { cursor: grabbing; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+// ── Nimbus Sans Bold — embedded glyph subset (é i s t) ───────────────────
+const FONT_DATA = {"glyphs":{"é":{"ha":556,"x_min":0,"x_max":556,"o":"m 524 -226 b 525 -238 525 -243 525 -250 b 525 -304 517 -354 504 -392 b 468 -490 381 -549 272 -549 b 117 -549 22 -437 22 -256 b 22 -83 116 23 269 23 b 390 23 488 -45 519 -152 l 381 -152 b 364 -109 325 -84 274 -84 b 234 -84 202 -101 182 -131 b 169 -151 164 -175 162 -226 m 164 -319 b 173 -402 208 -442 270 -442 b 334 -442 372 -399 379 -319 m 419 -757 l 293 -757 l 223 -607 l 293 -607"},"i":{"ha":278,"x_min":0,"x_max":278,"o":"m 207 -540 l 67 -540 l 67 0 l 207 0 m 207 -729 l 67 -729 l 67 -604 l 207 -604"},"s":{"ha":556,"x_min":0,"x_max":556,"o":"m 505 -366 b 503 -480 415 -549 270 -549 b 133 -549 48 -480 48 -369 b 48 -333 59 -302 78 -281 b 97 -262 114 -253 166 -236 l 333 -184 b 368 -173 380 -162 380 -140 b 380 -107 341 -87 276 -87 b 239 -87 211 -93 193 -106 b 178 -117 172 -128 166 -157 l 29 -157 b 33 -38 120 23 284 23 b 359 23 416 7 456 -25 b 496 -57 520 -107 520 -160 b 520 -230 485 -275 414 -296 l 237 -347 b 198 -359 188 -367 188 -389 b 188 -419 220 -439 269 -439 b 336 -439 369 -415 370 -366"},"t":{"ha":333,"x_min":0,"x_max":333,"o":"m 301 -529 l 223 -529 l 223 -674 l 83 -674 l 83 -529 l 14 -529 l 14 -436 l 83 -436 l 83 -104 b 83 -19 128 23 220 23 b 252 23 275 20 301 12 l 301 -86 b 287 -84 280 -83 269 -83 b 232 -83 223 -94 223 -142 l 223 -436 l 301 -436"}," ":{"ha":278,"x_min":0,"x_max":278,"o":""}},"cssFontWeight":"bold","ascender":729,"descender":-271,"underlinePosition":-121,"cssFontStyle":"normal","boundingBox":{"yMin":-307,"xMin":-188,"yMax":1070,"xMax":1069},"resolution":1000,"original_font_information":{"subfamily_name":"Bold","family_name":"Nimbus Sans"},"familyName":"Nimbus Sans"};
+
+// Font parser: typeface.js -> THREE.Shape[] with correct hole support.
+// Y is negated (typeface.js goes down, Three.js goes up).
+// Contours with negative signed area after Y-flip are holes; they get
+// attached to the preceding outer shape via shape.holes so ExtrudeGeometry
+// punches a real cutout (fixes the glitchy e counter).
+function charShapes(char, size, ox, oy) {
+  const scale = size / FONT_DATA.resolution;
+  const glyph = FONT_DATA.glyphs[char];
+  if (!glyph || !glyph.o) return [];
+  const tok = glyph.o.split(' ');
+  const fx = v =>  parseFloat(v) * scale + ox;
+  const fy = v => -parseFloat(v) * scale + oy;
+
+  // Pass 1: collect raw contours as THREE.Path objects
+  const contours = [];
+  let cur = null, i = 0;
+  while (i < tok.length) {
+    switch (tok[i++]) {
+      case 'm':
+        cur = new THREE.Path();
+        cur.moveTo(fx(tok[i++]), fy(tok[i++]));
+        contours.push(cur);
+        break;
+      case 'l': cur.lineTo(fx(tok[i++]), fy(tok[i++])); break;
+      case 'q': { const cx=fx(tok[i++]),cy=fy(tok[i++]),ex=fx(tok[i++]),ey=fy(tok[i++]); cur.quadraticCurveTo(cx,cy,ex,ey); break; }
+      case 'b': { const c1x=fx(tok[i++]),c1y=fy(tok[i++]),c2x=fx(tok[i++]),c2y=fy(tok[i++]),ex=fx(tok[i++]),ey=fy(tok[i++]); cur.bezierCurveTo(c1x,c1y,c2x,c2y,ex,ey); break; }
+      case 'z': break;
+    }
+  }
+
+  // Shoelace signed area: positive = CCW = outer, negative = CW = hole
+  function signedArea(pts) {
+    let a = 0;
+    for (let j = 0; j < pts.length; j++) {
+      const k = (j + 1) % pts.length;
+      a += pts[j].x * pts[k].y - pts[k].x * pts[j].y;
+    }
+    return a / 2;
+  }
+
+  // Offset a polygon's vertices along per-vertex normals to fatten strokes
+  const FATTEN_DIST = 0.02;
+  function offsetPoly(pts, dist) {
+    const n = pts.length;
+    const out = [];
+    for (let j = 0; j < n; j++) {
+      const prev = pts[(j - 1 + n) % n], curr = pts[j], next = pts[(j + 1) % n];
+      const e1x = curr.x - prev.x, e1y = curr.y - prev.y;
+      const e2x = next.x - curr.x, e2y = next.y - curr.y;
+      const l1 = Math.sqrt(e1x*e1x + e1y*e1y) || 1;
+      const l2 = Math.sqrt(e2x*e2x + e2y*e2y) || 1;
+      const n1x = e1y/l1, n1y = -e1x/l1;
+      const n2x = e2y/l2, n2y = -e2x/l2;
+      let bx = n1x + n2x, by = n1y + n2y;
+      const bl = Math.sqrt(bx*bx + by*by);
+      if (bl < 0.001) { bx = n1x; by = n1y; }
+      else { bx /= bl; by /= bl; }
+      const dot = n1x*bx + n1y*by;
+      const d = dot > 0.25 ? dist / dot : dist * 2;
+      out.push(new THREE.Vector2(curr.x + bx * d, curr.y + by * d));
+    }
+    return out;
+  }
+
+  // Pass 2: classify as outer or hole, build Shape[] with holes attached
+  const shapes = [];
+  let lastOuter = null;
+  for (const contour of contours) {
+    const pts = contour.getPoints(12);
+    if (signedArea(pts) >= 0) {
+      const rawPts = contour.getPoints(48);
+      const fatPts = offsetPoly(rawPts, FATTEN_DIST);
+      const s = new THREE.Shape(fatPts);
+      shapes.push(s);
+      lastOuter = s;
+    } else {
+      if (lastOuter) {
+        const holePts = contour.getPoints(48);
+        const shrunkPts = offsetPoly(holePts, -FATTEN_DIST * 0.05);
+        const h = new THREE.Path();
+        h.moveTo(shrunkPts[0].x, shrunkPts[0].y);
+        for (let j = 1; j < shrunkPts.length; j++) h.lineTo(shrunkPts[j].x, shrunkPts[j].y);
+        lastOuter.holes.push(h);
+      }
+    }
+  }
+  return shapes;
+}
+
+function advance(char, size) {
+  const g = FONT_DATA.glyphs[char];
+  return g ? g.ha * (size / FONT_DATA.resolution) : size;
+}
+
+// ── Scene ─────────────────────────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x6A3DE8);
+
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 100);
+function updateCamera() {
+  camera.aspect = innerWidth / innerHeight;
+  if (camera.aspect < 1.2) {
+    const halfTan = Math.tan(38 * Math.PI / 360);
+    camera.position.z = 3.7 / (2 * halfTan * camera.aspect);
+  } else {
+    camera.position.z = 7.5;
+  }
+  camera.updateProjectionMatrix();
+}
+updateCamera();
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// ── Lighting ──────────────────────────────────────────────────────────────
+// One modest white ambient + six low-intensity green directionals (one per
+// axis). Total per-face illumination stays well below 1.0 so the front face
+// never blows out to white, while every back/side face still reads green.
+scene.add(new THREE.AmbientLight(0xffffff, 0.15));
+
+const dirs = [
+  [ 0,  0,  1], [ 0,  0, -1],
+  [ 1,  0,  0], [-1,  0,  0],
+  [ 0,  1,  0], [ 0, -1,  0],
+];
+for (const [x, y, z] of dirs) {
+  const dl = new THREE.DirectionalLight(0xAFFC41, 0.28);
+  dl.position.set(x * 6, y * 6, z * 6);
+  scene.add(dl);
+}
+
+// ── Material ──────────────────────────────────────────────────────────────
+// Emissive carries the base green so faces are never black even with zero
+// direct light. Low shininess keeps highlights from going white.
+const mat = new THREE.MeshPhongMaterial({
+  color: 0xAFFC41,
+  emissive: new THREE.Color(0xAFFC41).multiplyScalar(0.45),
+  specular: new THREE.Color(0xAFFC41),
+  shininess: 18,
+  transparent: true,
+  opacity: 0.76,
+  side: THREE.DoubleSide,
+});
+
+// ── Layout ────────────────────────────────────────────────────────────────
+// From the reference image:
+//   é and s are shifted DOWNWARD relative to i and t.
+//   All letters share the same cap-height reference for i/t;
+//   é and s drop by ~10% of cap height.
+const FONT_SIZE  = 1.6;
+const EXTRUDE_D  = 0.3;
+const capH = FONT_DATA.ascender * (FONT_SIZE / FONT_DATA.resolution);  // ≈ 1.17
+const LOWER_AMT  = capH * 0.16;  // ~0.19 — visible but not extreme
+
+// Letter order: é i s t
+// é → lower, i → normal, s → lower, t → normal
+const LETTERS = [
+  { char: 'é', lower: true  },
+  { char: 'i', lower: false },
+  { char: 's', lower: true  },
+  { char: 't', lower: false },
+];
+
+const LETTER_GAP = 0.13;  // extra spacing between each letter
+const totalW = LETTERS.reduce((s, l) => s + advance(l.char, FONT_SIZE), 0) + LETTER_GAP * (LETTERS.length - 1);
+
+const word = new THREE.Group();
+scene.add(word);
+
+let curX = -totalW / 2;
+for (let li = 0; li < LETTERS.length; li++) {
+  const { char, lower } = LETTERS[li];
+  const yOff = lower ? -LOWER_AMT : 0;
+  const shapes = charShapes(char, FONT_SIZE, curX, yOff);
+  const geo = new THREE.ExtrudeGeometry(shapes, {
+    depth: EXTRUDE_D,
+    bevelEnabled: false,
+    curveSegments: 14,
+  });
+  word.add(new THREE.Mesh(geo, mat));
+  curX += advance(char, FONT_SIZE) + LETTER_GAP;
+}
+
+
+// Vertically centre the group
+word.position.y = -(capH / 2) + (LOWER_AMT / 2) - 0.05;
+
+// ── Interaction & physics ──────────────────────────────────────────────────
+const AUTO_SPEED   = 0.002;
+const RETURN_FORCE = 0.02;
+const MAX_SPIN     = 0.14;
+
+let spinY = AUTO_SPEED, spinX = 0;
+let isDragging = false, lastX = 0, lastY = 0;
+
+function pDown(x, y) { isDragging = true; lastX = x; lastY = y; document.body.classList.add('dragging'); }
+function pMove(x, y) {
+  if (!isDragging) return;
+  spinY = Math.max(-MAX_SPIN, Math.min(MAX_SPIN, spinY + (x - lastX) * 0.0032));
+  spinX = Math.max(-MAX_SPIN, Math.min(MAX_SPIN, spinX + (y - lastY) * 0.0032));
+  lastX = x; lastY = y;
+}
+function pUp() { isDragging = false; document.body.classList.remove('dragging'); }
+
+renderer.domElement.addEventListener('mousedown',  e => pDown(e.clientX, e.clientY));
+renderer.domElement.addEventListener('touchstart', e => pDown(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+window.addEventListener('mousemove',   e => pMove(e.clientX, e.clientY));
+window.addEventListener('touchmove',   e => pMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+window.addEventListener('mouseup', pUp);
+window.addEventListener('touchend', pUp);
+window.addEventListener('resize', () => {
+  updateCamera();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ── Animate ───────────────────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (!isDragging) {
+    spinY += (AUTO_SPEED - spinY) * RETURN_FORCE;
+    spinX += (0 - spinX) * RETURN_FORCE;
+
+    // Ease X rotation back to level
+    word.rotation.x += (0 - word.rotation.x) * 0.02;
+  }
+
+  if (Math.abs(spinY) < AUTO_SPEED) spinY = AUTO_SPEED;
+  word.rotation.y += spinY;
+  word.rotation.x += spinX;
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
