@@ -28,6 +28,8 @@ const splashImage = require('../assets/images/eist.png');
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     FunnelSans: require('../assets/fonts/FunnelSans-VariableFont_wght.ttf'),
+    NimbusSans: require('../assets/fonts/NimbusSans-Regular.otf'),
+    NimbusSansBold: require('../assets/fonts/NimbusSans-Bold.otf'),
     ...Ionicons.font,
   });
 
