@@ -270,7 +270,7 @@ export default function ArtistScreen() {
         {archivedShows.map((show) => (
           <Pressable
             key={show.slug}
-            onPress={() => router.push(`/archive/${show.slug}`)}
+            onPress={() => router.push(`/archive/${encodeURIComponent(show.slug)}`)}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
