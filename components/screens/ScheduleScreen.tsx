@@ -283,47 +283,50 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
   const viewportH = useRef(0)
   const [activeDay, setActiveDay] = useState('Today')
 
-  // Centre the current ("Now") show in the viewport. Returns false if the
-  // current show's position isn't known yet (data/layout not ready).
-  const centerOnLive = useCallback((animated: boolean): boolean => {
+  // A centring request stays "pending" until the geometry it needs is
+  // available, so it survives the race between data load, row layout and swipe.
+  const pending = useRef(false)
+  const pendingAnimated = useRef(false)
+
+  // Try to satisfy a pending centring request. Called after every layout event
+  // (and from the effects) so it fires the instant the live row is measured.
+  const maybeCenter = useCallback(() => {
+    if (!pending.current) return
+    const animated = pendingAnimated.current
     const id = currentShowId
-    if (!id) return false
-    const r = rowOffsets.current[id]
-    if (!r || dayOffsets.current[r.day] == null) return false
-    const absY = dayOffsets.current[r.day] + r.y
-    const target = Math.max(0, absY - viewportH.current / 2 + r.h / 2)
-    scrollRef.current?.scrollTo({ y: target, animated })
-    return true
+    if (id) {
+      const r = rowOffsets.current[id]
+      if (r && dayOffsets.current[r.day] != null) {
+        const absY = dayOffsets.current[r.day] + r.y
+        const target = Math.max(0, absY - viewportH.current / 2 + r.h / 2)
+        scrollRef.current?.scrollTo({ y: target, animated })
+        pending.current = false
+      }
+      return // wait for the live row's geometry
+    }
+    // Off air: fall back to the top of Today.
+    const t = dayOffsets.current['Today']
+    if (t != null) {
+      scrollRef.current?.scrollTo({ y: t, animated })
+      pending.current = false
+    }
   }, [currentShowId])
 
-  // Try to centre on the live show, retrying briefly while positions settle;
-  // fall back to the top of Today if there's no live show.
-  const recenter = useCallback((animated: boolean) => {
-    let attempts = 0
-    const tryIt = () => {
-      if (centerOnLive(animated)) return
-      if (attempts++ < 10) {
-        setTimeout(tryIt, 80)
-      } else if (dayOffsets.current['Today'] != null) {
-        scrollRef.current?.scrollTo({ y: dayOffsets.current['Today'], animated })
-      }
-    }
-    tryIt()
-  }, [centerOnLive])
-
-  const onSectionLayout = (dayName: string, y: number) => {
-    dayOffsets.current[dayName] = y
-  }
+  const requestCenter = useCallback((animated: boolean) => {
+    pending.current = true
+    pendingAnimated.current = animated
+    requestAnimationFrame(maybeCenter)
+  }, [maybeCenter])
 
   // Centre on the current show on first load / whenever it changes, and each
   // time the page is swiped back into view.
   useEffect(() => {
-    requestAnimationFrame(() => recenter(false))
-  }, [currentShowId, recenter])
+    requestCenter(false)
+  }, [currentShowId, requestCenter])
 
   useEffect(() => {
-    if (isActive) requestAnimationFrame(() => recenter(true))
-  }, [isActive, recenter])
+    if (isActive) requestCenter(true)
+  }, [isActive, requestCenter])
 
   const onScroll = (e: { nativeEvent: { contentOffset: { y: number } } }) => {
     const y = e.nativeEvent.contentOffset.y + 8
@@ -348,13 +351,16 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
         onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height }}
       >
         {days.map((d) => (
-          <View key={d.key} onLayout={(e) => onSectionLayout(d.dayName, e.nativeEvent.layout.y)}>
+          <View
+            key={d.key}
+            onLayout={(e) => { dayOffsets.current[d.dayName] = e.nativeEvent.layout.y; maybeCenter() }}
+          >
             {d.rows.map((r) => (
               <Pressable
                 key={r.id}
                 style={s.row}
                 onPress={() => router.push(`/show/${r.id}`)}
-                onLayout={(e) => { rowOffsets.current[r.id] = { day: d.dayName, y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height } }}
+                onLayout={(e) => { rowOffsets.current[r.id] = { day: d.dayName, y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height }; maybeCenter() }}
               >
                 <Text
                   style={[s.time, r.isLive ? s.timeNow : { color: colors.lilac }]}

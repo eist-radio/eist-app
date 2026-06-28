@@ -18,6 +18,7 @@ import { useTrackPlayer } from '../../context/TrackPlayerContext'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
 import { colors, font } from '../../theme/tokens'
 import { formatShowTimeRange } from '../../utils/liveShowInfo'
+import { FormattedShowTitle } from '../FormattedShowTitle'
 import { Eyebrow } from '../ui/Eyebrow'
 import { PageScaffold } from '../ui/PageScaffold'
 import { Pills } from '../ui/Pills'
@@ -538,7 +539,13 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       <View style={{ flex: 1 }} />
       <View style={s.tick} />
       <Pressable onPress={() => currentShowId && router.push(`/show/${currentShowId}` as any)} disabled={!currentShowId}>
-        <Text style={s.title} numberOfLines={3}>{broadcastStatus === 'schedule' && showTitle ? showTitle : 'éist'}</Text>
+        <FormattedShowTitle
+          title={broadcastStatus === 'schedule' && showTitle ? showTitle : 'éist'}
+          color={colors.green}
+          size={33}
+          style={s.title}
+          numberOfLines={3}
+        />
       </Pressable>
       <Pressable onPress={() => artistId && router.push(`/artist/${artistId}` as any)} disabled={!artistId}>
         <Text style={s.artist}>{artistName}</Text>
