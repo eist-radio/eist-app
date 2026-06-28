@@ -8,7 +8,7 @@ import { Pills } from '../ui/Pills'
 import { Eyebrow } from '../ui/Eyebrow'
 import { FormattedShowTitle } from '../FormattedShowTitle'
 import { apiKey } from '../../config'
-import { useArtistMapping } from '../../hooks/useArtists'
+import { useArtistMapping, useArtists } from '../../hooks/useArtists'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
 
 const STATION_ID = 'eist-radio'
@@ -157,8 +157,21 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
   const router = useRouter()
   const currentTimezone = useTimezoneChange()
 
-  // Fetch artist mapping from API
+  // Artist-name resolution: the curated mapping is incomplete, so fall back to
+  // the full RadioCult artist list, then to a lazily-fetched per-id cache.
   const { data: artistMapping } = useArtistMapping()
+  const { artists } = useArtists()
+  const artistsById = React.useMemo(() => {
+    const m: Record<string, string> = {}
+    for (const a of artists) m[a.id] = a.name
+    return m
+  }, [artists])
+  const [extraNames, setExtraNames] = useState<Record<string, string>>({})
+
+  const resolveArtistName = useCallback(
+    (id?: string) => (id ? (artistMapping?.[id]?.name ?? artistsById[id] ?? extraNames[id] ?? '') : ''),
+    [artistMapping, artistsById, extraNames]
+  )
 
   const [sections, setSections] = useState<SectionData[]>([])
   const [, setLoading] = useState(true)
@@ -268,11 +281,54 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
           time: it.startTime,
           isLive: it.id === currentShowId,
           title: it.title,
-          artist: it.artistIds?.[0] ? (artistMapping?.[it.artistIds[0]]?.name ?? '') : '',
+          artist: resolveArtistName(it.artistIds?.[0]),
         })),
       })),
-    [sections, currentShowId, artistMapping]
+    [sections, currentShowId, resolveArtistName]
   )
+
+  // Lazily fetch names for any schedule artist id that neither the mapping nor
+  // the full artist list resolves, so no row is left without a host name.
+  useEffect(() => {
+    const missing = new Set<string>()
+    for (const sec of sections) {
+      for (const it of sec.data) {
+        const id = it.artistIds?.[0]
+        if (id && !artistMapping?.[id]?.name && !artistsById[id] && !extraNames[id]) missing.add(id)
+      }
+    }
+    if (missing.size === 0) return
+    let cancelled = false
+    ;(async () => {
+      const entries = await Promise.all(
+        [...missing].map(async (id) => {
+          try {
+            const res = await fetch(
+              `https://api.radiocult.fm/api/station/${STATION_ID}/artists/${encodeURIComponent(id)}`,
+              { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } }
+            )
+            if (!res.ok) return [id, ''] as const
+            const json = await res.json()
+            return [id, json?.artist?.name ?? ''] as const
+          } catch {
+            return [id, ''] as const
+          }
+        })
+      )
+      if (cancelled) return
+      const resolved = entries.filter(([, name]) => name)
+      if (resolved.length > 0) {
+        setExtraNames((prev) => {
+          const next = { ...prev }
+          for (const [id, name] of resolved) next[id] = name
+          return next
+        })
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [sections, artistMapping, artistsById, extraNames])
 
   // Big heading reflects the day currently scrolled to the top.
   const scrollRef = useRef<ScrollView>(null)
