@@ -277,41 +277,53 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
   // Big heading reflects the day currently scrolled to the top.
   const scrollRef = useRef<ScrollView>(null)
   const dayOffsets = useRef<Record<string, number>>({})
-  const liveRow = useRef<{ day: string; y: number; h: number } | null>(null)
+  // Every row's geometry, keyed by show id (captured on layout regardless of
+  // whether it's the live one — currentShowId often arrives after layout).
+  const rowOffsets = useRef<Record<string, { day: string; y: number; h: number }>>({})
   const viewportH = useRef(0)
-  const didInitialScroll = useRef(false)
   const [activeDay, setActiveDay] = useState('Today')
 
-  // Bring the current ("Now") show into the centre of the viewport. Falls back
-  // to the top of Today when nothing is live.
-  const scrollToCurrent = useCallback((animated: boolean) => {
-    const lr = liveRow.current
-    if (lr && dayOffsets.current[lr.day] != null) {
-      const absY = dayOffsets.current[lr.day] + lr.y
-      const target = Math.max(0, absY - viewportH.current / 2 + lr.h / 2)
-      scrollRef.current?.scrollTo({ y: target, animated })
-      return
+  // Centre the current ("Now") show in the viewport. Returns false if the
+  // current show's position isn't known yet (data/layout not ready).
+  const centerOnLive = useCallback((animated: boolean): boolean => {
+    const id = currentShowId
+    if (!id) return false
+    const r = rowOffsets.current[id]
+    if (!r || dayOffsets.current[r.day] == null) return false
+    const absY = dayOffsets.current[r.day] + r.y
+    const target = Math.max(0, absY - viewportH.current / 2 + r.h / 2)
+    scrollRef.current?.scrollTo({ y: target, animated })
+    return true
+  }, [currentShowId])
+
+  // Try to centre on the live show, retrying briefly while positions settle;
+  // fall back to the top of Today if there's no live show.
+  const recenter = useCallback((animated: boolean) => {
+    let attempts = 0
+    const tryIt = () => {
+      if (centerOnLive(animated)) return
+      if (attempts++ < 10) {
+        setTimeout(tryIt, 80)
+      } else if (dayOffsets.current['Today'] != null) {
+        scrollRef.current?.scrollTo({ y: dayOffsets.current['Today'], animated })
+      }
     }
-    const todayY = dayOffsets.current['Today']
-    if (todayY != null) scrollRef.current?.scrollTo({ y: todayY, animated })
-  }, [])
+    tryIt()
+  }, [centerOnLive])
 
   const onSectionLayout = (dayName: string, y: number) => {
     dayOffsets.current[dayName] = y
-    // First time we have positions, centre the live show (give the live row a
-    // moment to measure first).
-    if (!didInitialScroll.current && dayName === 'Today') {
-      didInitialScroll.current = true
-      setTimeout(() => scrollToCurrent(false), 60)
-    }
   }
 
-  // Re-centre on the current show each time the page is swiped back into view.
+  // Centre on the current show on first load / whenever it changes, and each
+  // time the page is swiped back into view.
   useEffect(() => {
-    if (isActive) {
-      requestAnimationFrame(() => scrollToCurrent(true))
-    }
-  }, [isActive, scrollToCurrent])
+    requestAnimationFrame(() => recenter(false))
+  }, [currentShowId, recenter])
+
+  useEffect(() => {
+    if (isActive) requestAnimationFrame(() => recenter(true))
+  }, [isActive, recenter])
 
   const onScroll = (e: { nativeEvent: { contentOffset: { y: number } } }) => {
     const y = e.nativeEvent.contentOffset.y + 8
@@ -342,10 +354,10 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
                 key={r.id}
                 style={s.row}
                 onPress={() => router.push(`/show/${r.id}`)}
-                onLayout={r.isLive ? (e) => { liveRow.current = { day: d.dayName, y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height } } : undefined}
+                onLayout={(e) => { rowOffsets.current[r.id] = { day: d.dayName, y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height } }}
               >
                 <Text
-                  style={[s.time, { color: r.isLive ? colors.green : colors.lilac }]}
+                  style={[s.time, r.isLive ? s.timeNow : { color: colors.lilac }]}
                   numberOfLines={1}
                 >
                   {r.isLive ? 'Now' : r.time}
@@ -366,4 +378,5 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 30 },
   time: { fontFamily: font.body, fontWeight: '600', fontSize: 13, width: 64 },
+  timeNow: { fontFamily: font.headingBold, fontWeight: '700', color: colors.green },
 })
