@@ -532,7 +532,7 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
 
       <View style={s.onair}><View style={s.dot} /><Eyebrow color={colors.green}>On Air</Eyebrow></View>
       <View style={s.castRow}>
-        <CastButton style={{ width: 26, height: 26 }} tintColor={isCastConnected ? colors.green : colors.lilac} />
+        <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.lilac} />
       </View>
 
       <View style={{ flex: 1 }} />
