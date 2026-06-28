@@ -7,6 +7,7 @@ import { PageScaffold } from './ui/PageScaffold';
 import { Pills } from './ui/Pills';
 import { SpinningLogo } from './ui/SpinningLogo';
 import ListenScreen from './screens/ListenScreen';
+import ScheduleScreen from './screens/ScheduleScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -23,8 +24,8 @@ export function Pager() {
         onMomentumScrollEnd={onEnd} removeClippedSubviews={false}>
         {Array.from({ length: PAGE_COUNT }).map((_, i) => (
           <View key={i} style={{ width }}>
-            {i === 0
-              ? <ListenScreen pageIndex={0} isActive={active === 0} />
+            {i === 0 ? <ListenScreen pageIndex={0} isActive={active === 0} />
+              : i === 1 ? <ScheduleScreen pageIndex={1} isActive={active === 1} />
               : <PageScaffold left={<Pills active={i} />}><Text style={{ color: colors.green }}>Page {i}</Text></PageScaffold>}
           </View>
         ))}
