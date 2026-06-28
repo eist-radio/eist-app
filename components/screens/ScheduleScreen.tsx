@@ -277,17 +277,41 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
   // Big heading reflects the day currently scrolled to the top.
   const scrollRef = useRef<ScrollView>(null)
   const dayOffsets = useRef<Record<string, number>>({})
+  const liveRow = useRef<{ day: string; y: number; h: number } | null>(null)
+  const viewportH = useRef(0)
   const didInitialScroll = useRef(false)
   const [activeDay, setActiveDay] = useState('Today')
 
+  // Bring the current ("Now") show into the centre of the viewport. Falls back
+  // to the top of Today when nothing is live.
+  const scrollToCurrent = useCallback((animated: boolean) => {
+    const lr = liveRow.current
+    if (lr && dayOffsets.current[lr.day] != null) {
+      const absY = dayOffsets.current[lr.day] + lr.y
+      const target = Math.max(0, absY - viewportH.current / 2 + lr.h / 2)
+      scrollRef.current?.scrollTo({ y: target, animated })
+      return
+    }
+    const todayY = dayOffsets.current['Today']
+    if (todayY != null) scrollRef.current?.scrollTo({ y: todayY, animated })
+  }, [])
+
   const onSectionLayout = (dayName: string, y: number) => {
     dayOffsets.current[dayName] = y
-    // On first measure of Today, jump there so yesterday sits above (scroll up to reveal).
-    if (dayName === 'Today' && !didInitialScroll.current) {
+    // First time we have positions, centre the live show (give the live row a
+    // moment to measure first).
+    if (!didInitialScroll.current && dayName === 'Today') {
       didInitialScroll.current = true
-      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y, animated: false }))
+      setTimeout(() => scrollToCurrent(false), 60)
     }
   }
+
+  // Re-centre on the current show each time the page is swiped back into view.
+  useEffect(() => {
+    if (isActive) {
+      requestAnimationFrame(() => scrollToCurrent(true))
+    }
+  }, [isActive, scrollToCurrent])
 
   const onScroll = (e: { nativeEvent: { contentOffset: { y: number } } }) => {
     const y = e.nativeEvent.contentOffset.y + 8
@@ -309,11 +333,17 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={onScroll}
+        onLayout={(e) => { viewportH.current = e.nativeEvent.layout.height }}
       >
         {days.map((d) => (
           <View key={d.key} onLayout={(e) => onSectionLayout(d.dayName, e.nativeEvent.layout.y)}>
             {d.rows.map((r) => (
-              <Pressable key={r.id} style={s.row} onPress={() => router.push(`/show/${r.id}`)}>
+              <Pressable
+                key={r.id}
+                style={s.row}
+                onPress={() => router.push(`/show/${r.id}`)}
+                onLayout={r.isLive ? (e) => { liveRow.current = { day: d.dayName, y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height } } : undefined}
+              >
                 <Text
                   style={[s.time, { color: r.isLive ? colors.green : colors.lilac }]}
                   numberOfLines={1}

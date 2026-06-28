@@ -100,6 +100,7 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     let castStateSubscription: any
     let sessionStartedSubscription: any
     let sessionEndedSubscription: any
+    let diagInterval: ReturnType<typeof setInterval> | undefined
 
     const initializeCast = async () => {
       try {
@@ -107,6 +108,26 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
         const currentState = await GoogleCast.getCastState()
         console.log('Initial cast state:', currentState)
         setCastState(currentState)
+
+        // --- TEMP cast discovery diagnostic ---------------------------------
+        // Polls the cast state for ~45s after launch. If discovery is working
+        // and a device is on the network, the state should move from
+        // 'noDevicesAvailable' to 'notConnected'. If it stays
+        // 'noDevicesAvailable' the whole time, discovery is finding nothing
+        // (most often the iOS Local Network permission was denied, or the
+        // device is on a different subnet/VLAN). Remove once cast is verified.
+        let polls = 0
+        diagInterval = setInterval(async () => {
+          polls += 1
+          try {
+            const s = await GoogleCast.getCastState()
+            console.log(`[cast-debug] poll ${polls} (t+${polls * 3}s): castState=${s}`)
+          } catch (e) {
+            console.log('[cast-debug] poll error:', e)
+          }
+          if (polls >= 15 && diagInterval) clearInterval(diagInterval)
+        }, 3000)
+        // --------------------------------------------------------------------
 
         // Listen for cast state changes
         castStateSubscription = GoogleCast.onCastStateChanged((state: string) => {
@@ -141,6 +162,7 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     initializeCast()
 
     return () => {
+      if (diagInterval) clearInterval(diagInterval)
       castStateSubscription?.remove?.()
       sessionStartedSubscription?.remove?.()
       sessionEndedSubscription?.remove?.()

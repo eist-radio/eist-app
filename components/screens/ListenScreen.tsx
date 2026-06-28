@@ -544,15 +544,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         <Text style={s.artist}>{artistName}</Text>
       </Pressable>
 
-      {broadcastStatus !== 'schedule' && nextShowTitle ? (
-        <View style={s.upNext}>
-          <Eyebrow>Up next</Eyebrow>
-          <Text style={s.upNextText} numberOfLines={1}>
-            {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
-          </Text>
-        </View>
-      ) : null}
-
       <View style={s.player}>
         <Pressable onPress={handlePlayButtonPress} style={s.disc} accessibilityRole="button"
           accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}>
@@ -560,6 +551,15 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         </Pressable>
         <Text style={s.playlabel}>{isPlaying ? 'Stop' : 'Listen now'}</Text>
       </View>
+
+      {nextShowTitle ? (
+        <View style={s.upNext}>
+          <Eyebrow>Up next</Eyebrow>
+          <Text style={s.upNextText} numberOfLines={1}>
+            {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
+          </Text>
+        </View>
+      ) : null}
     </PageScaffold>
   );
 }
