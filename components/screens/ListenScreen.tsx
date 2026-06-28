@@ -182,12 +182,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
     }
   }, [updateMetadata])
 
-  const clearNextShowInfo = useCallback(() => {
-    setNextShowId(null)
-    setNextShowTitle('')
-    setNextShowTime('')
-  }, [])
-
   const fetchLiveScheduleOnly = useCallback(async () => {
 
     try {
@@ -248,9 +242,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         setCurrentShowId(newCurrentShowId)
         setShowDescription(desc)
 
-        // Clear next show info when station is live
-        clearNextShowInfo()
-
         // Only fetch artist details if artist ID changed
         if (newArtistId !== artistId) {
           setArtistId(newArtistId)
@@ -299,7 +290,7 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime, currentTimezone])
+  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, formatTime, currentTimezone])
 
   const fetchNowPlayingWithArtist = useCallback(async () => {
 
@@ -371,9 +362,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       setArtistName(name)
       setShowDescription(desc)
 
-      // Clear next show info when station is live
-      clearNextShowInfo()
-
       // Handle image
       if (image?.uri) {
         const imageLoaded = await preloadImage(image.uri)
@@ -399,7 +387,35 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime, currentTimezone])
+  }, [getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, formatTime, currentTimezone])
+
+  // Always resolve the next upcoming show (the most imminent show that starts in
+  // the future), independent of whether the station is currently live or off
+  // air, so the "Up next" row can show during live broadcasts too.
+  const fetchNextShow = useCallback(async () => {
+    try {
+      const nowMs = Date.now()
+      const now = new Date(nowMs).toISOString()
+      const weekAhead = new Date(nowMs + 7 * 86400000).toISOString()
+      const res = await fetch(
+        `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(weekAhead)}`,
+        { headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' } }
+      )
+      if (!res.ok) return
+      const json = await res.json()
+      const events: any[] = (json.schedules || []).filter(
+        (e: any) => new Date(e.startDateUtc).getTime() > nowMs
+      )
+      events.sort((a, b) => new Date(a.startDateUtc).getTime() - new Date(b.startDateUtc).getTime())
+      if (events.length > 0) {
+        setNextShowId(events[0].id)
+        setNextShowTitle(events[0].title || '')
+        setNextShowTime(formatTime(events[0].startDateUtc))
+      }
+    } catch (err) {
+      console.warn('Up-next fetch failed:', err)
+    }
+  }, [formatTime])
 
   // Function to calculate time until next 1 minute past the hour
   const getTimeUntilNextRefresh = () => {
@@ -493,8 +509,13 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
   useEffect(() => {
     if (!isActive) return;
     fetchNowPlayingWithArtist();
-    if (isPlaying) { const id = setInterval(fetchLiveScheduleOnly, 60000); return () => clearInterval(id); }
-  }, [isActive, fetchNowPlayingWithArtist, fetchLiveScheduleOnly, isPlaying]);
+    fetchNextShow();
+    const interval = setInterval(() => {
+      if (isPlaying) fetchLiveScheduleOnly();
+      fetchNextShow();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [isActive, fetchNowPlayingWithArtist, fetchLiveScheduleOnly, fetchNextShow, isPlaying]);
 
   // Refresh now playing info whenever the app returns to the foreground
   useEffect(() => {
@@ -536,6 +557,15 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.lilac} />
       </View>
 
+      {nextShowTitle ? (
+        <View style={s.upNext}>
+          <Eyebrow>Up next</Eyebrow>
+          <Text style={s.upNextText} numberOfLines={1}>
+            {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={{ flex: 1 }} />
       <View style={s.tick} />
       <Pressable onPress={() => currentShowId && router.push(`/show/${currentShowId}` as any)} disabled={!currentShowId}>
@@ -558,15 +588,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         </Pressable>
         <Text style={s.playlabel}>{isPlaying ? 'Stop' : 'Listen now'}</Text>
       </View>
-
-      {nextShowTitle ? (
-        <View style={s.upNext}>
-          <Eyebrow>Up next</Eyebrow>
-          <Text style={s.upNextText} numberOfLines={1}>
-            {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
-          </Text>
-        </View>
-      ) : null}
     </PageScaffold>
   );
 }
