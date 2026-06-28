@@ -6,6 +6,7 @@ import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { FormattedShowTitle } from '../../components/FormattedShowTitle';
 import { BackTriangle } from '../../components/ui/BackTriangle';
+import { Chevron } from '../../components/ui/Chevron';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { PageScaffold } from '../../components/ui/PageScaffold';
 import { ShowArtworkBackground } from '../../components/ui/ShowArtworkBackground';
@@ -56,7 +57,7 @@ export default function ArchiveShowScreen() {
 
   if (isLoading || !show) {
     return (
-      <PageScaffold left={<BackTriangle />} right={<SpinningLogo />}>
+      <PageScaffold left={<BackTriangle />}>
         <Text style={[t.pagehead, { color: colors.green }]}>éist</Text>
       </PageScaffold>
     );
@@ -237,18 +238,7 @@ export default function ArchiveShowScreen() {
                     {formatDate(r.start)}
                   </Text>
                 </View>
-                <View
-                  style={{
-                    width: 0,
-                    height: 0,
-                    borderLeftWidth: 13,
-                    borderLeftColor: colors.green,
-                    borderTopWidth: 8,
-                    borderTopColor: 'transparent',
-                    borderBottomWidth: 8,
-                    borderBottomColor: 'transparent',
-                  }}
-                />
+                <Chevron direction="right" size={20} />
               </Pressable>
             ))}
           </>

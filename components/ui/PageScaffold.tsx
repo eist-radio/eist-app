@@ -14,7 +14,7 @@ export function PageScaffold({
         <View>{left}</View>
         <View>{right}</View>
       </View>
-      <View style={[styles.content, { paddingTop: insets.top + 60 }]}>{children}</View>
+      <View style={[styles.content, { paddingTop: insets.top + 86 }]}>{children}</View>
     </View>
   );
 }

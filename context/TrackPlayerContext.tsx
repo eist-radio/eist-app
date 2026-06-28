@@ -712,7 +712,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      const trackIndex = 0
+      // Resolve the live track index instead of assuming 0. The queue can be
+      // reset between getQueue() and updateMetadataForTrack() (stream restarts,
+      // cleanResetPlayer), so derive the active index and bounds-check it to
+      // avoid "The track index is out of bounds".
+      const activeIndex = await TrackPlayer.getActiveTrackIndex().catch(() => undefined)
+      const trackIndex = typeof activeIndex === 'number' ? activeIndex : 0
+      if (trackIndex < 0 || trackIndex >= queue.length) {
+        return
+      }
 
       const isDeadAir = title.trim().length === 0
 

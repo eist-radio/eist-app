@@ -13,7 +13,7 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
 
   return (
     <PageScaffold left={<Pills active={pageIndex} />}>
-      <Eyebrow>Residents</Eyebrow>
+      <Eyebrow>Hosts</Eyebrow>
       <ScrollView style={{ marginTop: 32 }} showsVerticalScrollIndicator={false}>
         {artists.map((a) => (
           <Pressable key={a.slug} style={{ marginBottom: 30 }} onPress={() => router.push(`/artist/${a.slug}`)}>
@@ -21,7 +21,6 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
           </Pressable>
         ))}
       </ScrollView>
-      <Text style={[type.eyebrow, { color: colors.lilac }]}>{artists.length} residents</Text>
     </PageScaffold>
   );
 }

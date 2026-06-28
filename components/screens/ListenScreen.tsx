@@ -59,8 +59,8 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
   const [imageFailed, setImageFailed] = useState(false)
   const [broadcastStatus, setBroadcastStatus] = useState('off air')
   const [, setNextShowId] = useState<string | null>(null)
-  const [, setNextShowTitle] = useState('')
-  const [, setNextShowTime] = useState('')
+  const [nextShowTitle, setNextShowTitle] = useState('')
+  const [nextShowTime, setNextShowTime] = useState('')
   const [artistId, setArtistId] = useState<string | null>(null)
   const [currentShowId, setCurrentShowId] = useState<string | null>(null)
   const [, setIsContentLoading] = useState(false)
@@ -544,6 +544,15 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         <Text style={s.artist}>{artistName}</Text>
       </Pressable>
 
+      {broadcastStatus !== 'schedule' && nextShowTitle ? (
+        <View style={s.upNext}>
+          <Eyebrow>Up next</Eyebrow>
+          <Text style={s.upNextText} numberOfLines={1}>
+            {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={s.player}>
         <Pressable onPress={handlePlayButtonPress} style={s.disc} accessibilityRole="button"
           accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}>
@@ -562,6 +571,8 @@ const s = StyleSheet.create({
   tick: { width: 30, height: 3, borderRadius: 3, backgroundColor: colors.green, marginBottom: 20 },
   title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 33, lineHeight: 34, letterSpacing: -0.5, color: colors.green },
   artist: { fontFamily: font.body, fontWeight: '500', fontSize: 18, color: colors.green, marginTop: 9 },
+  upNext: { marginTop: 22, gap: 6 },
+  upNextText: { fontFamily: font.body, fontWeight: '500', fontSize: 14, color: colors.lilac },
   player: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 30 },
   disc: { width: 66, height: 66, borderRadius: 33, borderWidth: 1.5, borderColor: colors.green, alignItems: 'center', justifyContent: 'center' },
   playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 15, letterSpacing: 2.4, textTransform: 'uppercase', color: colors.green },

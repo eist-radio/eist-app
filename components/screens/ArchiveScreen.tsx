@@ -6,6 +6,7 @@ import { useArchiveShows } from '../../hooks/useArchiveShows';
 import { PageScaffold } from '../ui/PageScaffold';
 import { Pills } from '../ui/Pills';
 import { Eyebrow } from '../ui/Eyebrow';
+import { Chevron } from '../ui/Chevron';
 import { FormattedShowTitle } from '../FormattedShowTitle';
 
 export default function ArchiveScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
@@ -23,7 +24,7 @@ export default function ArchiveScreen({ pageIndex }: { pageIndex: number; isActi
               <FormattedShowTitle title={it.title} color={colors.green} size={22} style={type.rowTitle} />
               <Text style={[type.rowSub, { color: colors.lilac, marginTop: 4 }]}>{it.artistName}</Text>
             </View>
-            <View style={s.tri} />
+            <Chevron direction="right" size={20} />
           </Pressable>
         ))}
       </ScrollView>
@@ -33,5 +34,4 @@ export default function ArchiveScreen({ pageIndex }: { pageIndex: number; isActi
 
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 30 },
-  tri: { width: 0, height: 0, borderLeftWidth: 13, borderLeftColor: colors.green, borderTopWidth: 8, borderTopColor: 'transparent', borderBottomWidth: 8, borderBottomColor: 'transparent' },
 });

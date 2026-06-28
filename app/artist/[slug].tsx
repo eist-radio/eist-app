@@ -19,6 +19,8 @@ import { Eyebrow } from '../../components/ui/Eyebrow';
 import { NotifyControl } from '../../components/ui/NotifyControl';
 import { PageScaffold } from '../../components/ui/PageScaffold';
 import { SpinningLogo } from '../../components/ui/SpinningLogo';
+import { Chevron } from '../../components/ui/Chevron';
+import { ShowArtworkBackground } from '../../components/ui/ShowArtworkBackground';
 import { FormattedShowTitle } from '../../components/FormattedShowTitle';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useTimezoneChange } from '../../hooks/useTimezoneChange';
@@ -26,6 +28,7 @@ import { stripFormatting } from '../../utils/stripFormatting';
 import { colors, type as t } from '../../theme/tokens';
 
 const STATION_ID = 'eist-radio';
+const fallbackImage = require('../../assets/images/eist_online.png');
 
 const REPEAT_PATTERNS = [
   'éist arís',
@@ -191,6 +194,7 @@ export default function ArtistScreen() {
 
   const { isArtistSubscribed, toggleArtistSubscription, isLoading } = useNotifications();
   const [isToggling, setIsToggling] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const isSubscribed = artist ? isArtistSubscribed(artist.id) : false;
 
   const onToggleNotify = useCallback(async () => {
@@ -212,7 +216,7 @@ export default function ArtistScreen() {
 
   if (!artist) {
     return (
-      <PageScaffold left={<BackTriangle />} right={<SpinningLogo />}>
+      <PageScaffold left={<BackTriangle />}>
         <Text style={[t.pagehead, { color: colors.green }]}>éist</Text>
       </PageScaffold>
     );
@@ -226,10 +230,18 @@ export default function ArtistScreen() {
     .filter((tag) => tag.startsWith('GENRE_'))
     .map((tag) => tag.replace('GENRE_', '').replace(/_/g, ' '));
 
+  const artistImageUrl =
+    artist.logo?.['1024x1024'] ||
+    artist.logo?.['512x512'] ||
+    artist.logo?.['256x256'] ||
+    artist.logo?.default;
+  const imageSource = artistImageUrl && !imageFailed ? { uri: artistImageUrl } : fallbackImage;
+
   return (
-    <PageScaffold left={<BackTriangle />} right={<SpinningLogo />}>
+    <PageScaffold left={<BackTriangle />} right={<SpinningLogo />} transparentBg>
+      <ShowArtworkBackground source={imageSource} onError={() => setImageFailed(true)} />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Eyebrow>Resident</Eyebrow>
+        <Eyebrow color={colors.green}>Host</Eyebrow>
 
         <Text style={[t.pagehead, { color: colors.green, marginTop: 8 }]}>
           {artist.name}
@@ -293,18 +305,7 @@ export default function ArtistScreen() {
                 })}
               </Text>
             </View>
-            <View
-              style={{
-                width: 0,
-                height: 0,
-                borderLeftWidth: 13,
-                borderLeftColor: colors.green,
-                borderTopWidth: 8,
-                borderTopColor: 'transparent',
-                borderBottomWidth: 8,
-                borderBottomColor: 'transparent',
-              }}
-            />
+            <Chevron direction="right" size={20} />
           </Pressable>
         ))}
       </ScrollView>

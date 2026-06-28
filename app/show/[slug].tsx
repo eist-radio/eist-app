@@ -197,7 +197,7 @@ export default function ShowScreen() {
   // Loading / not-found guard
   if (!event) {
     return (
-      <PageScaffold left={<BackTriangle />} right={<SpinningLogo />}>
+      <PageScaffold left={<BackTriangle />}>
         <Text style={[t.pagehead, { color: colors.green }]}>éist</Text>
       </PageScaffold>
     );

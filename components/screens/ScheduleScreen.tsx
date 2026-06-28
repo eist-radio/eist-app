@@ -79,6 +79,9 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
   const tomorrowKey = tomorrow.toISOString().split('T')[0]
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  const yesterdayKey = yesterday.toISOString().split('T')[0]
 
   const buckets: Record<string, RawScheduleItem[]> = {}
 
@@ -93,7 +96,7 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
       dateKey = prev.toISOString().split('T')[0]
     }
 
-    if (dateKey >= todayKey) {
+    if (dateKey >= yesterdayKey) {
       ;(buckets[dateKey] ||= []).push(item)
     }
   })
@@ -113,6 +116,7 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
   const getDayName = (dateKey: string): string => {
     if (dateKey === todayKey) return 'Today'
     if (dateKey === tomorrowKey) return 'Tomorrow'
+    if (dateKey === yesterdayKey) return 'Yesterday'
     return new Date(dateKey + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' })
   }
 
@@ -202,11 +206,12 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
     if (isFetchingSchedule.current) return
     isFetchingSchedule.current = true
     try {
-      const today = new Date()
+      const startDate = new Date()
+      startDate.setDate(startDate.getDate() - 1)
       const endDate = new Date()
-      endDate.setDate(today.getDate() + NUM_DAYS)
+      endDate.setDate(endDate.getDate() + NUM_DAYS)
 
-      const startIso = fmt(today, '00:00:00Z')
+      const startIso = fmt(startDate, '00:00:00Z')
       const endIso = fmt(endDate, '23:59:59Z')
 
       const raw = await fetchSchedule(startIso, endIso, currentTimezone)
@@ -252,31 +257,76 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
     return () => sub.remove()
   }, [fetchScheduleData, fetchLiveNow])
 
-  const rows = React.useMemo(() => {
-    const todaySection = sections.find((sec) => sec.dayName === 'Today')
-    if (!todaySection) return [] as { id: string; time: string; isLive: boolean; title: string; artist: string }[]
-    return todaySection.data.map((it) => ({
-      id: it.id,
-      time: it.startTime,
-      isLive: it.id === currentShowId,
-      title: it.title,
-      artist: it.artistIds?.[0] ? (artistMapping?.[it.artistIds[0]]?.name ?? '') : '',
-    }))
-  }, [sections, currentShowId, artistMapping])
+  // All days (-1 .. +7), each with its rows. Sorted chronologically by groupByDate.
+  const days = React.useMemo(
+    () =>
+      sections.map((sec) => ({
+        key: sec.key,
+        dayName: sec.dayName,
+        rows: sec.data.map((it) => ({
+          id: it.id,
+          time: it.startTime,
+          isLive: it.id === currentShowId,
+          title: it.title,
+          artist: it.artistIds?.[0] ? (artistMapping?.[it.artistIds[0]]?.name ?? '') : '',
+        })),
+      })),
+    [sections, currentShowId, artistMapping]
+  )
+
+  // Big heading reflects the day currently scrolled to the top.
+  const scrollRef = useRef<ScrollView>(null)
+  const dayOffsets = useRef<Record<string, number>>({})
+  const didInitialScroll = useRef(false)
+  const [activeDay, setActiveDay] = useState('Today')
+
+  const onSectionLayout = (dayName: string, y: number) => {
+    dayOffsets.current[dayName] = y
+    // On first measure of Today, jump there so yesterday sits above (scroll up to reveal).
+    if (dayName === 'Today' && !didInitialScroll.current) {
+      didInitialScroll.current = true
+      requestAnimationFrame(() => scrollRef.current?.scrollTo({ y, animated: false }))
+    }
+  }
+
+  const onScroll = (e: { nativeEvent: { contentOffset: { y: number } } }) => {
+    const y = e.nativeEvent.contentOffset.y + 8
+    let name = days[0]?.dayName ?? 'Today'
+    for (const d of days) {
+      const off = dayOffsets.current[d.dayName]
+      if (off != null && off <= y) name = d.dayName
+    }
+    if (name !== activeDay) setActiveDay(name)
+  }
 
   return (
     <PageScaffold left={<Pills active={pageIndex} />}>
       <Eyebrow>Schedule</Eyebrow>
-      <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Today</Text>
-      <ScrollView style={{ marginTop: 32 }} showsVerticalScrollIndicator={false}>
-        {rows.map((r) => (
-          <Pressable key={r.id} style={s.row} onPress={() => router.push(`/show/${r.id}`)}>
-            <Text style={[s.time, { color: r.isLive ? colors.green : colors.lilac }]}>{r.isLive ? 'Now' : r.time}</Text>
-            <View style={{ flex: 1 }}>
-              <FormattedShowTitle title={r.title} color={colors.green} size={22} style={type.rowTitle} />
-              <Text style={[type.rowSub, { color: colors.lilac, marginTop: 4 }]}>{r.artist}</Text>
-            </View>
-          </Pressable>
+      <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>{activeDay}</Text>
+      <ScrollView
+        ref={scrollRef}
+        style={{ marginTop: 32 }}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={onScroll}
+      >
+        {days.map((d) => (
+          <View key={d.key} onLayout={(e) => onSectionLayout(d.dayName, e.nativeEvent.layout.y)}>
+            {d.rows.map((r) => (
+              <Pressable key={r.id} style={s.row} onPress={() => router.push(`/show/${r.id}`)}>
+                <Text
+                  style={[s.time, { color: r.isLive ? colors.green : colors.lilac }]}
+                  numberOfLines={1}
+                >
+                  {r.isLive ? 'Now' : r.time}
+                </Text>
+                <View style={{ flex: 1 }}>
+                  <FormattedShowTitle title={r.title} color={colors.green} size={22} style={type.rowTitle} />
+                  <Text style={[type.rowSub, { color: colors.lilac, marginTop: 4 }]}>{r.artist}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
         ))}
       </ScrollView>
     </PageScaffold>
@@ -284,6 +334,6 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
 }
 
 const s = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 30 },
-  time: { fontFamily: font.body, fontWeight: '600', fontSize: 13, width: 46 },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 30 },
+  time: { fontFamily: font.body, fontWeight: '600', fontSize: 13, width: 64 },
 })

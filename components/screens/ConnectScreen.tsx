@@ -10,15 +10,14 @@ const LINKS = [
   { label: 'Instagram', url: 'https://www.instagram.com/eistradio' },
   { label: 'SoundCloud', url: 'https://soundcloud.com/eistcork' },
   { label: 'Mixcloud', url: 'https://www.mixcloud.com/eistcork/' },
-  { label: 'Donate', url: 'https://eist.radio/support' },
   { label: 'Website', url: 'https://eist.radio' },
-  { label: 'Contact', url: 'mailto:hello@eist.radio' },
+  { label: 'Email', url: 'mailto:info@eist.radio' },
 ];
 
 export default function ConnectScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
   return (
     <PageScaffold left={<Pills active={pageIndex} />}>
-      <Eyebrow>Elsewhere</Eyebrow>
+      <Eyebrow>We over here</Eyebrow>
       <ScrollView style={{ flex: 1, marginTop: 14 }} contentContainerStyle={{ gap: 22, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {LINKS.map((l) => (
           <Pressable key={l.url} onPress={() => Linking.openURL(l.url)}>
