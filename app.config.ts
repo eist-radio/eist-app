@@ -3,7 +3,10 @@ import { ConfigContext, ExpoConfig } from '@expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: config.name ?? 'eist-app',
+  // Drives the iOS Xcode project/scheme name (sanitized ASCII). Kept as plain
+  // "eist" so the scheme is "eist" rather than "ist" (the fada in "éist" gets
+  // stripped). The user-facing app name keeps the fada via CFBundleDisplayName.
+  name: 'eist',
   slug: config.slug ?? 'eist-app',
   extra: {
     apiKey: process.env.API_KEY,
@@ -36,6 +39,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ...config.ios,
     infoPlist: {
       ...config.ios?.infoPlist,
+      // Keep the branded name (with fada) on the home screen even though the
+      // Xcode project/scheme is the plain-ASCII "eist".
+      CFBundleDisplayName: "éist",
       UIBackgroundModes: [
         "audio",
         "remote-notification"
