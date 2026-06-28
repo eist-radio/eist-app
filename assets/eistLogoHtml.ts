@@ -2,7 +2,7 @@ export const eistLogoHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>éist</title>
 <style>
@@ -133,14 +133,20 @@ const scene = new THREE.Scene();
 scene.background = null;
 
 const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 100);
+// Word half-extents, filled in once the geometry is built. The camera frames
+// these (plus the extrude depth) with margin so the logo never clips on any
+// axis as it spins or tilts.
+let HALF_W = 1, HALF_H = 1, HALF_D = 0;
 function updateCamera() {
   camera.aspect = innerWidth / innerHeight;
-  if (camera.aspect < 1.2) {
-    const halfTan = Math.tan(38 * Math.PI / 360);
-    camera.position.z = 3.7 / (2 * halfTan * camera.aspect);
-  } else {
-    camera.position.z = 7.5;
-  }
+  const vHalf = 38 * Math.PI / 360;          // vertical half-FOV
+  const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect); // horizontal half-FOV
+  const margin = 1.15;                        // headroom on every side
+  // Worst-case projected half-extents: a tilt toward the camera can add the
+  // extrude depth to either screen axis, so include HALF_D in both.
+  const distV = ((HALF_H + HALF_D) * margin) / Math.tan(vHalf);
+  const distH = ((HALF_W + HALF_D) * margin) / Math.tan(hHalf);
+  camera.position.z = Math.max(distV, distH);
   camera.updateProjectionMatrix();
 }
 updateCamera();
@@ -220,8 +226,21 @@ for (let li = 0; li < LETTERS.length; li++) {
 }
 
 
-// Vertically centre the group
-word.position.y = -(capH / 2) + (LOWER_AMT / 2) - 0.05;
+// Centre the word on its true 3D bounding box (every axis, including the é
+// accent and extrude depth) and frame the camera to those extents so it never
+// clips at any rotation.
+{
+  const box = new THREE.Box3().setFromObject(word);
+  const center = box.getCenter(new THREE.Vector3());
+  word.position.x -= center.x;
+  word.position.y -= center.y;
+  word.position.z -= center.z;
+  const size = box.getSize(new THREE.Vector3());
+  HALF_W = size.x / 2;
+  HALF_H = size.y / 2;
+  HALF_D = size.z / 2;
+  updateCamera();
+}
 
 // ── Interaction & physics ──────────────────────────────────────────────────
 const AUTO_SPEED   = 0.002;
