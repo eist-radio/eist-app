@@ -23,7 +23,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     }],
     ["react-native-google-cast", {
       receiverAppId: "7A2782C8",
-      iosStartDiscoveryAfterFirstTapOnCastButton: true,
+      // Must stay false: the native iOS Cast button hides itself while the
+      // state is noDevicesAvailable, so deferring discovery until "first tap"
+      // is a catch-22 (you can't tap a hidden button). Autostarting discovery
+      // at launch lets the button appear as soon as a device is found.
+      iosStartDiscoveryAfterFirstTapOnCastButton: false,
       iosSuspendSessionsWhenBackgrounded: false
     }],
     "./plugins/withAndroidAuto"
