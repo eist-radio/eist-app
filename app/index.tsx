@@ -1,7 +1,7 @@
 // app/index.tsx
 
-import { Redirect } from 'expo-router';
+import { Pager } from '../components/Pager';
 
 export default function Index() {
-  return <Redirect href="/listen" />;
+  return <Pager />;
 }
