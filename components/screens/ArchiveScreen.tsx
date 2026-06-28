@@ -31,7 +31,7 @@ export default function ArchiveScreen({ pageIndex }: { pageIndex: number; isActi
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder="Search shows or hosts"
+        placeholder="Search shows or hosts..."
         placeholderTextColor={colors.lilac}
         style={s.search}
         autoCapitalize="none"

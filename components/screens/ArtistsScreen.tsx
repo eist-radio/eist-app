@@ -25,7 +25,7 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder="Search hosts"
+        placeholder="Search hosts..."
         placeholderTextColor={colors.lilac}
         style={s.search}
         autoCapitalize="none"
