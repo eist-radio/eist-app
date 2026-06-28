@@ -192,6 +192,17 @@ export default function ArtistScreen() {
 
   const { shows: archivedShows } = useArchiveShowsByArtist(archiveArtistSlug, 12);
 
+  // TEMP diagnostic for missing past shows — remove once verified.
+  console.log('[past-shows]', {
+    id,
+    queryId,
+    routeSlug,
+    fetchedArtistSlug: artist?.slug,
+    nameSlug,
+    archiveArtistSlug,
+    count: archivedShows.length,
+  });
+
   const { isArtistSubscribed, toggleArtistSubscription, isLoading } = useNotifications();
   const [isToggling, setIsToggling] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
