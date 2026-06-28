@@ -10,6 +10,7 @@ import ListenScreen from './screens/ListenScreen';
 import ScheduleScreen from './screens/ScheduleScreen';
 import ArtistsScreen from './screens/ArtistsScreen';
 import ArchiveScreen from './screens/ArchiveScreen';
+import ConnectScreen from './screens/ConnectScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -30,6 +31,7 @@ export function Pager() {
               : i === 1 ? <ScheduleScreen pageIndex={1} isActive={active === 1} />
               : i === 2 ? <ArtistsScreen pageIndex={2} isActive={active === 2} />
               : i === 3 ? <ArchiveScreen pageIndex={3} isActive={active === 3} />
+              : i === 4 ? <ConnectScreen pageIndex={4} isActive={active === 4} />
               : <PageScaffold left={<Pills active={i} />}><Text style={{ color: colors.green }}>Page {i}</Text></PageScaffold>}
           </View>
         ))}
