@@ -1,5 +1,4 @@
 // components/screens/ListenScreen.tsx
-import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -22,6 +21,7 @@ import { FormattedShowTitle } from '../FormattedShowTitle'
 import { Eyebrow } from '../ui/Eyebrow'
 import { PageScaffold } from '../ui/PageScaffold'
 import { Pills } from '../ui/Pills'
+import { PlayDisc } from '../ui/PlayDisc'
 import { ShowArtworkBackground } from '../ui/ShowArtworkBackground'
 
 // Only import TrackPlayer on mobile platforms
@@ -552,13 +552,12 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         source={broadcastStatus === 'schedule' && remoteImageUrl && !imageFailed ? { uri: remoteImageUrl } : placeholderOfflineImage}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}><View style={s.dot} /><Eyebrow color={colors.green}>On Air</Eyebrow></View>
+      <View style={s.onair}><View style={s.dot} /><Eyebrow color={colors.green}>on air</Eyebrow></View>
       <View style={s.castRow}>
-        <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.lilac} />
+        <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.bone} />
       </View>
 
       <View style={{ flex: 1 }} />
-      <View style={s.tick} />
       <Pressable onPress={() => currentShowId && router.push(`/show/${currentShowId}` as any)} disabled={!currentShowId}>
         <FormattedShowTitle
           title={broadcastStatus === 'schedule' && showTitle ? showTitle : 'éist'}
@@ -578,7 +577,7 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
           onPress={() => nextShowId && router.push(`/show/${nextShowId}` as any)}
           disabled={!nextShowId}
         >
-          <Eyebrow>Up next</Eyebrow>
+          <Eyebrow>up next</Eyebrow>
           <Text style={s.upNextText} numberOfLines={1}>
             {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
           </Text>
@@ -586,9 +585,9 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       ) : null}
 
       <View style={s.player}>
-        <Pressable onPress={handlePlayButtonPress} style={s.disc} accessibilityRole="button"
+        <Pressable onPress={handlePlayButtonPress} accessibilityRole="button"
           accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}>
-          <Ionicons name={isPlaying ? 'stop' : 'play'} size={26} color={colors.green} style={!isPlaying && { marginLeft: 4 }} />
+          <PlayDisc playing={isPlaying} size={72} />
         </Pressable>
         <Text style={s.playlabel}>{isPlaying ? 'Stop' : 'Listen now'}</Text>
       </View>
@@ -599,13 +598,11 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
 const s = StyleSheet.create({
   onair: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green },
-  castRow: { marginTop: 18 },
-  tick: { width: 30, height: 3, borderRadius: 3, backgroundColor: colors.green, marginBottom: 20 },
+  castRow: { marginTop: 18, marginBottom: 20 },
   title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 33, lineHeight: 34, letterSpacing: -0.5, color: colors.green },
-  artist: { fontFamily: font.body, fontWeight: '500', fontSize: 18, color: colors.green, marginTop: 9 },
+  artist: { fontFamily: font.body, fontWeight: '500', fontSize: 18, color: colors.bone, marginTop: 9 },
   upNext: { marginTop: 22, gap: 6 },
-  upNextText: { fontFamily: font.body, fontWeight: '500', fontSize: 14, color: colors.lilac },
+  upNextText: { fontFamily: font.body, fontWeight: '500', fontSize: 14, color: colors.bone },
   player: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 30 },
-  disc: { width: 66, height: 66, borderRadius: 33, borderWidth: 1.5, borderColor: colors.green, alignItems: 'center', justifyContent: 'center' },
-  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 15, letterSpacing: 2.4, textTransform: 'uppercase', color: colors.green },
+  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 15, letterSpacing: 0.2, color: colors.green },
 });

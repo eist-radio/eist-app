@@ -248,7 +248,7 @@ export default function ArtistScreen() {
     <PageScaffold left={<BackTriangle />} right={<SpinningLogo />} transparentBg>
       <ShowArtworkBackground source={imageSource} onError={() => setImageFailed(true)} />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Eyebrow color={colors.green}>Host</Eyebrow>
+        <Eyebrow color={colors.green}>host</Eyebrow>
 
         <Text style={[t.pagehead, { color: colors.green, marginTop: 8 }]}>
           {artist.name}
@@ -258,14 +258,14 @@ export default function ArtistScreen() {
           <Pressable
             onPress={() => router.push(`/show/${encodeURIComponent(nextShow.id)}`)}
           >
-            <Text style={[t.meta, { color: colors.lilac, marginTop: 10 }]}>
+            <Text style={[t.meta, { color: colors.bone, marginTop: 10 }]}>
               {formatNextShowDate(nextShow.startDateUtc)}
             </Text>
           </Pressable>
         )}
 
         {genres.length > 0 && (
-          <Text style={[t.meta, { color: colors.lilac, marginTop: 10 }]}>
+          <Text style={[t.meta, { color: colors.bone, marginTop: 10 }]}>
             {genres.slice(0, 4).join('  ·  ')}
           </Text>
         )}
@@ -277,13 +277,13 @@ export default function ArtistScreen() {
         />
 
         {plain ? (
-          <Text style={[t.bio, { color: colors.lilac, marginTop: 26 }]}>
+          <Text style={[t.bio, { color: colors.bone, marginTop: 26 }]}>
             {plain}
           </Text>
         ) : null}
 
         <View style={{ marginTop: 34 }}>
-          <Eyebrow>Past shows</Eyebrow>
+          <Eyebrow>past shows</Eyebrow>
         </View>
 
         {archivedShows.map((show) => (
@@ -304,7 +304,7 @@ export default function ArtistScreen() {
                 size={22}
                 style={t.rowTitle}
               />
-              <Text style={[t.rowSub, { color: colors.lilac, marginTop: 4 }]}>
+              <Text style={[t.rowSub, { color: colors.bone, marginTop: 4 }]}>
                 {new Date(show.start).toLocaleDateString(undefined, {
                   day: 'numeric',
                   month: 'long',

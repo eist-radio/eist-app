@@ -396,7 +396,7 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
 
   return (
     <PageScaffold left={<Pills active={pageIndex} />}>
-      <Eyebrow>Schedule</Eyebrow>
+      <Eyebrow>schedule</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>{activeDay}</Text>
       <ScrollView
         ref={scrollRef}
@@ -418,15 +418,16 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
                 onPress={() => router.push(`/show/${r.id}`)}
                 onLayout={(e) => { rowOffsets.current[r.id] = { day: d.dayName, y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height }; maybeCenter() }}
               >
-                <Text
-                  style={[s.time, r.isLive ? s.timeNow : { color: colors.lilac }]}
-                  numberOfLines={1}
-                >
-                  {r.isLive ? 'Now' : r.time}
-                </Text>
+                <View style={s.timeCol}>
+                  {r.isLive ? (
+                    <View style={s.nowChip}><Text style={s.nowChipText}>NOW</Text></View>
+                  ) : (
+                    <Text style={[s.time, { color: colors.bone }]} numberOfLines={1}>{r.time}</Text>
+                  )}
+                </View>
                 <View style={{ flex: 1 }}>
-                  <FormattedShowTitle title={r.title} color={colors.green} size={22} style={type.rowTitle} />
-                  <Text style={[type.rowSub, { color: colors.lilac, marginTop: 4 }]}>{r.artist}</Text>
+                  <FormattedShowTitle title={r.title} color={r.isLive ? colors.green : colors.bone} size={22} style={type.rowTitle} />
+                  <Text style={[type.rowSub, { color: colors.bone, marginTop: 4 }]}>{r.artist}</Text>
                 </View>
               </Pressable>
             ))}
@@ -439,6 +440,8 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
 
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 30 },
-  time: { fontFamily: font.body, fontWeight: '600', fontSize: 13, width: 64 },
-  timeNow: { fontFamily: font.headingBold, fontWeight: '700', color: colors.green },
+  timeCol: { width: 64 },
+  time: { fontFamily: font.body, fontWeight: '600', fontSize: 13 },
+  nowChip: { alignSelf: 'flex-start', backgroundColor: colors.green, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3, marginTop: 1 },
+  nowChipText: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 11, letterSpacing: 0.4, color: colors.purple },
 })

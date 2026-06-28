@@ -20,13 +20,13 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
 
   return (
     <PageScaffold left={<Pills active={pageIndex} />}>
-      <Eyebrow>Hosts</Eyebrow>
-      <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>People of éist</Text>
+      <Eyebrow>hosts</Eyebrow>
+      <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Artists</Text>
       <TextInput
         value={query}
         onChangeText={setQuery}
         placeholder="Search hosts..."
-        placeholderTextColor={colors.lilac}
+        placeholderTextColor={colors.boneDim}
         style={s.search}
         autoCapitalize="none"
         autoCorrect={false}

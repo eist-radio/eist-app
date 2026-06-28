@@ -206,7 +206,7 @@ export default function ShowScreen() {
   return (
     <PageScaffold left={<BackTriangle />} right={<SpinningLogo />}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Eyebrow>Coming up</Eyebrow>
+        <Eyebrow>coming up</Eyebrow>
 
         <FormattedShowTitle
           title={event.title}
@@ -248,7 +248,7 @@ export default function ShowScreen() {
               </Text>
             </Pressable>
           ) : null}
-          <Text style={[t.meta, { color: colors.lilac }]}>
+          <Text style={[t.meta, { color: colors.bone }]}>
             {hosts[0]?.name
               ? `· ${dateString}, ${timeString}`
               : `${dateString}, ${timeString}`}
@@ -262,7 +262,7 @@ export default function ShowScreen() {
         />
 
         {plain ? (
-          <Text style={[t.bio, { color: colors.lilac, marginTop: 26 }]}>
+          <Text style={[t.bio, { color: colors.bone, marginTop: 26 }]}>
             {plain}
           </Text>
         ) : null}

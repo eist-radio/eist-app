@@ -17,7 +17,7 @@ const LINKS = [
 export default function ConnectScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
   return (
     <PageScaffold left={<Pills active={pageIndex} />}>
-      <Eyebrow>Find us here</Eyebrow>
+      <Eyebrow>links</Eyebrow>
       <ScrollView style={{ flex: 1, marginTop: 14 }} contentContainerStyle={{ gap: 22, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {LINKS.map((l) => (
           <Pressable key={l.url} onPress={() => Linking.openURL(l.url)}>
@@ -25,8 +25,8 @@ export default function ConnectScreen({ pageIndex }: { pageIndex: number; isActi
           </Pressable>
         ))}
       </ScrollView>
-      <Text style={[type.eyebrow, { color: colors.lilac }]}>
-        <Text style={{ textTransform: 'none' }}>éist</Text> · Cork, Ireland
+      <Text style={[type.eyebrow, { color: colors.boneDim }]}>
+        éist · Cork, Ireland
       </Text>
     </PageScaffold>
   );

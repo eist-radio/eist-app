@@ -1,6 +1,5 @@
 // app/archive/[slug].tsx
 
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
@@ -9,6 +8,7 @@ import { BackTriangle } from '../../components/ui/BackTriangle';
 import { Chevron } from '../../components/ui/Chevron';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { PageScaffold } from '../../components/ui/PageScaffold';
+import { PlayDisc } from '../../components/ui/PlayDisc';
 import { ShowArtworkBackground } from '../../components/ui/ShowArtworkBackground';
 import { SpinningLogo } from '../../components/ui/SpinningLogo';
 import {
@@ -88,18 +88,9 @@ export default function ArchiveShowScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        <Eyebrow color={colors.green}>Listen back</Eyebrow>
+        <Eyebrow color={colors.green}>listen back</Eyebrow>
 
-        <View
-          style={{
-            width: 30,
-            height: 3,
-            borderRadius: 3,
-            backgroundColor: colors.green,
-            marginTop: 18,
-            marginBottom: 16,
-          }}
-        />
+        <View style={{ height: 18 }} />
 
         <FormattedShowTitle
           title={show.title}
@@ -141,7 +132,7 @@ export default function ArchiveShowScreen() {
               {show.artistName}
             </Text>
           </Pressable>
-          <Text style={[t.meta, { color: colors.lilac }]}>
+          <Text style={[t.meta, { color: colors.bone }]}>
             {`· ${formatDate(show.start)}`}
           </Text>
         </View>
@@ -157,15 +148,6 @@ export default function ArchiveShowScreen() {
           >
             <Pressable
               onPress={() => primaryUrl && Linking.openURL(primaryUrl)}
-              style={{
-                width: 66,
-                height: 66,
-                borderRadius: 33,
-                borderWidth: 1.5,
-                borderColor: colors.green,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
               accessibilityRole="button"
               accessibilityLabel={
                 primaryPlatform === 'soundcloud'
@@ -173,20 +155,14 @@ export default function ArchiveShowScreen() {
                   : 'Play on Mixcloud'
               }
             >
-              <Ionicons
-                name="play"
-                size={26}
-                color={colors.green}
-                style={{ marginLeft: 4 }}
-              />
+              <PlayDisc size={66} />
             </Pressable>
             <Text
               style={{
                 fontFamily: font.body,
                 fontWeight: '600',
                 fontSize: 15,
-                letterSpacing: 2.4,
-                textTransform: 'uppercase',
+                letterSpacing: 0.2,
                 color: colors.green,
               }}
             >
@@ -200,7 +176,7 @@ export default function ArchiveShowScreen() {
         {paragraphs.map((p, i) => (
           <Text
             key={i}
-            style={[t.bio, { color: colors.lilac, marginTop: i === 0 ? 30 : 14 }]}
+            style={[t.bio, { color: colors.bone, marginTop: i === 0 ? 30 : 14 }]}
           >
             {p}
           </Text>
@@ -209,7 +185,7 @@ export default function ArchiveShowScreen() {
         {otherShows.length > 0 && (
           <>
             <View style={{ marginTop: 34 }}>
-              <Eyebrow>{`More from ${show.artistName}`}</Eyebrow>
+              <Eyebrow>{`more from ${show.artistName}`}</Eyebrow>
             </View>
             {otherShows.map((r) => (
               <Pressable
@@ -232,7 +208,7 @@ export default function ArchiveShowScreen() {
                     style={t.rowTitle}
                   />
                   <Text
-                    style={[t.rowSub, { color: colors.lilac, marginTop: 4 }]}
+                    style={[t.rowSub, { color: colors.bone, marginTop: 4 }]}
                   >
                     {formatDate(r.start)}
                   </Text>
