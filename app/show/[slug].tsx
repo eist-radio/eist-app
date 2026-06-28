@@ -196,11 +196,7 @@ export default function ShowScreen() {
 
   // Loading / not-found guard
   if (!event) {
-    return (
-      <PageScaffold left={<BackTriangle />}>
-        <Text style={[t.pagehead, { color: colors.green }]}>éist</Text>
-      </PageScaffold>
-    );
+    return <PageScaffold left={<BackTriangle />}>{null}</PageScaffold>;
   }
 
   const plain = stripFormatting(event.description?.content || []);

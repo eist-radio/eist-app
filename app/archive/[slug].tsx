@@ -56,11 +56,7 @@ export default function ArchiveShowScreen() {
   const [imageFailed, setImageFailed] = useState(false);
 
   if (isLoading || !show) {
-    return (
-      <PageScaffold left={<BackTriangle />}>
-        <Text style={[t.pagehead, { color: colors.green }]}>éist</Text>
-      </PageScaffold>
-    );
+    return <PageScaffold left={<BackTriangle />}>{null}</PageScaffold>;
   }
 
   const imageUrl = getShowImage(show);

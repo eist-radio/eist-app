@@ -215,11 +215,7 @@ export default function ArtistScreen() {
   }, [artist, isToggling, isLoading, toggleArtistSubscription, archiveArtistSlug]);
 
   if (!artist) {
-    return (
-      <PageScaffold left={<BackTriangle />}>
-        <Text style={[t.pagehead, { color: colors.green }]}>éist</Text>
-      </PageScaffold>
-    );
+    return <PageScaffold left={<BackTriangle />}>{null}</PageScaffold>;
   }
 
   const plain = stripFormatting(artist.description?.content);
