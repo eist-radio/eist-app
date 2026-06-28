@@ -389,7 +389,7 @@ const ShowCard = ({
             source={
               imageUrl && !imageFailed
                 ? { uri: imageUrl }
-                : require('../../../assets/images/eist_online.png')
+                : require('../../assets/images/eist_online.png')
             }
             style={styles.showImage}
             contentFit="cover"
