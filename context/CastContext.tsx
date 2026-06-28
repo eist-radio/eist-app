@@ -100,38 +100,15 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     let castStateSubscription: any
     let sessionStartedSubscription: any
     let sessionEndedSubscription: any
-    let diagInterval: ReturnType<typeof setInterval> | undefined
 
     const initializeCast = async () => {
       try {
         // Get initial cast state
         const currentState = await GoogleCast.getCastState()
-        console.log('Initial cast state:', currentState)
         setCastState(currentState)
-
-        // --- TEMP cast discovery diagnostic ---------------------------------
-        // Polls the cast state for ~45s after launch. If discovery is working
-        // and a device is on the network, the state should move from
-        // 'noDevicesAvailable' to 'notConnected'. If it stays
-        // 'noDevicesAvailable' the whole time, discovery is finding nothing
-        // (most often the iOS Local Network permission was denied, or the
-        // device is on a different subnet/VLAN). Remove once cast is verified.
-        let polls = 0
-        diagInterval = setInterval(async () => {
-          polls += 1
-          try {
-            const s = await GoogleCast.getCastState()
-            console.log(`[cast-debug] poll ${polls} (t+${polls * 3}s): castState=${s}`)
-          } catch (e) {
-            console.log('[cast-debug] poll error:', e)
-          }
-          if (polls >= 15 && diagInterval) clearInterval(diagInterval)
-        }, 3000)
-        // --------------------------------------------------------------------
 
         // Listen for cast state changes
         castStateSubscription = GoogleCast.onCastStateChanged((state: string) => {
-          console.log('Cast state changed:', state)
           setCastState(state)
         })
 
@@ -139,7 +116,6 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
         const sessionManager = GoogleCast.getSessionManager()
 
         sessionStartedSubscription = sessionManager.onSessionStarted(async (session: any) => {
-          console.log('Cast session started')
           try {
             const device = await session.getCastDevice()
             setCastDeviceName(device?.friendlyName || 'Cast Device')
@@ -149,7 +125,6 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
         })
 
         sessionEndedSubscription = sessionManager.onSessionEnded(() => {
-          console.log('Cast session ended')
           setCastDeviceName(null)
           setIsCastPlaying(false)
         })
@@ -162,7 +137,6 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     initializeCast()
 
     return () => {
-      if (diagInterval) clearInterval(diagInterval)
       castStateSubscription?.remove?.()
       sessionStartedSubscription?.remove?.()
       sessionEndedSubscription?.remove?.()
@@ -231,14 +205,11 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
       // This avoids race conditions where state hasn't updated yet but session exists
       currentMetadata.current = { title, artist, artworkUrl, showTime }
 
-      console.log('Loading media on cast device...')
       const success = await loadMediaOnCast(title, artist, artworkUrl, showTime)
       if (success) {
-        console.log('Cast playback started')
         setIsCastPlaying(true)
         return true
       } else {
-        console.log('Failed to start cast playback')
         return false
       }
     },

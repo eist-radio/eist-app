@@ -35,7 +35,6 @@ export const setupAndroidNotificationChannel = async () => {
         mediaSession: true,
       });
 
-      console.log('Android notification channel created successfully with Android Auto support');
     }
   } catch (error) {
     console.warn('Failed to create Android notification channel:', error);

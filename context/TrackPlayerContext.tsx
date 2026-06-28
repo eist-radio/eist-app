@@ -186,7 +186,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         isLiveStream: true,
       }
 
-      console.log('Creating track with metadata:', { title: trackTitle, artist: trackArtist })
 
       try {
         await TrackPlayer.add(trackToAdd)
@@ -196,7 +195,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      console.log('Clean reset completed')
     } catch (err) {
       console.error('Clean reset failed:', err)
       throw err
@@ -275,7 +273,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         return
       } catch (checkError) {
         // TrackPlayer not initialized yet, proceed with setup
-        console.log('TrackPlayer not initialized, proceeding with setup')
       }
 
       if (!hasInitialized.current) {
@@ -285,11 +282,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setIsPlayerReady(true)
-      console.log('Player setup completed')
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message.toLowerCase() : ''
       if (errorMsg.includes('already been initialized')) {
-        console.log('TrackPlayer already initialized, continuing...')
         hasInitialized.current = true
         setIsPlayerReady(true)
         return
@@ -308,12 +303,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     
     // Use userPlay instead of isPlayingRef.current
     if (!userPlay.current) {
-      console.log('Not restarting - user has stopped playback')
       return
     }
 
     isRecovering.current = true
-    console.log(`Attempting stream restart due to: ${reason}`)
 
     // Clear any existing retry timeout
     if (retryTimeout.current) {
@@ -364,7 +357,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       if (userPlay.current) {
         await setupPlayer()
         await play()
-        console.log(`Stream restart completed after: ${reason}`)
       }
     } catch (err) {
       console.error(`Restart failed after ${reason}:`, err)
@@ -382,7 +374,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const retryDelay = Math.min(5000 + Math.random() * 5000, 60000) // 5-10s with max 60s
     
     retryTimeout.current = setTimeout(() => {
-      console.log(`Retrying stream restart after delay for: ${reason}`)
       attemptStreamRestart(`retry-${reason}`)
     }, retryDelay)
   }
@@ -444,11 +435,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           if (imagePreloaded) {
             // Update metadata again with the validated artwork
             await updateMetadata(title, artist, artworkUrl, showTime)
-            console.log('Lock screen image updated after preload validation')
           }
         }
 
-        console.log('Metadata updated successfully:', { title, artist, artworkUrl, showTime })
       }
 
       // Return the metadata for immediate use
@@ -524,16 +513,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         if (castSuccess) {
           setIsPlaying(true)
           await storeLastPlayedState(true)
-          console.log('Started playback on cast device')
           return
         }
         if (castOnly) {
-          console.log('Cast-only play requested; not falling back to local')
           setIsPlaying(false)
           await storeLastPlayedState(false)
           return
         }
-        console.log('Cast play returned false, falling back to local playback')
         // Fall through to local playback
       } catch (err) {
         console.error('Cast play failed, falling back to local:', err)
@@ -595,7 +581,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Gradually restore volume to avoid jarring audio start
       await TrackPlayer.setVolume(1)
 
-      console.log('Stream started successfully')
     } catch (err) {
       console.error('Play failed:', err)
       
@@ -609,7 +594,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
       // Use unified restart for all play errors
-      console.log('Play failed, attempting restart...')
       await attemptStreamRestart('play-error')
     }
   }, [isPlayerReady, isWeb, setupPlayer, attemptStreamRestart, cleanResetPlayer, fetchAndUpdateShowMetadata, isCastConnected, castPlay, showTitle, showArtist, showArtworkUrl])
@@ -628,7 +612,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (isCastConnected || isCastPlaying) {
       try {
         await castStop()
-        console.log('Stopped cast playback')
       } catch (err) {
         console.error('Cast stop failed:', err)
       }
@@ -647,7 +630,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('Stopping playback...')
 
       // Stop playback but preserve metadata for lock screen/CarPlay
       await TrackPlayer.stop()
@@ -658,7 +640,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setIsPlaying(false)
       await storeLastPlayedState(false)
 
-      console.log('Stream stopped')
     } catch (err) {
       console.error('Stop failed:', err)
       // Force stop even if there's an error
@@ -708,7 +689,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     try {
       const queue = await TrackPlayer.getQueue()
       if (!queue || queue.length === 0) {
-        console.log('No queue available for metadata update')
         return
       }
 
@@ -773,8 +753,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     // Check userPlay instead of isPlaying to handle network disconnection cases
     if (shouldRestart && userPlay.current) {
-      console.log(`Network change detected - Previous: ${previous.type}/${previous.isConnected}, Current: ${current.type}/${current.isConnected}`)
-      console.log(`User wants to play: ${userPlay.current}, Currently playing: ${isPlaying}`)
       
       setTimeout(async () => {
         await attemptStreamRestart(`network-change-${previous.type}-to-${current.type}`)
@@ -930,11 +908,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     if (!wasConnected && isCastConnected && !isCastPlaying) {
       const castOnly = !userPlay.current && !isPlayingRef.current
-      console.log(
-        castOnly
-          ? 'Cast connected; starting playback on cast'
-          : 'Cast connected while playing, moving playback to cast'
-      )
       ;(async () => {
         try {
           await play({ castOnly })
@@ -946,7 +919,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     if (wasConnected && !isCastConnected && userPlay.current) {
       // Cast disconnected while user wanted to play - resume locally
-      console.log('Cast disconnected, resuming local playback')
       // Small delay to let cast session fully end
       setTimeout(async () => {
         if (userPlay.current && !isPlayingRef.current) {

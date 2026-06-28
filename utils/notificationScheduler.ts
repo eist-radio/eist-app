@@ -76,7 +76,6 @@ export async function scheduleShowReminder(
 
   // Don't schedule if show already started or reminder time has passed
   if (reminderTime <= new Date()) {
-    console.log('Show already started or too close, not scheduling reminder');
     return null;
   }
 
@@ -98,7 +97,6 @@ export async function scheduleShowReminder(
       },
     });
 
-    console.log(`Scheduled reminder for show ${showId} at ${reminderTime}`);
     return notificationId;
   } catch (error) {
     console.error('Failed to schedule show reminder:', error);
@@ -111,7 +109,6 @@ export async function cancelShowReminder(
 ): Promise<void> {
   try {
     await Notifications.cancelScheduledNotificationAsync(notificationId);
-    console.log(`Cancelled reminder ${notificationId}`);
   } catch (error) {
     console.error('Failed to cancel show reminder:', error);
   }
@@ -120,7 +117,6 @@ export async function cancelShowReminder(
 export async function cancelAllReminders(): Promise<void> {
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
-    console.log('Cancelled all scheduled reminders');
   } catch (error) {
     console.error('Failed to cancel all reminders:', error);
   }

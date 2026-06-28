@@ -89,7 +89,6 @@ export async function loadMediaOnCast(
   showTime?: string
 ): Promise<boolean> {
   if (Platform.OS === 'web' || !GoogleCast) {
-    console.log('Cast not available on this platform')
     return false
   }
 
@@ -139,7 +138,6 @@ export async function loadMediaOnCast(
       console.warn('Failed to send cast metadata message:', messageError)
     }
 
-    console.log('Media loaded on cast device')
     return true
   } catch (error) {
     console.error('Failed to load media on cast:', error)

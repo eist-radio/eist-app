@@ -55,14 +55,12 @@ export const preloadLockScreenImage = async (artworkUrl?: string): Promise<boole
   }
 
   try {
-    console.log('Preloading lock screen image:', artworkUrl);
     
     // Check if we already have a valid cached version
     const cached = lockScreenImageCache.get(artworkUrl);
     const now = Date.now();
     
     if (cached && cached.isValid && (now - cached.timestamp) < CACHE_DURATION) {
-      console.log('Using cached lock screen image');
       return true;
     }
 
@@ -78,7 +76,6 @@ export const preloadLockScreenImage = async (artworkUrl?: string): Promise<boole
         timestamp: now,
         isValid: true
       });
-      console.log('Lock screen image preloaded successfully');
       return true;
     } else {
       // Mark as invalid
@@ -104,7 +101,6 @@ export const preloadLockScreenImage = async (artworkUrl?: string): Promise<boole
 
 export const clearLockScreenImageCache = (): void => {
   lockScreenImageCache.clear();
-  console.log('Lock screen image cache cleared');
 };
 
 export const invalidateLockScreenImage = (artworkUrl: string): void => {
@@ -112,7 +108,6 @@ export const invalidateLockScreenImage = (artworkUrl: string): void => {
     const cached = lockScreenImageCache.get(artworkUrl);
     if (cached) {
       cached.isValid = false;
-      console.log('Lock screen image invalidated:', artworkUrl);
     }
   }
 }; 
