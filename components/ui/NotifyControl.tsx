@@ -44,7 +44,7 @@ export function NotifyControl({ active, onToggle, caption }: { active: boolean; 
     <Pressable style={s.row} onPress={onToggle} accessibilityRole="button" accessibilityState={{ selected: active }}>
       <NotifyGlyph active={active} />
       <View>
-        <Text style={s.l1}>Notify me</Text>
+        <Text style={s.l1}>{active ? 'Notifications active' : 'Notify me'}</Text>
         <Text style={s.l2}>{caption}</Text>
       </View>
     </Pressable>
@@ -52,6 +52,6 @@ export function NotifyControl({ active, onToggle, caption }: { active: boolean; 
 }
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 26 },
-  l1: { fontFamily: font.body, fontWeight: '600', fontSize: 15, letterSpacing: 0.2, color: colors.green },
-  l2: { fontFamily: font.body, fontWeight: '500', fontSize: 13, color: colors.bone, marginTop: 4 },
+  l1: { fontFamily: font.body, fontWeight: '600', fontSize: 17, letterSpacing: 0.2, color: colors.green },
+  l2: { fontFamily: font.body, fontWeight: '500', fontSize: 15, color: colors.bone, marginTop: 4 },
 });

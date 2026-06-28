@@ -125,7 +125,7 @@ export default function ArchiveShowScreen() {
               style={{
                 fontFamily: font.body,
                 fontWeight: '600',
-                fontSize: 16,
+                fontSize: 18,
                 color: colors.green,
               }}
             >
@@ -161,7 +161,7 @@ export default function ArchiveShowScreen() {
               style={{
                 fontFamily: font.body,
                 fontWeight: '600',
-                fontSize: 15,
+                fontSize: 17,
                 letterSpacing: 0.2,
                 color: colors.green,
               }}

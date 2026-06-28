@@ -45,5 +45,5 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
 }
 
 const s = StyleSheet.create({
-  search: { fontFamily: font.body, fontWeight: '500', fontSize: 17, color: colors.green, marginTop: 18, paddingVertical: 4 },
+  search: { fontFamily: font.body, fontWeight: '500', fontSize: 19, color: colors.green, marginTop: 18, paddingVertical: 4 },
 });

@@ -36,8 +36,9 @@ export function Pager() {
           </View>
         ))}
       </ScrollView>
-      {/* single shared logo overlay, top-right, above all pages */}
-      <View pointerEvents="none" style={{ position: 'absolute', top: insets.top - 30, right: space.screenX - 8 }}>
+      {/* single shared logo overlay, top-right, above all pages — positioned to
+          match the detail pages' logo (centred in a 100px top row) */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: insets.top + space.topGap, right: space.screenX }}>
         <SpinningLogo size={100} />
       </View>
     </View>

@@ -600,9 +600,9 @@ const s = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green },
   castRow: { marginTop: 18, marginBottom: 20 },
   title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 33, lineHeight: 34, letterSpacing: -0.5, color: colors.green },
-  artist: { fontFamily: font.body, fontWeight: '500', fontSize: 18, color: colors.bone, marginTop: 9 },
+  artist: { fontFamily: font.body, fontWeight: '500', fontSize: 20, color: colors.bone, marginTop: 9 },
   upNext: { marginTop: 22, gap: 6 },
-  upNextText: { fontFamily: font.body, fontWeight: '500', fontSize: 14, color: colors.bone },
+  upNextText: { fontFamily: font.body, fontWeight: '500', fontSize: 16, color: colors.bone },
   player: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 30 },
-  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 15, letterSpacing: 0.2, color: colors.green },
+  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 17, letterSpacing: 0.2, color: colors.green },
 });

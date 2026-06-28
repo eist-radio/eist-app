@@ -56,5 +56,5 @@ export default function ArchiveScreen({ pageIndex }: { pageIndex: number; isActi
 
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 30 },
-  search: { fontFamily: font.body, fontWeight: '500', fontSize: 17, color: colors.green, marginTop: 18, paddingVertical: 4 },
+  search: { fontFamily: font.body, fontWeight: '500', fontSize: 19, color: colors.green, marginTop: 18, paddingVertical: 4 },
 });

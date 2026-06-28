@@ -240,7 +240,7 @@ export default function ShowScreen() {
                 style={{
                   fontFamily: font.body,
                   fontWeight: '600',
-                  fontSize: 16,
+                  fontSize: 18,
                   color: colors.green,
                 }}
               >

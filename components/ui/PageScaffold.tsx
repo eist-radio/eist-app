@@ -20,6 +20,6 @@ export function PageScaffold({
 }
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  top: { position: 'absolute', left: space.screenX, right: space.screenX, zIndex: 5, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  top: { position: 'absolute', left: space.screenX, right: space.screenX, zIndex: 5, height: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   content: { flex: 1, paddingHorizontal: space.screenX, paddingBottom: 40 },
 });
