@@ -557,15 +557,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.lilac} />
       </View>
 
-      {nextShowTitle ? (
-        <View style={s.upNext}>
-          <Eyebrow>Up next</Eyebrow>
-          <Text style={s.upNextText} numberOfLines={1}>
-            {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
-          </Text>
-        </View>
-      ) : null}
-
       <View style={{ flex: 1 }} />
       <View style={s.tick} />
       <Pressable onPress={() => currentShowId && router.push(`/show/${currentShowId}` as any)} disabled={!currentShowId}>
@@ -580,6 +571,15 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       <Pressable onPress={() => artistId && router.push(`/artist/${artistId}` as any)} disabled={!artistId}>
         <Text style={s.artist}>{artistName}</Text>
       </Pressable>
+
+      {nextShowTitle ? (
+        <View style={s.upNext}>
+          <Eyebrow>Up next</Eyebrow>
+          <Text style={s.upNextText} numberOfLines={1}>
+            {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
+          </Text>
+        </View>
+      ) : null}
 
       <View style={s.player}>
         <Pressable onPress={handlePlayButtonPress} style={s.disc} accessibilityRole="button"
