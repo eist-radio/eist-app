@@ -128,7 +128,10 @@ export default function ArchiveShowScreen() {
         >
           <Pressable
             onPress={() =>
-              router.push(`/artist/${encodeURIComponent(show.artistSlug)}`)
+              router.push(
+                `/artist/${encodeURIComponent(show.artistSlug)}` +
+                  (show.artistIds?.[0] ? `?id=${encodeURIComponent(show.artistIds[0])}` : '')
+              )
             }
           >
             <Text

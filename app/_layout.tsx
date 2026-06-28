@@ -102,6 +102,7 @@ export default function RootLayout() {
                         gestureEnabled: true,
                         gestureDirection: 'horizontal',
                         animation: 'slide_from_right',
+                        contentStyle: { backgroundColor: '#4733FF' },
                       }}
                     />
                     <StatusBar style="auto" />
@@ -139,6 +140,7 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#4733FF',
   },
   loader: {
     flex: 1,

@@ -17,7 +17,7 @@ const LINKS = [
 export default function ConnectScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
   return (
     <PageScaffold left={<Pills active={pageIndex} />}>
-      <Eyebrow>We over here</Eyebrow>
+      <Eyebrow>Find us here</Eyebrow>
       <ScrollView style={{ flex: 1, marginTop: 14 }} contentContainerStyle={{ gap: 22, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {LINKS.map((l) => (
           <Pressable key={l.url} onPress={() => Linking.openURL(l.url)}>
