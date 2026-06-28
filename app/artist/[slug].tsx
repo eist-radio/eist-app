@@ -182,26 +182,20 @@ export default function ArtistScreen() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Archive API expects a slug; avoid sending a raw artist ID from ID-based routes.
+  // The archive indexes shows by its own artistSlug. The authoritative match is
+  // the artist mapping (built from the archive shows themselves: id -> slug),
+  // then the normalized artist name (the archive uses the same scheme). The
+  // RadioCult artist.slug is a different field that often doesn't match, so it's
+  // only a last-resort fallback — preferring it left some artists with no
+  // past shows.
   const routeSlug =
     queryId || (artist && slug && slug !== artist.id) ? slug : undefined;
   const mappedSlug = id ? artistMapping?.[id]?.slug : undefined;
   const nameSlug = artist?.name ? normalizeSlug(artist.name) : undefined;
   const archiveArtistSlug =
-    artist?.slug ?? routeSlug ?? mappedSlug ?? nameSlug;
+    mappedSlug ?? nameSlug ?? routeSlug ?? artist?.slug;
 
   const { shows: archivedShows } = useArchiveShowsByArtist(archiveArtistSlug, 12);
-
-  // TEMP diagnostic for missing past shows — remove once verified.
-  console.log('[past-shows]', {
-    id,
-    queryId,
-    routeSlug,
-    fetchedArtistSlug: artist?.slug,
-    nameSlug,
-    archiveArtistSlug,
-    count: archivedShows.length,
-  });
 
   const { isArtistSubscribed, toggleArtistSubscription, isLoading } = useNotifications();
   const [isToggling, setIsToggling] = useState(false);
@@ -259,7 +253,7 @@ export default function ArtistScreen() {
             onPress={() => router.push(`/show/${encodeURIComponent(nextShow.id)}`)}
           >
             <Text style={[t.meta, { color: colors.bone, marginTop: 10 }]}>
-              {formatNextShowDate(nextShow.startDateUtc)}
+              {`Next show: ${formatNextShowDate(nextShow.startDateUtc)}`}
             </Text>
           </Pressable>
         )}
