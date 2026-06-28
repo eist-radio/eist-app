@@ -9,6 +9,7 @@ import { SpinningLogo } from './ui/SpinningLogo';
 import ListenScreen from './screens/ListenScreen';
 import ScheduleScreen from './screens/ScheduleScreen';
 import ArtistsScreen from './screens/ArtistsScreen';
+import ArchiveScreen from './screens/ArchiveScreen';
 
 const { width } = Dimensions.get('window');
 
@@ -28,6 +29,7 @@ export function Pager() {
             {i === 0 ? <ListenScreen pageIndex={0} isActive={active === 0} />
               : i === 1 ? <ScheduleScreen pageIndex={1} isActive={active === 1} />
               : i === 2 ? <ArtistsScreen pageIndex={2} isActive={active === 2} />
+              : i === 3 ? <ArchiveScreen pageIndex={3} isActive={active === 3} />
               : <PageScaffold left={<Pills active={i} />}><Text style={{ color: colors.green }}>Page {i}</Text></PageScaffold>}
           </View>
         ))}
