@@ -23,7 +23,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     }],
     ["react-native-google-cast", {
       receiverAppId: "7A2782C8",
-      iosStartDiscoveryAfterFirstTapOnCastButton: false,
+      iosStartDiscoveryAfterFirstTapOnCastButton: true,
       iosSuspendSessionsWhenBackgrounded: false
     }],
     "./plugins/withAndroidAuto"
