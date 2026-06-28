@@ -59,7 +59,7 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
   const [remoteImageUrl, setRemoteImageUrl] = useState<string | null>(null)
   const [imageFailed, setImageFailed] = useState(false)
   const [broadcastStatus, setBroadcastStatus] = useState('off air')
-  const [, setNextShowId] = useState<string | null>(null)
+  const [nextShowId, setNextShowId] = useState<string | null>(null)
   const [nextShowTitle, setNextShowTitle] = useState('')
   const [nextShowTime, setNextShowTime] = useState('')
   const [artistId, setArtistId] = useState<string | null>(null)
@@ -573,12 +573,16 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       </Pressable>
 
       {nextShowTitle ? (
-        <View style={s.upNext}>
+        <Pressable
+          style={s.upNext}
+          onPress={() => nextShowId && router.push(`/show/${nextShowId}` as any)}
+          disabled={!nextShowId}
+        >
           <Eyebrow>Up next</Eyebrow>
           <Text style={s.upNextText} numberOfLines={1}>
             {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
           </Text>
-        </View>
+        </Pressable>
       ) : null}
 
       <View style={s.player}>
