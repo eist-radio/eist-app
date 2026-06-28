@@ -30,9 +30,9 @@ import {
   PanGestureHandler,
   State,
 } from 'react-native-gesture-handler';
-import { apiKey } from '../../../config';
-import { stripFormatting } from '../../../utils/stripFormatting';
-import { useTimezoneChange } from '../../../hooks/useTimezoneChange';
+import { apiKey } from '../../config';
+import { stripFormatting } from '../../utils/stripFormatting';
+import { useTimezoneChange } from '../../hooks/useTimezoneChange';
 
 // éist brand colors
 const COLORS = {
@@ -447,7 +447,7 @@ export default function ArtistScreen() {
 
   const { shows: archivedShows } = useArchiveShowsByArtist(archiveArtistSlug, 12);
 
-  const fallbackImage = require('../../../assets/images/eist_online.png');
+  const fallbackImage = require('../../assets/images/eist_online.png');
   const [imageFailed, setImageFailed] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(false);
   const [preloadedImageUrl, setPreloadedImageUrl] = useState<string | null>(

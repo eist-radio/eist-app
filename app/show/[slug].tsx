@@ -26,10 +26,10 @@ import {
 } from 'react-native';
 import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 import { captureRef } from 'react-native-view-shot';
-import { FormattedShowTitle } from '../../../components/FormattedShowTitle';
-import { apiKey } from '../../../config';
-import { useTimezoneChange } from '../../../hooks/useTimezoneChange';
-import { stripFormatting } from '../../../utils/stripFormatting';
+import { FormattedShowTitle } from '../../components/FormattedShowTitle';
+import { apiKey } from '../../config';
+import { useTimezoneChange } from '../../hooks/useTimezoneChange';
+import { stripFormatting } from '../../utils/stripFormatting';
 
 const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: boolean }) => {
   const animatedValue = React.useRef(new Animated.Value(0)).current
@@ -76,7 +76,7 @@ const BackToTopButton = ({ onPress, visible }: { onPress: () => void; visible: b
 const STATION_ID = 'eist-radio';
 const { width: screenWidth } = Dimensions.get('window');
 
-const logoImage = require('../../../assets/images/eist-logo-header.png')
+const logoImage = require('../../assets/images/eist-logo-header.png')
 
 type RawScheduleItem = {
   id: string;
@@ -405,9 +405,9 @@ export default function ShowScreen() {
   // Determine which image to use - try preloaded artist image first, fallback to eist online image
   const getBannerImage = () => {
     if (imageFailed || !preloadedImageUrl) {
-      return require('../../../assets/images/eist_online.png');
+      return require('../../assets/images/eist_online.png');
     }
-    
+
     return { uri: preloadedImageUrl };
   };
 

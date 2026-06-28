@@ -26,12 +26,12 @@ import {
   PanGestureHandler,
   State,
 } from 'react-native-gesture-handler';
-import { FormattedShowTitle } from '../../../components/FormattedShowTitle';
+import { FormattedShowTitle } from '../../components/FormattedShowTitle';
 import {
   useArchiveShowBySlug,
   useArchiveShowsByArtist,
-} from '../../../hooks/useArchiveShows';
-import { stripFormatting } from '../../../utils/stripFormatting';
+} from '../../hooks/useArchiveShows';
+import { stripFormatting } from '../../utils/stripFormatting';
 
 // éist brand colors
 const COLORS = {
@@ -47,7 +47,7 @@ const COLORS = {
   mixcloud: '#5000FF',
 };
 
-const fallbackImage = require('../../../assets/images/eist_online.png');
+const fallbackImage = require('../../assets/images/eist_online.png');
 const { width: screenWidth } = Dimensions.get('window');
 
 // Back to top button
