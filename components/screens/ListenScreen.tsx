@@ -1,0 +1,568 @@
+// components/screens/ListenScreen.tsx
+import { Ionicons } from '@expo/vector-icons'
+import { useRouter } from 'expo-router'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Alert,
+  AppState,
+  Image as RNImage,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
+import { CastButton } from '../CastButton'
+import { apiKey } from '../../config'
+import { useTrackPlayer } from '../../context/TrackPlayerContext'
+import { useTimezoneChange } from '../../hooks/useTimezoneChange'
+import { colors, font } from '../../theme/tokens'
+import { formatShowTimeRange } from '../../utils/liveShowInfo'
+import { Eyebrow } from '../ui/Eyebrow'
+import { PageScaffold } from '../ui/PageScaffold'
+import { Pills } from '../ui/Pills'
+import { ShowArtworkBackground } from '../ui/ShowArtworkBackground'
+
+// Only import TrackPlayer on mobile platforms
+let TrackPlayer: any, Event: any;
+if (Platform.OS !== 'web') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const trackPlayerModule = require('react-native-track-player');
+    TrackPlayer = trackPlayerModule.default;
+    Event = trackPlayerModule.Event;
+  } catch {
+    console.warn('TrackPlayer not available');
+  }
+}
+
+const placeholderArtistImage = require('../../assets/images/eist_online.png')
+const placeholderOfflineImage = require('../../assets/images/eist_offline.png')
+
+const stationId = 'eist-radio'
+const apiUrl = `https://api.radiocult.fm/api/station/${stationId}`
+
+export default function ListenScreen({ pageIndex, isActive }: { pageIndex: number; isActive: boolean }) {
+  const {
+    isPlaying,
+    togglePlayStop,
+    updateMetadata,
+    isCastConnected,
+  } = useTrackPlayer()
+  const router = useRouter()
+  const currentTimezone = useTimezoneChange()
+
+  const [showTitle, setShowTitle] = useState('')
+  const [, setShowDescription] = useState('')
+  const [artistName, setArtistName] = useState('éist · off air')
+  const [remoteImageUrl, setRemoteImageUrl] = useState<string | null>(null)
+  const [imageFailed, setImageFailed] = useState(false)
+  const [broadcastStatus, setBroadcastStatus] = useState('off air')
+  const [, setNextShowId] = useState<string | null>(null)
+  const [, setNextShowTitle] = useState('')
+  const [, setNextShowTime] = useState('')
+  const [artistId, setArtistId] = useState<string | null>(null)
+  const [currentShowId, setCurrentShowId] = useState<string | null>(null)
+  const [, setIsContentLoading] = useState(false)
+  const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
+  const [isCarConnected, setIsCarConnected] = useState(false)
+  const carRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const formatTime = useCallback((isoString: string): string => {
+    const date = new Date(isoString)
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZone: currentTimezone,
+    })
+  }, [currentTimezone])
+
+  const parseDescription = (blocks: any[]): string =>
+    blocks
+      .map(block => {
+        if (!Array.isArray(block.content)) return ''
+        return block.content
+          .map((child: any) => {
+            if (child.type === 'text') return child.text
+            if (child.type === 'hardBreak') return '\n'
+            return ''
+          })
+          .join('')
+      })
+      .filter(Boolean)
+      .join('\n\n') || ''
+
+  // Preload image function
+  const preloadImage = useCallback((uri: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      if (!uri) {
+        resolve(false)
+        return
+      }
+
+      // Check if we're on web or native
+      if (Platform.OS === 'web') {
+        // Web environment - use standard HTML Image preloading
+        try {
+          const img = new (global as any).Image()
+          img.onload = () => {
+            resolve(true)
+          }
+          img.onerror = () => {
+            resolve(false)
+          }
+          img.src = uri
+        } catch {
+          resolve(true)
+        }
+      } else {
+        // React Native environment
+        if (typeof RNImage.prefetch === 'function') {
+          RNImage.prefetch(uri)
+            .then(() => {
+              resolve(true)
+            })
+            .catch(() => {
+              resolve(false)
+            })
+        } else {
+          resolve(true)
+        }
+      }
+    })
+  }, [])
+
+  const getArtistDetails = useCallback(async (id: string | null) => {
+    if (!id) return { name: '', image: placeholderArtistImage }
+
+    // Check cache first
+    if (artistCache[id]) {
+      return artistCache[id]
+    }
+
+    try {
+      const res = await fetch(`${apiUrl}/artists/${id}`, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      const artist = json.artist || {}
+      const imageUrl = artist.logo?.['1024x1024'] || artist.logo?.['512x512'] || artist.logo?.['256x256']
+      const artistData = {
+        name: artist.name || '',
+        image: imageUrl ? { uri: imageUrl } : placeholderArtistImage,
+      }
+
+      // Cache the result
+      setArtistCache(prev => ({ ...prev, [id]: artistData }))
+      return artistData
+    } catch (err) {
+      console.error('Error fetching artist details:', err)
+      // Don't let errors propagate - just log them and return fallback
+      return { name: '', image: placeholderArtistImage }
+    }
+  }, [artistCache])
+
+  const clearNowPlayingState = useCallback(async () => {
+    setShowTitle('')
+    setArtistName('éist · off air')
+    setRemoteImageUrl(null)
+    setImageFailed(false)
+    setShowDescription('')
+    setArtistId(null)
+    setCurrentShowId(null)
+    // Don't clear next show info - it should be preserved when station is off air
+    setIsContentLoading(false)
+    try {
+      await updateMetadata('éist · off air', '', undefined, '')
+    } catch {
+      // Don't let errors propagate - just log them
+    }
+  }, [updateMetadata])
+
+  const clearNextShowInfo = useCallback(() => {
+    setNextShowId(null)
+    setNextShowTitle('')
+    setNextShowTime('')
+  }, [])
+
+  const fetchLiveScheduleOnly = useCallback(async () => {
+
+    try {
+      const res = await fetch(`${apiUrl}/schedule/live`, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const { status, content, metadata } = data.result
+
+      setBroadcastStatus(status)
+
+      if (status !== 'schedule') {
+        await clearNowPlayingState()
+
+        try {
+          const now = new Date().toISOString()
+          const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString()
+          const nextRes = await fetch(
+            `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(weekAhead)}`,
+            {
+              headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+            }
+          )
+          if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`)
+          const nextJson = await nextRes.json()
+          const events: any[] = nextJson.schedules || []
+          if (events.length > 0) {
+            events.sort((a, b) => new Date(a.startDateUtc).getTime() - new Date(b.startDateUtc).getTime())
+            const nextEvent = events[0]
+            setNextShowId(nextEvent.id)
+            setNextShowTitle(nextEvent.title || '')
+            setNextShowTime(formatTime(nextEvent.startDateUtc))
+          }
+        } catch (nextErr) {
+          console.error('Error fetching next show information in fetchLiveScheduleOnly:', nextErr)
+          // Don't let errors propagate - just log them
+        }
+        setIsContentLoading(false)
+      } else {
+        // Update schedule data only
+        const newShowTitle = content.title || ''
+        const newCurrentShowId = content.id || null
+        const newArtistId = content.artistIds?.[0] ?? null
+        const showTimeRange = formatShowTimeRange(
+          content.startDateUtc,
+          content.endDateUtc,
+          currentTimezone
+        )
+
+        // Prepare description
+        let desc = parseDescription(content.description?.content || [])
+        if (content.media?.type === 'playlist' && metadata?.title) {
+          desc += `\n\nNow playing: ${metadata.title}`
+        }
+
+        setShowTitle(newShowTitle)
+        setCurrentShowId(newCurrentShowId)
+        setShowDescription(desc)
+
+        // Clear next show info when station is live
+        clearNextShowInfo()
+
+        // Only fetch artist details if artist ID changed
+        if (newArtistId !== artistId) {
+          setArtistId(newArtistId)
+          setIsContentLoading(true)
+
+          const { name, image } = await getArtistDetails(newArtistId)
+
+          // Update artist-related state
+          setArtistName(name)
+
+          if (image?.uri) {
+            const imageLoaded = await preloadImage(image.uri)
+
+            if (imageLoaded) {
+              setRemoteImageUrl(image.uri)
+              setImageFailed(false)
+              await updateMetadata(newShowTitle || 'éist', name, image.uri, showTimeRange)
+            } else {
+              setRemoteImageUrl(null)
+              setImageFailed(true)
+              await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
+            }
+          } else {
+            setRemoteImageUrl(null)
+            setImageFailed(false)
+            await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
+          }
+
+          setIsContentLoading(false)
+        } else {
+          // Artist ID hasn't changed, just update metadata with current artist info
+          if (artistId && artistCache[artistId]) {
+            const cachedArtist = artistCache[artistId]
+            await updateMetadata(
+              newShowTitle || 'éist',
+              cachedArtist.name,
+              cachedArtist.image?.uri || undefined,
+              showTimeRange
+            )
+          } else {
+            await updateMetadata(newShowTitle || 'éist', artistName, remoteImageUrl || undefined, showTimeRange)
+          }
+        }
+      }
+    } catch {
+      setBroadcastStatus('error')
+      await clearNowPlayingState()
+    }
+  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime, currentTimezone])
+
+  const fetchNowPlayingWithArtist = useCallback(async () => {
+
+    // Set loading state when starting to fetch new content
+    setIsContentLoading(true)
+
+    try {
+      const res = await fetch(`${apiUrl}/schedule/live`, {
+        headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      const { status, content, metadata } = data.result
+
+      setBroadcastStatus(status)
+
+      if (status !== 'schedule') {
+        await clearNowPlayingState()
+
+        // Fetch next show information when station is off air
+        try {
+          const now = new Date().toISOString()
+          const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString()
+          const nextRes = await fetch(
+            `${apiUrl}/schedule?startDate=${encodeURIComponent(now)}&endDate=${encodeURIComponent(weekAhead)}`,
+            {
+              headers: { 'x-api-key': apiKey, 'Content-Type': 'application/json' },
+            }
+          )
+          if (!nextRes.ok) throw new Error(`HTTP ${nextRes.status}`)
+          const nextJson = await nextRes.json()
+          const events: any[] = nextJson.schedules || []
+          if (events.length > 0) {
+            events.sort((a, b) => new Date(a.startDateUtc).getTime() - new Date(b.startDateUtc).getTime())
+            const nextEvent = events[0]
+            setNextShowId(nextEvent.id)
+            setNextShowTitle(nextEvent.title || '')
+            setNextShowTime(formatTime(nextEvent.startDateUtc))
+          }
+        } catch (nextErr) {
+          console.error('Error fetching next show information:', nextErr)
+          // Don't let errors propagate - just log them
+        }
+        return
+      }
+
+      // Prepare new content
+      const newShowTitle = content.title || ''
+      const newCurrentShowId = content.id || null
+      const newArtistId = content.artistIds?.[0] ?? null
+      const showTimeRange = formatShowTimeRange(
+        content.startDateUtc,
+        content.endDateUtc,
+        currentTimezone
+      )
+
+      const { name, image } = await getArtistDetails(newArtistId)
+
+      // Prepare description
+      let desc = parseDescription(content.description?.content || [])
+      if (content.media?.type === 'playlist' && metadata?.title) {
+        desc += `\n\nNow playing: ${metadata.title}`
+      }
+
+      // Update all states
+      setShowTitle(newShowTitle)
+      setCurrentShowId(newCurrentShowId)
+      setArtistId(newArtistId)
+      setArtistName(name)
+      setShowDescription(desc)
+
+      // Clear next show info when station is live
+      clearNextShowInfo()
+
+      // Handle image
+      if (image?.uri) {
+        const imageLoaded = await preloadImage(image.uri)
+
+        if (imageLoaded) {
+          setRemoteImageUrl(image.uri)
+          setImageFailed(false)
+          await updateMetadata(newShowTitle || 'éist', name, image.uri, showTimeRange)
+        } else {
+          setRemoteImageUrl(null)
+          setImageFailed(true)
+          await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
+        }
+      } else {
+        setRemoteImageUrl(null)
+        setImageFailed(false)
+        await updateMetadata(newShowTitle || 'éist', name, placeholderArtistImage, showTimeRange)
+      }
+
+      // Mark loading as finished
+      setIsContentLoading(false)
+    } catch {
+      setBroadcastStatus('error')
+      await clearNowPlayingState()
+    }
+  }, [getArtistDetails, updateMetadata, clearNowPlayingState, clearNextShowInfo, preloadImage, formatTime, currentTimezone])
+
+  // Function to calculate time until next 1 minute past the hour
+  const getTimeUntilNextRefresh = () => {
+    const now = new Date()
+    const nextRefresh = new Date(now)
+    nextRefresh.setMinutes(1, 0, 0) // Set to 1 minute past the hour
+    nextRefresh.setSeconds(0, 0)
+
+    // If we're already past 1 minute, move to next hour
+    if (now.getMinutes() >= 1) {
+      nextRefresh.setHours(nextRefresh.getHours() + 1)
+    }
+
+    return nextRefresh.getTime() - now.getTime()
+  }
+
+  // Function to refresh metadata at exactly 1 minute past the hour
+  const scheduleCarRefresh = useCallback(() => {
+    if (!isCarConnected || !isPlaying) return
+
+    // Clear existing interval
+    if (carRefreshIntervalRef.current) {
+      clearTimeout(carRefreshIntervalRef.current)
+    }
+
+    const timeUntilRefresh = getTimeUntilNextRefresh()
+
+    carRefreshIntervalRef.current = setTimeout(() => {
+      // Refresh metadata
+      fetchLiveScheduleOnly()
+
+      // Schedule next refresh (every hour)
+      carRefreshIntervalRef.current = setInterval(() => {
+        if (isCarConnected && isPlaying) {
+          fetchLiveScheduleOnly()
+        }
+      }, 60 * 60 * 1000) // 1 hour
+    }, timeUntilRefresh)
+  }, [isCarConnected, isPlaying, fetchLiveScheduleOnly])
+
+  // Car connectivity detection
+  useEffect(() => {
+    let remotePlayListener: any
+    let remoteStopListener: any
+    let remotePauseListener: any
+
+    const setupCarDetection = async () => {
+      if (Platform.OS === 'web' || !TrackPlayer) {
+        // Don't set up car detection on web or if TrackPlayer is not available
+        return;
+      }
+      try {
+        // Listen for remote events which indicate car connectivity
+        remotePlayListener = TrackPlayer.addEventListener(Event.RemotePlay, () => {
+          setIsCarConnected(true)
+        })
+
+        remoteStopListener = TrackPlayer.addEventListener(Event.RemoteStop, () => {
+          setIsCarConnected(true)
+        })
+
+        remotePauseListener = TrackPlayer.addEventListener(Event.RemotePause, () => {
+          setIsCarConnected(true)
+        })
+      } catch {
+        // Don't let errors propagate - just log them
+      }
+    }
+
+    setupCarDetection()
+
+    return () => {
+      if (remotePlayListener) remotePlayListener.remove()
+      if (remoteStopListener) remoteStopListener.remove()
+      if (remotePauseListener) remotePauseListener.remove()
+    }
+  }, [])
+
+  // Schedule car refresh when car connectivity or playing state changes
+  useEffect(() => {
+    scheduleCarRefresh()
+
+    return () => {
+      if (carRefreshIntervalRef.current) {
+        clearTimeout(carRefreshIntervalRef.current)
+        carRefreshIntervalRef.current = null
+      }
+    }
+  }, [scheduleCarRefresh])
+
+  useEffect(() => {
+    if (!isActive) return;
+    fetchNowPlayingWithArtist();
+    if (isPlaying) { const id = setInterval(fetchLiveScheduleOnly, 60000); return () => clearInterval(id); }
+  }, [isActive, fetchNowPlayingWithArtist, fetchLiveScheduleOnly, isPlaying]);
+
+  // Refresh now playing info whenever the app returns to the foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        // Only refresh if we're playing - use lightweight function
+        if (isPlaying) {
+          fetchLiveScheduleOnly()
+        }
+      }
+    })
+
+    return () => {
+      subscription.remove()
+    }
+  }, [fetchLiveScheduleOnly, isPlaying])
+
+  const handlePlayButtonPress = useCallback(async () => {
+    try {
+      await togglePlayStop()
+    } catch {
+      // Show user-friendly error message
+      Alert.alert(
+        'Playback Error',
+        'Unable to start playback. Please try again.',
+        [{ text: 'OK' }]
+      )
+    }
+  }, [togglePlayStop])
+
+  return (
+    <PageScaffold left={<Pills active={pageIndex} />} transparentBg>
+      <ShowArtworkBackground
+        source={broadcastStatus === 'schedule' && remoteImageUrl && !imageFailed ? { uri: remoteImageUrl } : placeholderOfflineImage}
+        onError={() => setImageFailed(true)} />
+
+      <View style={s.onair}><View style={s.dot} /><Eyebrow color={colors.green}>On Air</Eyebrow></View>
+      <View style={s.castRow}>
+        <CastButton style={{ width: 26, height: 26 }} tintColor={isCastConnected ? colors.green : colors.lilac} />
+      </View>
+
+      <View style={{ flex: 1 }} />
+      <View style={s.tick} />
+      <Pressable onPress={() => currentShowId && router.push(`/show/${currentShowId}` as any)} disabled={!currentShowId}>
+        <Text style={s.title} numberOfLines={3}>{broadcastStatus === 'schedule' && showTitle ? showTitle : 'éist'}</Text>
+      </Pressable>
+      <Pressable onPress={() => artistId && router.push(`/artist/${artistId}` as any)} disabled={!artistId}>
+        <Text style={s.artist}>{artistName}</Text>
+      </Pressable>
+
+      <View style={s.player}>
+        <Pressable onPress={handlePlayButtonPress} style={s.disc} accessibilityRole="button"
+          accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}>
+          <Ionicons name={isPlaying ? 'stop' : 'play'} size={26} color={colors.green} style={!isPlaying && { marginLeft: 4 }} />
+        </Pressable>
+        <Text style={s.playlabel}>{isPlaying ? 'Stop' : 'Listen now'}</Text>
+      </View>
+    </PageScaffold>
+  );
+}
+
+const s = StyleSheet.create({
+  onair: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green },
+  castRow: { marginTop: 18 },
+  tick: { width: 30, height: 3, borderRadius: 3, backgroundColor: colors.green, marginBottom: 20 },
+  title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 33, lineHeight: 34, letterSpacing: -0.5, color: colors.green },
+  artist: { fontFamily: font.body, fontWeight: '500', fontSize: 18, color: colors.green, marginTop: 9 },
+  player: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 30 },
+  disc: { width: 66, height: 66, borderRadius: 33, borderWidth: 1.5, borderColor: colors.green, alignItems: 'center', justifyContent: 'center' },
+  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 15, letterSpacing: 2.4, textTransform: 'uppercase', color: colors.green },
+});

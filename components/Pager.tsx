@@ -6,11 +6,11 @@ import { PAGE_COUNT, colors, space } from '../theme/tokens';
 import { PageScaffold } from './ui/PageScaffold';
 import { Pills } from './ui/Pills';
 import { SpinningLogo } from './ui/SpinningLogo';
+import ListenScreen from './screens/ListenScreen';
 
 const { width } = Dimensions.get('window');
 
 export function Pager() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [active, setActive] = useState(0);
   const insets = useSafeAreaInsets();
   const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
@@ -23,9 +23,9 @@ export function Pager() {
         onMomentumScrollEnd={onEnd} removeClippedSubviews={false}>
         {Array.from({ length: PAGE_COUNT }).map((_, i) => (
           <View key={i} style={{ width }}>
-            <PageScaffold left={<Pills active={i} />}>
-              <Text style={{ color: colors.green }}>Page {i}</Text>
-            </PageScaffold>
+            {i === 0
+              ? <ListenScreen pageIndex={0} isActive={active === 0} />
+              : <PageScaffold left={<Pills active={i} />}><Text style={{ color: colors.green }}>Page {i}</Text></PageScaffold>}
           </View>
         ))}
       </ScrollView>
