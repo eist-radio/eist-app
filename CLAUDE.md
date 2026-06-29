@@ -80,8 +80,8 @@ components/
     ├── ScheduleScreen.tsx   #   1 · schedule (live/upcoming)
     ├── ArtistsScreen.tsx    #   2 · artists
     ├── ArchiveScreen.tsx    #   3 · archive / listen back
-    ├── ConnectScreen.tsx    #   4 · external links (incl. "Support us" → eist.radio/support)
-    └── NotificationsScreen.tsx  # 5 · active notifications (clear show reminders/artist subs)
+    ├── NotificationsScreen.tsx  # 4 · active reminders (clear show reminders/artist subs)
+    └── ConnectScreen.tsx    #   5 · external links, last page (incl. "Support us" → eist.radio/support)
 ```
 
 To add/remove a swipe page: update `PAGE_COUNT` in `theme/tokens.ts` and the index→component mapping in `components/Pager.tsx`. The `Pills` indicator reads `PAGE_COUNT` automatically.
@@ -141,9 +141,11 @@ Two distinct backends — keep them straight:
   - Platform-specific icon alignment adjustments for iOS/Android
   - Supports both inline (`asContent={true}`) and standalone text rendering
 - **Usage Locations**:
-  - Listen page: For "Next up" show titles and current show titles
-  - Schedule page: For all show titles in the schedule list
-  - Show detail pages: For show title display
+  - Listen screen: "Next up" and current show titles
+  - Schedule screen: all show titles in the schedule list
+  - Archive screen & archive detail (`app/archive/[slug].tsx`): archived show titles
+  - Notifications screen: show-reminder titles
+  - Show & artist detail pages (`app/show/[slug].tsx`, `app/artist/[slug].tsx`)
 - **Text Wrapping**: No ellipsizeMode - titles wrap naturally over multiple lines within their container constraints
 - **Props**: `title`, `color`, `size`, `style`, `numberOfLines`, `asContent`, etc.
 
