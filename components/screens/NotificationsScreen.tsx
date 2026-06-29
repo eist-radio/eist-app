@@ -102,7 +102,7 @@ export default function NotificationsScreen({ pageIndex }: { pageIndex: number; 
         <Text style={[type.bio, { color: colors.textDim, marginTop: 28 }]}>
           {Platform.OS === 'web'
             ? 'Notifications are available in the mobile app.'
-            : "You have no active notifications. Tap the bell on a show or artist to get notified before they go live."}
+            : "You have no active reminders set up. Tap the bell beside a show or artist to get notified before they go live."}
         </Text>
       ) : (
         <ScrollView

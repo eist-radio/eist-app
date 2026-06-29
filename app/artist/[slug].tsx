@@ -276,7 +276,7 @@ export default function ArtistScreen() {
           </Text>
         ) : null}
 
-        <View style={{ marginTop: 34 }}>
+        <View style={{ marginTop: 34, marginBottom: 12 }}>
           <Eyebrow>past shows</Eyebrow>
         </View>
 

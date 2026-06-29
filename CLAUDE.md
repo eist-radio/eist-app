@@ -99,7 +99,7 @@ Two distinct backends — keep them straight:
 
 #### Theming (`theme/tokens.ts`)
 - `colors` — `purple` (bg), `green` (`#AFFC41`), `text` (`#E7E5E5` "Alabaster gray", secondary text), `textDim` (translucent gray for eyebrows/placeholders), `pillDim`. There is **no** `bone`/`boneDim` token (renamed to `text`/`textDim`).
-- **Colour convention:** `green` is used for headings/titles, artist names, links, and the schedule "now playing" (live) row. `text`/`textDim` (gray) is for all other secondary text — body/descriptions, dates/times, captions, subtitles. So in a non-live schedule row the title is gray but the artist name is green.
+- **Colour convention:** `green` is used for headings/titles, links, and the "now playing" context — the Listen screen's current-show artist and the schedule live ("NOW") row (whole row green). `text`/`textDim` (gray) is for all other secondary text — body/descriptions, dates/times, captions, and **artist-name subtitles in lists** (archive, non-live schedule rows).
 - `font`, `type` (shared text-style fragments; colour applied at call site), `space`, `PAGE_COUNT`.
 
 #### State Management Patterns

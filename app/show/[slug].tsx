@@ -76,25 +76,13 @@ async function fetchHostArtist(artistId: string): Promise<Artist> {
 
 function formatShowTime(start: string, end: string, timezone: string): string {
   const startDate = new Date(start);
-  const endDate = new Date(end);
 
-  const startTime = startDate
-    .toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: timezone,
-    })
-    .replace(/ (AM|PM)$/, '');
-
-  const endTime = endDate.toLocaleTimeString('en-US', {
+  return startDate.toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
     timeZone: timezone,
   });
-
-  return `${startTime} - ${endTime}`;
 }
 
 function formatShowDate(start: string, timezone: string): string {
@@ -249,9 +237,7 @@ export default function ShowScreen() {
             </Pressable>
           ) : null}
           <Text style={[t.meta, { color: colors.text }]}>
-            {hosts[0]?.name
-              ? `· ${dateString}, ${timeString}`
-              : `${dateString}, ${timeString}`}
+            {`Next show: ${dateString}, ${timeString}`}
           </Text>
         </View>
 

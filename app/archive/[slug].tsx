@@ -184,7 +184,7 @@ export default function ArchiveShowScreen() {
 
         {otherShows.length > 0 && (
           <>
-            <View style={{ marginTop: 34 }}>
+            <View style={{ marginTop: 34, marginBottom: 12 }}>
               <Eyebrow>{`more from ${show.artistName}`}</Eyebrow>
             </View>
             {otherShows.map((r) => (
