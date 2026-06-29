@@ -52,7 +52,8 @@ type NotificationContextType = {
   toggleArtistSubscription: (
     artistId: string,
     artistName: string,
-    artistSlug: string
+    artistSlug: string,
+    upcomingShows?: ScheduleShowReminderParams[]
   ) => Promise<boolean>;
 
   // Sync subscribed artist shows
@@ -225,7 +226,8 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     async (
       artistId: string,
       artistName: string,
-      artistSlug: string
+      artistSlug: string,
+      upcomingShows: ScheduleShowReminderParams[] = []
     ): Promise<boolean> => {
       if (Platform.OS === 'web') {
         return false;
@@ -234,13 +236,27 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
       const existingSubscription = subscriptions[artistId];
 
       if (existingSubscription?.isActive) {
-        // Unsubscribe
+        // Unsubscribe: remove the subscription and cancel any reminders that
+        // were scheduled for this artist's upcoming shows.
         await removeArtistSubscription(artistId);
         setSubscriptions((prev) => {
           const updated = { ...prev };
           delete updated[artistId];
           return updated;
         });
+
+        for (const show of upcomingShows) {
+          const existingReminder = reminders[show.showId];
+          if (existingReminder) {
+            await cancelShowReminder(existingReminder.notificationId);
+            await removeShowReminder(show.showId);
+            setReminders((prev) => {
+              const updated = { ...prev };
+              delete updated[show.showId];
+              return updated;
+            });
+          }
+        }
         return false;
       }
 
@@ -268,9 +284,33 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         [artistId]: newSubscription,
       }));
 
+      // Schedule reminders for the artist's known upcoming shows so that
+      // subscribing actually delivers notifications (mirrors the per-show
+      // reminder path in toggleShowReminder).
+      for (const show of upcomingShows) {
+        if (!reminders[show.showId]) {
+          const notificationId = await scheduleShowReminder(show);
+          if (notificationId) {
+            const newReminder: ShowReminder = {
+              showId: show.showId,
+              showTitle: show.showTitle,
+              artistName: show.artistName,
+              startDateUtc: show.startDateUtc,
+              notificationId,
+              createdAt: new Date().toISOString(),
+            };
+            await setShowReminder(newReminder);
+            setReminders((prev) => ({
+              ...prev,
+              [show.showId]: newReminder,
+            }));
+          }
+        }
+      }
+
       return true;
     },
-    [subscriptions, permissionStatus, requestPermissions]
+    [subscriptions, reminders, permissionStatus, requestPermissions]
   );
 
   const syncSubscribedArtistShows = useCallback(

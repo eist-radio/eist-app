@@ -117,17 +117,30 @@ export default function ArtistScreen() {
     setIsToggling(true);
     if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      // Pass the artist's known upcoming show so subscribing schedules a
+      // reminder for it (and unsubscribing cancels it).
+      const upcomingShows = nextShow
+        ? [
+            {
+              showId: nextShow.id,
+              showTitle: nextShow.title,
+              artistName: artist.name,
+              startDateUtc: nextShow.startDateUtc,
+            },
+          ]
+        : [];
       await toggleArtistSubscription(
         artist.id,
         artist.name ?? '',
-        archiveArtistSlug ?? artist.id
+        archiveArtistSlug ?? artist.id,
+        upcomingShows
       );
     } catch (e) {
       console.error('Failed to toggle subscription:', e);
     } finally {
       setIsToggling(false);
     }
-  }, [artist, isToggling, isLoading, toggleArtistSubscription, archiveArtistSlug]);
+  }, [artist, isToggling, isLoading, toggleArtistSubscription, archiveArtistSlug, nextShow]);
 
   if (!artist) {
     return <PageScaffold left={<HeaderLeftNav />}>{null}</PageScaffold>;
