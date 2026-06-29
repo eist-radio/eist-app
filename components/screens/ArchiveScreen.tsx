@@ -35,7 +35,7 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
   }, [items, query]);
 
   return (
-    <PageScaffold>
+    <PageScaffold liveNow>
       <Eyebrow>archive</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Listen back</Text>
       <TextInput

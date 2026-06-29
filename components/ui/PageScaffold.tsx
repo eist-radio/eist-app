@@ -3,10 +3,11 @@ import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, space } from '../../theme/tokens';
+import { LiveNowIndicator } from './LiveNowIndicator';
 
 export function PageScaffold({
-  children, left, right, transparentBg = false,
-}: { children: React.ReactNode; left?: React.ReactNode; right?: React.ReactNode; transparentBg?: boolean }) {
+  children, left, right, transparentBg = false, liveNow = false,
+}: { children: React.ReactNode; left?: React.ReactNode; right?: React.ReactNode; transparentBg?: boolean; liveNow?: boolean }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.root, !transparentBg && { backgroundColor: colors.purple }]}>
@@ -14,7 +15,10 @@ export function PageScaffold({
         <View>{left}</View>
         <View>{right}</View>
       </View>
-      <View style={[styles.content, { paddingTop: insets.top + 86 }]}>{children}</View>
+      <View style={[styles.content, { paddingTop: insets.top + 86 }]}>
+        {liveNow && <LiveNowIndicator />}
+        {children}
+      </View>
     </View>
   );
 }

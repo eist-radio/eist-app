@@ -16,7 +16,7 @@ const LINKS = [
 
 export default function ConnectScreen(_props: { pageIndex: number; isActive: boolean }) {
   return (
-    <PageScaffold>
+    <PageScaffold liveNow>
       <Eyebrow>links</Eyebrow>
       <ScrollView style={{ flex: 1, marginTop: 14 }} contentContainerStyle={{ gap: 22, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {LINKS.map((l) => (

@@ -389,7 +389,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
   }
 
   return (
-    <PageScaffold>
+    <PageScaffold liveNow>
       <Eyebrow>schedule</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>{activeDay}</Text>
       <ScrollView

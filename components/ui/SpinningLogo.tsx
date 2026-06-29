@@ -14,6 +14,11 @@ export function SpinningLogo({ size = 100 }: { size?: number }) {
         style={{ width: size, height: size, backgroundColor: 'transparent' }}
         opaque={false}
         scrollEnabled={false}
+        // iOS WKWebView otherwise adds a safe-area content inset that shifts the
+        // canvas down inside its fixed box, clipping the logo's bottom edge on
+        // physical devices. Pin insets to zero so the canvas fills the box.
+        automaticallyAdjustContentInsets={false}
+        contentInset={{ top: 0, left: 0, bottom: 0, right: 0 }}
         androidLayerType="hardware"
         originWhitelist={['*']}
         javaScriptEnabled

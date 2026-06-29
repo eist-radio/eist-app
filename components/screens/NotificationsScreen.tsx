@@ -128,7 +128,7 @@ export default function NotificationsScreen(_props: { pageIndex: number; isActiv
   );
 
   return (
-    <PageScaffold>
+    <PageScaffold liveNow>
       <Eyebrow>notifications</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Reminders</Text>
 

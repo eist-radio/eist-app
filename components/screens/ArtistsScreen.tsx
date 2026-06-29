@@ -19,7 +19,7 @@ export default function ArtistsScreen(_props: { pageIndex: number; isActive: boo
   }, [artists, query]);
 
   return (
-    <PageScaffold>
+    <PageScaffold liveNow>
       <Eyebrow>hosts</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Artists</Text>
       <TextInput

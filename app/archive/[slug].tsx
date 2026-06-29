@@ -5,16 +5,12 @@ import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { FormattedShowTitle } from '../../components/FormattedShowTitle';
 import { HeaderLeftNav } from '../../components/ui/HeaderLeftNav';
-import { Chevron } from '../../components/ui/Chevron';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { PageScaffold } from '../../components/ui/PageScaffold';
 import { PlayDisc } from '../../components/ui/PlayDisc';
 import { ShowArtworkBackground } from '../../components/ui/ShowArtworkBackground';
 import { SpinningLogo } from '../../components/ui/SpinningLogo';
-import {
-  useArchiveShowBySlug,
-  useArchiveShowsByArtist,
-} from '../../hooks/useArchiveShows';
+import { useArchiveShowBySlug } from '../../hooks/useArchiveShows';
 import { colors, font, type as t } from '../../theme/tokens';
 import { stripFormatting } from '../../utils/stripFormatting';
 
@@ -51,7 +47,6 @@ export default function ArchiveShowScreen() {
   const router = useRouter();
 
   const { data: show, isLoading } = useArchiveShowBySlug(slug);
-  const { shows: relatedShows } = useArchiveShowsByArtist(show?.artistSlug, 5);
 
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -74,8 +69,6 @@ export default function ArchiveShowScreen() {
     .split('\n')
     .map((p) => p.trim())
     .filter((p) => p);
-
-  const otherShows = relatedShows.filter((r) => r.slug !== show.slug);
 
   return (
     <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>
@@ -181,43 +174,6 @@ export default function ArchiveShowScreen() {
             {p}
           </Text>
         ))}
-
-        {otherShows.length > 0 && (
-          <>
-            <View style={{ marginTop: 34, marginBottom: 12 }}>
-              <Eyebrow>{`more from ${show.artistName}`}</Eyebrow>
-            </View>
-            {otherShows.map((r) => (
-              <Pressable
-                key={r.slug}
-                onPress={() =>
-                  router.push(`/archive/${encodeURIComponent(r.slug)}`)
-                }
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 16,
-                  marginBottom: 30,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <FormattedShowTitle
-                    title={r.title}
-                    color={colors.green}
-                    size={22}
-                    style={t.rowTitle}
-                  />
-                  <Text
-                    style={[t.rowSub, { color: colors.text, marginTop: 4 }]}
-                  >
-                    {formatDate(r.start)}
-                  </Text>
-                </View>
-                <Chevron direction="right" size={20} />
-              </Pressable>
-            ))}
-          </>
-        )}
       </ScrollView>
     </PageScaffold>
   );
