@@ -35,6 +35,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     }],
     ["react-native-google-cast", {
       receiverAppId: "7A2782C8",
+      // Pin the Android Cast framework: the default "+" resolves to 22.x, which
+      // is compiled with Kotlin 2.2.0 metadata and fails compileReleaseKotlin
+      // under Expo SDK 53's Kotlin 2.0.21. 21.4.0 is the latest Kotlin-2.0-safe release.
+      androidPlayServicesCastFrameworkVersion: "21.4.0",
       // Must stay false: the native iOS Cast button hides itself while the
       // state is noDevicesAvailable, so deferring discovery until "first tap"
       // is a catch-22 (you can't tap a hidden button). Autostarting discovery
