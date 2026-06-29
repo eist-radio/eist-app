@@ -1,7 +1,16 @@
 // app.config.ts
 import { ConfigContext, ExpoConfig } from '@expo/config';
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+export default ({ config }: ConfigContext): ExpoConfig => {
+  // CarPlay is gated behind an env flag: the plugin adds the
+  // `com.apple.developer.carplay-audio` entitlement, which Apple must approve on
+  // the App ID and which must be in the EAS signing profile before it can build.
+  // Until then it stays unloaded, so it cannot affect the current build. To work
+  // on it, build with EXPO_ENABLE_CARPLAY=true (see plugins/withCarPlay.js).
+  const carPlayPlugins =
+    process.env.EXPO_ENABLE_CARPLAY === 'true' ? ['./plugins/withCarPlay'] : [];
+
+  return {
   ...config,
   // Drives the iOS Xcode project/scheme name (sanitized ASCII). Kept as plain
   // "eist" so the scheme is "eist" rather than "ist" (the fada in "éist" gets
@@ -34,7 +43,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       iosSuspendSessionsWhenBackgrounded: false
     }],
     "./plugins/withAndroidAuto",
-    "./plugins/withFmtConstevalFix"
+    "./plugins/withFmtConstevalFix",
+    ...carPlayPlugins
   ],
   ios: {
     ...config.ios,
@@ -116,4 +126,5 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   experiments: {
     tsconfigPaths: true,
   }
-});
+  };
+};
