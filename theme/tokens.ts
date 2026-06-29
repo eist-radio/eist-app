@@ -4,8 +4,8 @@ import { TextStyle } from 'react-native';
 export const colors = {
   purple: '#4733FF',
   green: '#AFFC41',
-  text: 'rgba(175,252,65,0.9)',
-  textDim: 'rgba(175,252,65,0.55)',
+  text: '#E7E5E5',
+  textDim: 'rgba(231,229,229,0.55)',
   pillDim: 'rgba(175,252,65,0.28)',
 } as const;
 

@@ -430,7 +430,7 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
                 </View>
                 <View style={{ flex: 1 }}>
                   <FormattedShowTitle title={r.title} color={r.isLive ? colors.green : colors.text} size={22} style={type.rowTitle} />
-                  <Text style={[type.rowSub, { color: colors.text, marginTop: 4 }]}>{r.artist}</Text>
+                  <Text style={[type.rowSub, { color: colors.green, marginTop: 4 }]}>{r.artist}</Text>
                 </View>
               </Pressable>
             ))}

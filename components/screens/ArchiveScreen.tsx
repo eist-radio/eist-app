@@ -44,7 +44,7 @@ export default function ArchiveScreen({ pageIndex }: { pageIndex: number; isActi
           <Pressable key={it.slug} style={s.row} onPress={() => router.push(`/archive/${it.slug}`)}>
             <View style={{ flex: 1 }}>
               <FormattedShowTitle title={it.title} color={colors.green} size={22} style={type.rowTitle} />
-              <Text style={[type.rowSub, { color: colors.text, marginTop: 4 }]}>{it.artistName}</Text>
+              <Text style={[type.rowSub, { color: colors.green, marginTop: 4 }]}>{it.artistName}</Text>
             </View>
             <Chevron direction="right" size={20} />
           </Pressable>
