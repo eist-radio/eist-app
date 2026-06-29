@@ -11,8 +11,8 @@ const LINKS = [
   { label: 'SoundCloud', url: 'https://soundcloud.com/eistcork' },
   { label: 'Mixcloud', url: 'https://www.mixcloud.com/eistcork/' },
   { label: 'Website', url: 'https://eist.radio' },
-  { label: 'Support us', url: 'https://eist.radio/support/' },
   { label: 'Email', url: 'mailto:info@eist.radio' },
+  { label: 'Support éist', url: 'https://eist.radio/support/' },
 ];
 
 export default function ConnectScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
