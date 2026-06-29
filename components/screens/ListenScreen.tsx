@@ -61,7 +61,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
   const [broadcastStatus, setBroadcastStatus] = useState('off air')
   const [nextShowId, setNextShowId] = useState<string | null>(null)
   const [nextShowTitle, setNextShowTitle] = useState('')
-  const [nextShowTime, setNextShowTime] = useState('')
   const [artistId, setArtistId] = useState<string | null>(null)
   const [currentShowId, setCurrentShowId] = useState<string | null>(null)
   const [, setIsContentLoading] = useState(false)
@@ -69,15 +68,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
   const [isCarConnected, setIsCarConnected] = useState(false)
   const carRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const formatTime = useCallback((isoString: string): string => {
-    const date = new Date(isoString)
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: currentTimezone,
-    })
-  }, [currentTimezone])
 
   const parseDescription = (blocks: any[]): string =>
     blocks
@@ -214,7 +204,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
             const nextEvent = events[0]
             setNextShowId(nextEvent.id)
             setNextShowTitle(nextEvent.title || '')
-            setNextShowTime(formatTime(nextEvent.startDateUtc))
           }
         } catch (nextErr) {
           console.error('Error fetching next show information in fetchLiveScheduleOnly:', nextErr)
@@ -290,7 +279,7 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, formatTime, currentTimezone])
+  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
 
   const fetchNowPlayingWithArtist = useCallback(async () => {
 
@@ -328,7 +317,6 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
             const nextEvent = events[0]
             setNextShowId(nextEvent.id)
             setNextShowTitle(nextEvent.title || '')
-            setNextShowTime(formatTime(nextEvent.startDateUtc))
           }
         } catch (nextErr) {
           console.error('Error fetching next show information:', nextErr)
@@ -387,7 +375,7 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       setBroadcastStatus('error')
       await clearNowPlayingState()
     }
-  }, [getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, formatTime, currentTimezone])
+  }, [getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
 
   // Always resolve the next upcoming show (the most imminent show that starts in
   // the future), independent of whether the station is currently live or off
@@ -410,12 +398,11 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
       if (events.length > 0) {
         setNextShowId(events[0].id)
         setNextShowTitle(events[0].title || '')
-        setNextShowTime(formatTime(events[0].startDateUtc))
       }
     } catch (err) {
       console.warn('Up-next fetch failed:', err)
     }
-  }, [formatTime])
+  }, [])
 
   // Function to calculate time until next 1 minute past the hour
   const getTimeUntilNextRefresh = () => {
@@ -579,7 +566,7 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
         >
           <Eyebrow>up next</Eyebrow>
           <Text style={s.upNextText} numberOfLines={1}>
-            {nextShowTitle}{nextShowTime ? `   ·   ${nextShowTime}` : ''}
+            {nextShowTitle}
           </Text>
         </Pressable>
       ) : null}

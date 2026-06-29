@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { FormattedShowTitle } from '../../components/FormattedShowTitle';
-import { BackTriangle } from '../../components/ui/BackTriangle';
+import { HeaderLeftNav } from '../../components/ui/HeaderLeftNav';
 import { Chevron } from '../../components/ui/Chevron';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { PageScaffold } from '../../components/ui/PageScaffold';
@@ -56,7 +56,7 @@ export default function ArchiveShowScreen() {
   const [imageFailed, setImageFailed] = useState(false);
 
   if (isLoading || !show) {
-    return <PageScaffold left={<BackTriangle />}>{null}</PageScaffold>;
+    return <PageScaffold left={<HeaderLeftNav />}>{null}</PageScaffold>;
   }
 
   const imageUrl = getShowImage(show);
@@ -78,7 +78,7 @@ export default function ArchiveShowScreen() {
   const otherShows = relatedShows.filter((r) => r.slug !== show.slug);
 
   return (
-    <PageScaffold left={<BackTriangle />} right={<SpinningLogo />} transparentBg>
+    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>
       <ShowArtworkBackground
         source={imageSource}
         onError={() => setImageFailed(true)}

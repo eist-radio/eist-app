@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { FormattedShowTitle } from '../../components/FormattedShowTitle';
-import { BackTriangle } from '../../components/ui/BackTriangle';
+import { HeaderLeftNav } from '../../components/ui/HeaderLeftNav';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { NotifyControl } from '../../components/ui/NotifyControl';
 import { PageScaffold } from '../../components/ui/PageScaffold';
@@ -196,7 +196,7 @@ export default function ShowScreen() {
 
   // Loading / not-found guard
   if (!event) {
-    return <PageScaffold left={<BackTriangle />}>{null}</PageScaffold>;
+    return <PageScaffold left={<HeaderLeftNav />}>{null}</PageScaffold>;
   }
 
   const plain = stripFormatting(event.description?.content || []);
@@ -204,7 +204,7 @@ export default function ShowScreen() {
   const dateString = formatShowDate(event.startDateUtc, currentTimezone);
 
   return (
-    <PageScaffold left={<BackTriangle />} right={<SpinningLogo />}>
+    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <Eyebrow>coming up</Eyebrow>
 

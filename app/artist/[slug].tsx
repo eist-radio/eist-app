@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { apiKey } from '../../config';
-import { BackTriangle } from '../../components/ui/BackTriangle';
+import { HeaderLeftNav } from '../../components/ui/HeaderLeftNav';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { NotifyControl } from '../../components/ui/NotifyControl';
 import { PageScaffold } from '../../components/ui/PageScaffold';
@@ -220,7 +220,7 @@ export default function ArtistScreen() {
   }, [artist, isToggling, isLoading, toggleArtistSubscription, archiveArtistSlug]);
 
   if (!artist) {
-    return <PageScaffold left={<BackTriangle />}>{null}</PageScaffold>;
+    return <PageScaffold left={<HeaderLeftNav />}>{null}</PageScaffold>;
   }
 
   const plain = stripFormatting(artist.description?.content);
@@ -239,7 +239,7 @@ export default function ArtistScreen() {
   const imageSource = artistImageUrl && !imageFailed ? { uri: artistImageUrl } : fallbackImage;
 
   return (
-    <PageScaffold left={<BackTriangle />} right={<SpinningLogo />} transparentBg>
+    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>
       <ShowArtworkBackground source={imageSource} onError={() => setImageFailed(true)} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <Eyebrow color={colors.green}>host</Eyebrow>
