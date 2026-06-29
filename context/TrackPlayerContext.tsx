@@ -88,6 +88,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const hasInitialized = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const isPlayingRef = useRef(isPlaying)
+  // Mirror of isPlayerReady so mount-registered listeners / stale closures
+  // (attemptStreamRestart -> play -> setupPlayer) read the LIVE readiness
+  // instead of the value captured on first render. Kept in sync synchronously
+  // alongside every setIsPlayerReady call below.
+  const isPlayerReadyRef = useRef(isPlayerReady)
   const wasPlayingBeforeBackground = useRef(false)
 
   // Separate user intent tracking from actual playback state
@@ -255,11 +260,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const setupPlayer = async () => {
-    if (hasInitialized.current && isPlayerReady) {
+    if (hasInitialized.current && isPlayerReadyRef.current) {
       return
     }
 
     if (isWeb) {
+      isPlayerReadyRef.current = true
       setIsPlayerReady(true)
       return
     }
@@ -269,6 +275,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       try {
         const state = await TrackPlayer.getPlaybackState()
         hasInitialized.current = true
+        isPlayerReadyRef.current = true
         setIsPlayerReady(true)
         return
       } catch (checkError) {
@@ -281,17 +288,20 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         hasInitialized.current = true
       }
 
+      isPlayerReadyRef.current = true
       setIsPlayerReady(true)
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message.toLowerCase() : ''
       if (errorMsg.includes('already been initialized')) {
         hasInitialized.current = true
+        isPlayerReadyRef.current = true
         setIsPlayerReady(true)
         return
       }
 
       console.error('Player setup failed:', err)
       hasInitialized.current = false
+      isPlayerReadyRef.current = false
       setIsPlayerReady(false)
       throw err
     }
@@ -344,6 +354,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Reset player state
+      isPlayerReadyRef.current = false
       setIsPlayerReady(false)
       hasInitialized.current = false
 
@@ -553,10 +564,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Ensure player is ready
-      if (!isPlayerReady) {
+      // Ensure player is ready. Read readiness from the ref (not the captured
+      // isPlayerReady state) so recovery paths driven by mount-registered
+      // listeners see the live value and actually reach TrackPlayer.play().
+      if (!isPlayerReadyRef.current) {
         await setupPlayer()
-        if (!isPlayerReady) {
+        if (!isPlayerReadyRef.current) {
           await attemptStreamRestart('player-not-ready')
           return
         }
@@ -851,7 +864,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Set up periodic metadata refresh for Android lockscreen
       if (Platform.OS === 'android') {
         metadataRefreshInterval.current = setInterval(async () => {
-          if (isPlaying) {
+          // This interval is created once on mount, so it captured isPlaying as
+          // its initial value (false). Read the live ref instead so background
+          // metadata actually refreshes while playing.
+          if (isPlayingRef.current) {
             try {
               await fetchAndUpdateShowMetadata()
             } catch (error) {
