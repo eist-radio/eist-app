@@ -123,6 +123,12 @@ Two distinct backends — keep them straight:
 - Media playback service configuration
 - Wake lock permissions
 
+#### In-car (CarPlay / Android Auto)
+Both are custom Expo config plugins (no third-party CarPlay/Android Auto npm package). They surface react-native-track-player's existing media session — éist logo artwork + play/stop on the current show — in the car. No browse UI beyond a single live-radio item.
+- **Android Auto** (`plugins/withAndroidAuto.js`): **enabled.** Injects a native `MediaBrowserService` (Kotlin) that binds to RNTP's `MusicService`, reflects out its `MediaSessionCompat` token, exposes one playable "éist radio" item, and fixes `DISPLAY_SUBTITLE`. Adds the `automotive_app_desc.xml` + manifest declarations.
+- **CarPlay** (`plugins/withCarPlay.js`): **gated, disabled by default.** Only added to the plugin list when `EXPO_ENABLE_CARPLAY=true` (see `app.config.ts`), so the default build is unaffected. When enabled it adds the `com.apple.developer.carplay-audio` entitlement, a CarPlay-only Info.plist scene (no `UIWindowScene` role, so RN rendering is untouched), and a Swift `CarPlaySceneDelegate` rooting CarPlay on `CPNowPlayingTemplate.shared`. Play/stop reuse the `MPRemoteCommandCenter` commands handled in `trackPlayerService.js`.
+  - **To turn CarPlay on** (all three required first): 1) request the CarPlay "audio" entitlement for the App ID in the Apple Developer portal and wait for approval; 2) ensure the EAS provisioning profile includes `com.apple.developer.carplay-audio` (`eas credentials`); 3) build with the flag, e.g. `EXPO_ENABLE_CARPLAY=true eas build -p ios` (or `EXPO_ENABLE_CARPLAY=true npx expo prebuild -p ios --clean` locally).
+
 ### Key Features
 - **Live Radio Streaming**: Continuous audio with metadata updates
 - **Background Playback**: Continues playing when app is backgrounded
