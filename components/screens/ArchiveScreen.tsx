@@ -8,6 +8,17 @@ import { Eyebrow } from '../ui/Eyebrow';
 import { Chevron } from '../ui/Chevron';
 import { FormattedShowTitle } from '../FormattedShowTitle';
 
+function formatDate(isoString?: string): string | null {
+  if (!isoString) return null;
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 export default function ArchiveScreen(_props: { pageIndex: number; isActive: boolean }) {
   const router = useRouter();
   const { shows: items } = useArchiveShows();
@@ -44,6 +55,9 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
             <View style={{ flex: 1 }}>
               <FormattedShowTitle title={it.title} color={colors.green} size={22} style={type.rowTitle} />
               <Text style={[type.rowSub, { color: colors.text, marginTop: 4 }]}>{it.artistName}</Text>
+              {formatDate(it.start) && (
+                <Text style={[type.meta, { color: colors.textDim, marginTop: 2 }]}>{formatDate(it.start)}</Text>
+              )}
             </View>
             <Chevron direction="right" size={20} />
           </Pressable>
