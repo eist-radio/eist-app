@@ -11,6 +11,7 @@ import { Eyebrow } from '../../components/ui/Eyebrow';
 import { NotifyControl } from '../../components/ui/NotifyControl';
 import { PageScaffold } from '../../components/ui/PageScaffold';
 import { SpinningLogo } from '../../components/ui/SpinningLogo';
+import { ShowArtworkBackground } from '../../components/ui/ShowArtworkBackground';
 import { apiKey } from '../../config';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useTimezoneChange } from '../../hooks/useTimezoneChange';
@@ -18,6 +19,7 @@ import { colors, font, type as t } from '../../theme/tokens';
 import { stripFormatting } from '../../utils/stripFormatting';
 
 const STATION_ID = 'eist-radio';
+const fallbackImage = require('../../assets/images/eist_online.png');
 
 type RawScheduleItem = {
   id: string;
@@ -122,6 +124,7 @@ export default function ShowScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
   const router = useRouter();
   const currentTimezone = useTimezoneChange();
+  const [imageFailed, setImageFailed] = useState(false);
 
   // All hooks must run before any early return (rules of hooks)
   const { data: event } = useQuery({
@@ -191,8 +194,16 @@ export default function ShowScreen() {
   const timeString = formatShowTime(event.startDateUtc, event.endDateUtc, currentTimezone);
   const dateString = formatShowDate(event.startDateUtc, currentTimezone);
 
+  const artistImageUrl =
+    hosts[0]?.logo?.['1024x1024'] ||
+    hosts[0]?.logo?.['512x512'] ||
+    hosts[0]?.logo?.['256x256'] ||
+    hosts[0]?.logo?.default;
+  const imageSource = artistImageUrl && !imageFailed ? { uri: artistImageUrl } : fallbackImage;
+
   return (
-    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />}>
+    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>
+      <ShowArtworkBackground source={imageSource} onError={() => setImageFailed(true)} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <Eyebrow>coming up</Eyebrow>
 

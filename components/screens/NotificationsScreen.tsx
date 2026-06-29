@@ -2,8 +2,11 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors, font, type } from '../../theme/tokens';
+import { useQuery } from '@tanstack/react-query';
+import { colors, type } from '../../theme/tokens';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useTimezoneChange } from '../../hooks/useTimezoneChange';
+import { fetchNextShowForArtist, formatNextShowDate } from '../../utils/nextShow';
 import { PageScaffold } from '../ui/PageScaffold';
 import { Pills } from '../ui/Pills';
 import { Eyebrow } from '../ui/Eyebrow';
@@ -32,6 +35,38 @@ function ClearButton({ onPress, label }: { onPress: () => void; label: string })
     >
       <Ionicons name="close" size={22} color={colors.green} />
     </Pressable>
+  );
+}
+
+function SubscriptionRow({
+  artistId,
+  artistName,
+  onClear,
+}: {
+  artistId: string;
+  artistName: string;
+  onClear: () => void;
+}) {
+  const timezone = useTimezoneChange();
+  const { data: nextShow } = useQuery({
+    queryKey: ['artist-next-show', artistId, timezone],
+    queryFn: () => fetchNextShowForArtist(artistId, timezone),
+    enabled: !!artistId,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const subtitle = nextShow
+    ? `Next show: ${formatNextShowDate(nextShow.startDateUtc)}`
+    : 'Notified for upcoming shows';
+
+  return (
+    <View style={s.row}>
+      <View style={{ flex: 1 }}>
+        <Text style={[type.rowTitle, { color: colors.green }]}>{artistName}</Text>
+        <Text style={[type.rowSub, { color: colors.text, marginTop: 4 }]}>{subtitle}</Text>
+      </View>
+      <ClearButton onPress={onClear} label={`Unsubscribe from ${artistName}`} />
+    </View>
   );
 }
 
@@ -96,7 +131,7 @@ export default function NotificationsScreen({ pageIndex }: { pageIndex: number; 
   return (
     <PageScaffold left={<Pills active={pageIndex} />}>
       <Eyebrow>notifications</Eyebrow>
-      <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Active reminders</Text>
+      <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Reminders</Text>
 
       {isEmpty ? (
         <Text style={[type.bio, { color: colors.textDim, marginTop: 28 }]}>
@@ -136,13 +171,12 @@ export default function NotificationsScreen({ pageIndex }: { pageIndex: number; 
             </Text>
           )}
           {subscriptionList.map((sub) => (
-            <View key={sub.artistId} style={s.row}>
-              <View style={{ flex: 1 }}>
-                <Text style={[type.rowTitle, { color: colors.green }]}>{sub.artistName}</Text>
-                <Text style={[type.rowSub, { color: colors.text, marginTop: 4 }]}>Notified for upcoming shows</Text>
-              </View>
-              <ClearButton onPress={() => clearSubscription(sub.artistId)} label={`Unsubscribe from ${sub.artistName}`} />
-            </View>
+            <SubscriptionRow
+              key={sub.artistId}
+              artistId={sub.artistId}
+              artistName={sub.artistName}
+              onClear={() => clearSubscription(sub.artistId)}
+            />
           ))}
         </ScrollView>
       )}

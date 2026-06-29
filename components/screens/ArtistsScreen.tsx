@@ -6,6 +6,7 @@ import { useArtists } from '../../hooks/useArtists';
 import { PageScaffold } from '../ui/PageScaffold';
 import { Pills } from '../ui/Pills';
 import { Eyebrow } from '../ui/Eyebrow';
+import { Chevron } from '../ui/Chevron';
 
 export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
   const router = useRouter();
@@ -35,8 +36,9 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
       />
       <ScrollView style={{ marginTop: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {filtered.map((a) => (
-          <Pressable key={a.slug} style={{ marginBottom: 30 }} onPress={() => router.push(`/artist/${encodeURIComponent(a.slug)}?id=${encodeURIComponent(a.id)}`)}>
-            <Text style={[type.rowTitle, { color: colors.green }]}>{a.name}</Text>
+          <Pressable key={a.slug} style={s.row} onPress={() => router.push(`/artist/${encodeURIComponent(a.slug)}?id=${encodeURIComponent(a.id)}`)}>
+            <Text style={[type.rowTitle, { color: colors.green, flex: 1 }]}>{a.name}</Text>
+            <Chevron direction="right" size={20} />
           </Pressable>
         ))}
       </ScrollView>
@@ -45,5 +47,6 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
 }
 
 const s = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 30 },
   search: { fontFamily: font.body, fontWeight: '500', fontSize: 19, color: colors.green, marginTop: 18, paddingVertical: 4 },
 });
