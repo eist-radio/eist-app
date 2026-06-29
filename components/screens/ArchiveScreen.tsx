@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, Pressable, Text, TextInput, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Pressable, Text, TextInput, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, font, type } from '../../theme/tokens';
 import { useArchiveShows } from '../../hooks/useArchiveShows';
@@ -21,8 +21,17 @@ function formatDate(isoString?: string): string | null {
 
 export default function ArchiveScreen(_props: { pageIndex: number; isActive: boolean }) {
   const router = useRouter();
-  const { shows: items } = useArchiveShows();
+  const { shows: items, hasMore, loadMore, isLoadingMore } = useArchiveShows();
   const [query, setQuery] = useState('');
+
+  // Load the next page as the user nears the bottom. loadMore() already guards
+  // against overlapping/duplicate fetches, so an eager threshold is safe.
+  const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+    const distanceFromBottom =
+      contentSize.height - (contentOffset.y + layoutMeasurement.height);
+    if (hasMore && distanceFromBottom < 600) loadMore();
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -49,7 +58,7 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
         returnKeyType="search"
         clearButtonMode="while-editing"
       />
-      <ScrollView style={{ marginTop: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ marginTop: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" onScroll={onScroll} scrollEventThrottle={16}>
         {filtered.map((it) => (
           <Pressable key={it.slug} style={s.row} onPress={() => router.push(`/archive/${it.slug}`)}>
             <View style={{ flex: 1 }}>
@@ -62,6 +71,9 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
             <Chevron direction="right" size={20} />
           </Pressable>
         ))}
+        {isLoadingMore && (
+          <ActivityIndicator color={colors.green} style={{ marginBottom: 30 }} />
+        )}
       </ScrollView>
     </PageScaffold>
   );
