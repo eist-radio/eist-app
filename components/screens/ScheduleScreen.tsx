@@ -4,7 +4,6 @@ import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { useRouter } from 'expo-router'
 import { colors, font, type } from '../../theme/tokens'
 import { PageScaffold } from '../ui/PageScaffold'
-import { Pills } from '../ui/Pills'
 import { Eyebrow } from '../ui/Eyebrow'
 import { FormattedShowTitle } from '../FormattedShowTitle'
 import { apiKey } from '../../config'
@@ -144,7 +143,7 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
     .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0))
 }
 
-export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: number; isActive: boolean }) {
+export default function ScheduleScreen({ isActive }: { pageIndex: number; isActive: boolean }) {
   const router = useRouter()
   const currentTimezone = useTimezoneChange()
 
@@ -389,7 +388,7 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
   }
 
   return (
-    <PageScaffold left={<Pills active={pageIndex} />}>
+    <PageScaffold>
       <Eyebrow>schedule</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>{activeDay}</Text>
       <ScrollView

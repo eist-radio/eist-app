@@ -8,7 +8,6 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { useTimezoneChange } from '../../hooks/useTimezoneChange';
 import { fetchNextShowForArtist, formatNextShowDate } from '../../utils/nextShow';
 import { PageScaffold } from '../ui/PageScaffold';
-import { Pills } from '../ui/Pills';
 import { Eyebrow } from '../ui/Eyebrow';
 import { FormattedShowTitle } from '../FormattedShowTitle';
 import { formatClockTime } from '../../utils/formatTime';
@@ -70,7 +69,7 @@ function SubscriptionRow({
   );
 }
 
-export default function NotificationsScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
+export default function NotificationsScreen(_props: { pageIndex: number; isActive: boolean }) {
   const { reminders, subscriptions, toggleShowReminder, toggleArtistSubscription } = useNotifications();
   const [busy, setBusy] = useState(false);
 
@@ -129,7 +128,7 @@ export default function NotificationsScreen({ pageIndex }: { pageIndex: number; 
   );
 
   return (
-    <PageScaffold left={<Pills active={pageIndex} />}>
+    <PageScaffold>
       <Eyebrow>notifications</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Reminders</Text>
 

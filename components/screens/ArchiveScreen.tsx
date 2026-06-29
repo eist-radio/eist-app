@@ -4,12 +4,11 @@ import { useRouter } from 'expo-router';
 import { colors, font, type } from '../../theme/tokens';
 import { useArchiveShows } from '../../hooks/useArchiveShows';
 import { PageScaffold } from '../ui/PageScaffold';
-import { Pills } from '../ui/Pills';
 import { Eyebrow } from '../ui/Eyebrow';
 import { Chevron } from '../ui/Chevron';
 import { FormattedShowTitle } from '../FormattedShowTitle';
 
-export default function ArchiveScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
+export default function ArchiveScreen(_props: { pageIndex: number; isActive: boolean }) {
   const router = useRouter();
   const { shows: items } = useArchiveShows();
   const [query, setQuery] = useState('');
@@ -25,7 +24,7 @@ export default function ArchiveScreen({ pageIndex }: { pageIndex: number; isActi
   }, [items, query]);
 
   return (
-    <PageScaffold left={<Pills active={pageIndex} />}>
+    <PageScaffold>
       <Eyebrow>archive</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Listen back</Text>
       <TextInput

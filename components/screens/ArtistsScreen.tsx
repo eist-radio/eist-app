@@ -4,11 +4,10 @@ import { useRouter } from 'expo-router';
 import { colors, font, type } from '../../theme/tokens';
 import { useArtists } from '../../hooks/useArtists';
 import { PageScaffold } from '../ui/PageScaffold';
-import { Pills } from '../ui/Pills';
 import { Eyebrow } from '../ui/Eyebrow';
 import { Chevron } from '../ui/Chevron';
 
-export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
+export default function ArtistsScreen(_props: { pageIndex: number; isActive: boolean }) {
   const router = useRouter();
   const { artists } = useArtists();
   const [query, setQuery] = useState('');
@@ -20,7 +19,7 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
   }, [artists, query]);
 
   return (
-    <PageScaffold left={<Pills active={pageIndex} />}>
+    <PageScaffold>
       <Eyebrow>hosts</Eyebrow>
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>Artists</Text>
       <TextInput

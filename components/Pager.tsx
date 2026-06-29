@@ -1,6 +1,6 @@
 // components/Pager.tsx
-import React, { useState } from 'react';
-import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, StatusBar, Text, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Animated, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBar, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PAGE_COUNT, colors, space } from '../theme/tokens';
 import { PageScaffold } from './ui/PageScaffold';
@@ -18,13 +18,16 @@ const { width } = Dimensions.get('window');
 export function Pager() {
   const [active, setActive] = useState(0);
   const insets = useSafeAreaInsets();
+  const scrollX = useRef(new Animated.Value(0)).current;
   const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
     setActive(Math.round(e.nativeEvent.contentOffset.x / width));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.purple }}>
       <StatusBar barStyle="light-content" />
-      <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+      <Animated.ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
         onMomentumScrollEnd={onEnd} removeClippedSubviews={false}>
         {Array.from({ length: PAGE_COUNT }).map((_, i) => (
           <View key={i} style={{ width }}>
@@ -34,10 +37,16 @@ export function Pager() {
               : i === 3 ? <ArchiveScreen pageIndex={3} isActive={active === 3} />
               : i === 4 ? <NotificationsScreen pageIndex={4} isActive={active === 4} />
               : i === 5 ? <ConnectScreen pageIndex={5} isActive={active === 5} />
-              : <PageScaffold left={<Pills active={i} />}><Text style={{ color: colors.green }}>Page {i}</Text></PageScaffold>}
+              : <PageScaffold><Text style={{ color: colors.green }}>Page {i}</Text></PageScaffold>}
           </View>
         ))}
-      </ScrollView>
+      </Animated.ScrollView>
+      {/* shared page indicator, top-left, fixed above all pages (centred in the
+          same 100px top row as the detail pages' nav). Driven by scroll offset
+          so it stays put while the active pill glides as you swipe. */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: insets.top + space.topGap, left: space.screenX, height: 100, justifyContent: 'center' }}>
+        <Pills scrollX={scrollX} pageWidth={width} />
+      </View>
       {/* single shared logo overlay, top-right, above all pages — positioned to
           match the detail pages' logo (centred in a 100px top row) */}
       <View pointerEvents="none" style={{ position: 'absolute', top: insets.top + space.topGap, right: space.screenX }}>

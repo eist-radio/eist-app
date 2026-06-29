@@ -20,7 +20,6 @@ import { formatShowTimeRange } from '../../utils/liveShowInfo'
 import { FormattedShowTitle } from '../FormattedShowTitle'
 import { Eyebrow } from '../ui/Eyebrow'
 import { PageScaffold } from '../ui/PageScaffold'
-import { Pills } from '../ui/Pills'
 import { PlayDisc } from '../ui/PlayDisc'
 import { ShowArtworkBackground } from '../ui/ShowArtworkBackground'
 
@@ -43,7 +42,7 @@ const placeholderOfflineImage = require('../../assets/images/eist_offline.png')
 const stationId = 'eist-radio'
 const apiUrl = `https://api.radiocult.fm/api/station/${stationId}`
 
-export default function ListenScreen({ pageIndex, isActive }: { pageIndex: number; isActive: boolean }) {
+export default function ListenScreen({ isActive }: { pageIndex: number; isActive: boolean }) {
   const {
     isPlaying,
     togglePlayStop,
@@ -557,7 +556,7 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
   }
 
   return (
-    <PageScaffold left={<Pills active={pageIndex} />} transparentBg>
+    <PageScaffold transparentBg>
       <ShowArtworkBackground
         source={artworkSource}
         onError={() => setImageFailed(true)} />

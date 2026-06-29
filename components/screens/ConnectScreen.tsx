@@ -2,7 +2,6 @@ import React from 'react';
 import { ScrollView, Pressable, Text, Linking } from 'react-native';
 import { colors, font, type } from '../../theme/tokens';
 import { PageScaffold } from '../ui/PageScaffold';
-import { Pills } from '../ui/Pills';
 import { Eyebrow } from '../ui/Eyebrow';
 
 const LINKS = [
@@ -15,9 +14,9 @@ const LINKS = [
   { label: 'Support éist', url: 'https://eist.radio/support/' },
 ];
 
-export default function ConnectScreen({ pageIndex }: { pageIndex: number; isActive: boolean }) {
+export default function ConnectScreen(_props: { pageIndex: number; isActive: boolean }) {
   return (
-    <PageScaffold left={<Pills active={pageIndex} />}>
+    <PageScaffold>
       <Eyebrow>links</Eyebrow>
       <ScrollView style={{ flex: 1, marginTop: 14 }} contentContainerStyle={{ gap: 22, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {LINKS.map((l) => (
