@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Pressable, Text, TextInput, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { colors, font, type } from '../../theme/tokens';
@@ -21,8 +21,20 @@ function formatDate(isoString?: string): string | null {
 
 export default function ArchiveScreen(_props: { pageIndex: number; isActive: boolean }) {
   const router = useRouter();
-  const { shows: items, hasMore, loadMore, isLoadingMore } = useArchiveShows();
   const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
+
+  // Debounce the input before hitting the backend so we don't fire a request
+  // on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  // Search runs server-side via the `q` param; results (and their pagination)
+  // come back already filtered, so we render `items` directly.
+  const { shows: items, hasMore, loadMore, isLoadingMore, isLoading } =
+    useArchiveShows(search);
 
   // Load the next page as the user nears the bottom. loadMore() already guards
   // against overlapping/duplicate fetches, so an eager threshold is safe.
@@ -32,16 +44,6 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
       contentSize.height - (contentOffset.y + layoutMeasurement.height);
     if (hasMore && distanceFromBottom < 600) loadMore();
   };
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (it) =>
-        it.title.toLowerCase().includes(q) ||
-        (it.artistName ?? '').toLowerCase().includes(q)
-    );
-  }, [items, query]);
 
   return (
     <PageScaffold liveNow>
@@ -59,7 +61,7 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
         clearButtonMode="while-editing"
       />
       <ScrollView style={{ marginTop: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" onScroll={onScroll} scrollEventThrottle={16}>
-        {filtered.map((it) => (
+        {items.map((it) => (
           <Pressable key={it.slug} style={s.row} onPress={() => router.push(`/archive/${it.slug}`)}>
             <View style={{ flex: 1 }}>
               <FormattedShowTitle title={it.title} color={colors.green} size={22} style={type.rowTitle} />
@@ -73,6 +75,11 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
         ))}
         {isLoadingMore && (
           <ActivityIndicator color={colors.green} style={{ marginBottom: 30 }} />
+        )}
+        {!isLoading && items.length === 0 && (
+          <Text style={[type.meta, { color: colors.textDim, marginTop: 8 }]}>
+            {search ? `No shows match "${search}"` : 'No shows found'}
+          </Text>
         )}
       </ScrollView>
     </PageScaffold>

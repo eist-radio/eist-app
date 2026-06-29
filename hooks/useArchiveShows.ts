@@ -8,10 +8,20 @@ import { ArchiveSection, ArchiveShow, ShowsApiResponse } from '../types/archive'
 const INITIAL_LIMIT = 75;
 const LOAD_MORE_LIMIT = 50;
 
-async function fetchArchiveShowsPage(limit: number, offset: number): Promise<ShowsApiResponse> {
-  const response = await fetch(
-    `${EIST_API_ENDPOINTS.shows}?hasArchive=true&limit=${limit}&offset=${offset}`
-  );
+async function fetchArchiveShowsPage(
+  limit: number,
+  offset: number,
+  q?: string
+): Promise<ShowsApiResponse> {
+  const params = new URLSearchParams({
+    hasArchive: 'true',
+    limit: String(limit),
+    offset: String(offset),
+  });
+  // Server-side search: q matches show title or host/artist name (case-insensitive).
+  if (q) params.set('q', q);
+
+  const response = await fetch(`${EIST_API_ENDPOINTS.shows}?${params.toString()}`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch archive shows: ${response.status} ${response.statusText}`);
@@ -71,13 +81,14 @@ function groupShowsByMonth(shows: ArchiveShow[]): ArchiveSection[] {
     .sort((a, b) => (b.key < a.key ? -1 : b.key > a.key ? 1 : 0)); // newest first
 }
 
-export function useArchiveShows() {
+export function useArchiveShows(q?: string) {
+  const search = q?.trim() || '';
   const query = useInfiniteQuery({
-    queryKey: ['archiveShows'],
+    queryKey: ['archiveShows', search],
     queryFn: ({ pageParam }) => {
       const offset = pageParam ?? 0;
       const limit = offset === 0 ? INITIAL_LIMIT : LOAD_MORE_LIMIT;
-      return fetchArchiveShowsPage(limit, offset);
+      return fetchArchiveShowsPage(limit, offset, search || undefined);
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {

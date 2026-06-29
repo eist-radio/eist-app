@@ -236,6 +236,10 @@ for (let li = 0; li < LETTERS.length; li++) {
   HALF_W = size.x / 2;
   HALF_H = size.y / 2;
   HALF_D = size.z / 2;
+  // On-device the WebView nudges the rendered canvas slightly downward, clipping
+  // the logo's bottom. Lift the word a touch (fraction of its half-height) to
+  // counter that — this only repositions, it does not change the logo's size.
+  word.position.y += HALF_H * 0.12;
   updateCamera();
 }
 
