@@ -34,6 +34,7 @@ import {
   setArtistSubscription,
   setShowReminder,
 } from '../utils/notificationStorage';
+import { fetchNextShowForArtist } from '../utils/nextShow';
 
 type NotificationContextType = {
   // Permission
@@ -345,6 +346,58 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     },
     [subscriptions, reminders]
   );
+
+  // Launch re-sync: once per app session (after subscriptions/reminders have
+  // hydrated from storage and permission is known), roll every active artist
+  // subscription forward by fetching that artist's next known show and
+  // scheduling a reminder for it if one isn't already set. This covers shows
+  // announced after the user subscribed, and re-arms the subscription once a
+  // previously reminded show has aired/passed. Relies on the existing
+  // `!reminders[showId]` dedupe in syncSubscribedArtistShows.
+  const hasSyncedSubscriptions = useRef(false);
+  useEffect(() => {
+    if (hasSyncedSubscriptions.current) return;
+    if (Platform.OS === 'web') return;
+    // Wait until hydration from storage has completed (initialize flips this).
+    if (isLoading) return;
+    if (permissionStatus !== 'granted') return;
+
+    const activeArtistIds = Object.values(subscriptions)
+      .filter((sub) => sub.isActive)
+      .map((sub) => sub.artistId);
+    if (activeArtistIds.length === 0) return;
+
+    // Only run the sync body once we actually have active subscriptions.
+    hasSyncedSubscriptions.current = true;
+
+    const resyncSubscriptions = async () => {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+      for (const artistId of activeArtistIds) {
+        try {
+          const nextShow = await fetchNextShowForArtist(artistId, timezone);
+          if (!nextShow) continue;
+
+          const sub = subscriptions[artistId];
+          await syncSubscribedArtistShows(artistId, [
+            {
+              showId: nextShow.id,
+              showTitle: nextShow.title,
+              artistName: sub?.artistName,
+              startDateUtc: nextShow.startDateUtc,
+            },
+          ]);
+        } catch (error) {
+          console.error(
+            `Failed to re-sync reminders for artist ${artistId}:`,
+            error
+          );
+        }
+      }
+    };
+
+    resyncSubscriptions();
+  }, [isLoading, permissionStatus, subscriptions, syncSubscribedArtistShows]);
 
   return (
     <NotificationContext.Provider
