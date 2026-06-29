@@ -1,3 +1,5 @@
+import { threeMinJs } from './threeMin';
+
 export const eistLogoHtml = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -20,15 +22,10 @@ export const eistLogoHtml = `<!DOCTYPE html>
 </style>
 </head>
 <body>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.module.js"
-  }
-}
-</script>
-<script type="module">
-import * as THREE from 'three';
+<script>${threeMinJs}</script>
+<script>
+// three.js r128 is injected above as a global \`THREE\` (UMD build), so the
+// logo renders with zero runtime/network dependencies — no CDN, no importmap.
 
 // ── Nimbus Sans Bold — embedded glyph subset (é i s t) ───────────────────
 const FONT_DATA = {"glyphs":{"é":{"ha":556,"x_min":0,"x_max":556,"o":"m 524 -226 b 525 -238 525 -243 525 -250 b 525 -304 517 -354 504 -392 b 468 -490 381 -549 272 -549 b 117 -549 22 -437 22 -256 b 22 -83 116 23 269 23 b 390 23 488 -45 519 -152 l 381 -152 b 364 -109 325 -84 274 -84 b 234 -84 202 -101 182 -131 b 169 -151 164 -175 162 -226 m 164 -319 b 173 -402 208 -442 270 -442 b 334 -442 372 -399 379 -319 m 419 -757 l 293 -757 l 223 -607 l 293 -607"},"i":{"ha":278,"x_min":0,"x_max":278,"o":"m 207 -540 l 67 -540 l 67 0 l 207 0 m 207 -729 l 67 -729 l 67 -604 l 207 -604"},"s":{"ha":556,"x_min":0,"x_max":556,"o":"m 505 -366 b 503 -480 415 -549 270 -549 b 133 -549 48 -480 48 -369 b 48 -333 59 -302 78 -281 b 97 -262 114 -253 166 -236 l 333 -184 b 368 -173 380 -162 380 -140 b 380 -107 341 -87 276 -87 b 239 -87 211 -93 193 -106 b 178 -117 172 -128 166 -157 l 29 -157 b 33 -38 120 23 284 23 b 359 23 416 7 456 -25 b 496 -57 520 -107 520 -160 b 520 -230 485 -275 414 -296 l 237 -347 b 198 -359 188 -367 188 -389 b 188 -419 220 -439 269 -439 b 336 -439 369 -415 370 -366"},"t":{"ha":333,"x_min":0,"x_max":333,"o":"m 301 -529 l 223 -529 l 223 -674 l 83 -674 l 83 -529 l 14 -529 l 14 -436 l 83 -436 l 83 -104 b 83 -19 128 23 220 23 b 252 23 275 20 301 12 l 301 -86 b 287 -84 280 -83 269 -83 b 232 -83 223 -94 223 -142 l 223 -436 l 301 -436"}," ":{"ha":278,"x_min":0,"x_max":278,"o":""}},"cssFontWeight":"bold","ascender":729,"descender":-271,"underlinePosition":-121,"cssFontStyle":"normal","boundingBox":{"yMin":-307,"xMin":-188,"yMax":1070,"xMax":1069},"resolution":1000,"original_font_information":{"subfamily_name":"Bold","family_name":"Nimbus Sans"},"familyName":"Nimbus Sans"};

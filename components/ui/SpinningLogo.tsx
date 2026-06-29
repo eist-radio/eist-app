@@ -18,6 +18,13 @@ export function SpinningLogo({ size = 100 }: { size?: number }) {
         originWhitelist={['*']}
         javaScriptEnabled
         domStorageEnabled
+        // three.js is now inlined into the HTML (no network), so the only way the
+        // logo can go blank is a script/WebGL error. Surface those instead of
+        // failing silently — the previous CDN version had no diagnostics, which
+        // is why a blank logo on-device went unexplained.
+        injectedJavaScriptBeforeContentLoaded={`window.onerror=function(m,s,l,c){window.ReactNativeWebView&&window.ReactNativeWebView.postMessage('logo-error: '+m);};true;`}
+        onMessage={(e) => console.warn('[SpinningLogo]', e.nativeEvent.data)}
+        onError={(e) => console.warn('[SpinningLogo] webview error', e.nativeEvent)}
       />
     </View>
   );
