@@ -54,30 +54,52 @@ eas credentials --platform ios                    # Manage iOS credentials
 
 #### Core Context System
 - **TrackPlayerContext** (`context/TrackPlayerContext.tsx`): Central audio management with comprehensive error handling, network recovery, background playback support, and CarPlay/Android Auto integration
+- **NotificationContext** (`context/NotificationContext.tsx`): Manages show reminders and artist subscriptions (local scheduled notifications), permission state, and AsyncStorage persistence. Consumed via the `useNotifications()` hook.
+- **CastContext** (`context/CastContext.tsx`): Google Cast / AirPlay state.
 
-#### File-based Routing Structure
+#### Navigation & Routing
+
+The primary UI is **not** bottom tabs — it's a horizontal **swipe Pager** (`components/Pager.tsx`) rendered by `app/index.tsx`. Each swipe page is a component in `components/screens/`. Detail pages are separate Expo Router routes navigated to via `router.push`.
+
 ```
 app/
-├── _layout.tsx              # Root layout with providers and splash screen
-├── index.tsx                # Main entry redirecting to listen tab
-├── (tabs)/                  # Tab navigation group
-│   ├── _layout.tsx          # Tab layout configuration
-│   ├── listen.tsx           # Main radio player interface
-│   ├── schedule.tsx         # Show schedule with live/upcoming indicators
-│   ├── discord.tsx          # Discord integration
-│   ├── instagram.tsx        # Instagram integration
-│   ├── soundcloud.tsx       # SoundCloud integration
-│   ├── mixcloud.tsx         # Mixcloud integration
-│   ├── artist/[slug].tsx    # Dynamic artist detail pages
-│   └── show/[slug].tsx      # Dynamic show detail pages
+├── _layout.tsx              # Root Stack layout: providers (Query, Cast, TrackPlayer,
+│                            #   Notification) + animated splash screen. Header hidden;
+│                            #   horizontal slide transitions.
+├── index.tsx                # Renders <Pager /> (the swipe deck)
+├── show/[slug].tsx          # Show detail page (radiocult schedule)
+├── artist/[slug].tsx        # Artist detail page
+├── archive/[slug].tsx       # Archived show detail page (worker API)
 └── +not-found.tsx           # 404 error page
+
+components/
+├── Pager.tsx                # Horizontal paging ScrollView; PAGE_COUNT (theme/tokens.ts)
+│                            #   pages, shared spinning-logo overlay, Pills indicator.
+└── screens/                 # One component per swipe page (props: { pageIndex, isActive })
+    ├── ListenScreen.tsx     #   0 · live player
+    ├── ScheduleScreen.tsx   #   1 · schedule (live/upcoming)
+    ├── ArtistsScreen.tsx    #   2 · artists
+    ├── ArchiveScreen.tsx    #   3 · archive / listen back
+    ├── ConnectScreen.tsx    #   4 · external links (incl. "Support us" → eist.radio/support)
+    └── NotificationsScreen.tsx  # 5 · active notifications (clear show reminders/artist subs)
 ```
+
+To add/remove a swipe page: update `PAGE_COUNT` in `theme/tokens.ts` and the index→component mapping in `components/Pager.tsx`. The `Pills` indicator reads `PAGE_COUNT` automatically.
 
 #### Audio Streaming Architecture
 - **TrackPlayerService** (`trackPlayerService.js`): Background service handling remote controls, CarPlay events, and audio session management
 - **Live Metadata API**: Real-time show information from `https://api.radiocult.fm/api/station/eist/schedule/live`
 - **Stream URL**: `https://eist-radio.radiocult.fm/stream`
 - **Cross-platform Support**: Web uses HTML5 Audio, mobile uses react-native-track-player
+
+#### Data APIs (`config.ts`)
+Two distinct backends — keep them straight:
+- **RadioCult** (`https://api.radiocult.fm`): live metadata, schedule, show & artist detail pages. Authenticated with `apiKey` (from EAS/Expo `extra`). Used by ListenScreen, ScheduleScreen, `app/show/[slug].tsx`, `app/artist/[slug].tsx`.
+- **éist worker API** (`EIST_API_BASE_URL` = `https://eist-api.johnocallaghan.workers.dev`, endpoints in `EIST_API_ENDPOINTS`): archive shows and artist stats/mapping. Used by `hooks/useArchiveShows.ts` and `hooks/useArtists.ts`. **This is production code.** Source lives in `workers/eist-api/` (a separate Cloudflare Worker project with its own deps/tsconfig — its TypeScript errors are unrelated to the app build).
+
+#### Theming (`theme/tokens.ts`)
+- `colors` — `purple` (bg), `green` (`#AFFC41`, accent), `text` / `textDim` (primary/dim foreground, a translucent green), `pillDim`. There is **no** `bone`/`boneDim` token (renamed to `text`/`textDim`).
+- `font`, `type` (shared text-style fragments; colour applied at call site), `space`, `PAGE_COUNT`.
 
 #### State Management Patterns
 - React Context for global audio state
@@ -105,7 +127,8 @@ app/
 - **CarPlay**: Minimal integration with vehicle systems.
 - **Network Recovery**: Automatic reconnection on network changes
 - **Show Schedule**: Live and upcoming show information with FormattedShowTitle component
-- **Social Integration**: Links to Discord, Instagram, SoundCloud, Mixcloud
+- **Notifications**: Per-show reminders and artist subscriptions (local scheduled notifications); the Active Notifications swipe page lists and clears them. Not available on web.
+- **Social Integration**: Links to Discord, Instagram, SoundCloud, Mixcloud, plus "Support us" (eist.radio/support)
 - **Cross-platform**: iOS, Android, and web support
 
 ### UI Components

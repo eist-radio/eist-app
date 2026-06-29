@@ -26,7 +26,7 @@ export default function ArtistsScreen({ pageIndex }: { pageIndex: number; isActi
         value={query}
         onChangeText={setQuery}
         placeholder="Search hosts..."
-        placeholderTextColor={colors.boneDim}
+        placeholderTextColor={colors.textDim}
         style={s.search}
         autoCapitalize="none"
         autoCorrect={false}

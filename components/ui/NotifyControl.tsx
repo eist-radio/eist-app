@@ -53,5 +53,5 @@ export function NotifyControl({ active, onToggle, caption }: { active: boolean; 
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 26 },
   l1: { fontFamily: font.body, fontWeight: '600', fontSize: 17, letterSpacing: 0.2, color: colors.green },
-  l2: { fontFamily: font.body, fontWeight: '500', fontSize: 15, color: colors.bone, marginTop: 4 },
+  l2: { fontFamily: font.body, fontWeight: '500', fontSize: 15, color: colors.text, marginTop: 4 },
 });

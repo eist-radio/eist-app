@@ -252,14 +252,14 @@ export default function ArtistScreen() {
           <Pressable
             onPress={() => router.push(`/show/${encodeURIComponent(nextShow.id)}`)}
           >
-            <Text style={[t.meta, { color: colors.bone, marginTop: 10 }]}>
+            <Text style={[t.meta, { color: colors.text, marginTop: 10 }]}>
               {`Next show: ${formatNextShowDate(nextShow.startDateUtc)}`}
             </Text>
           </Pressable>
         )}
 
         {genres.length > 0 && (
-          <Text style={[t.meta, { color: colors.bone, marginTop: 10 }]}>
+          <Text style={[t.meta, { color: colors.text, marginTop: 10 }]}>
             {genres.slice(0, 4).join('  ·  ')}
           </Text>
         )}
@@ -271,7 +271,7 @@ export default function ArtistScreen() {
         />
 
         {plain ? (
-          <Text style={[t.bio, { color: colors.bone, marginTop: 26 }]}>
+          <Text style={[t.bio, { color: colors.text, marginTop: 26 }]}>
             {plain}
           </Text>
         ) : null}
@@ -298,7 +298,7 @@ export default function ArtistScreen() {
                 size={22}
                 style={t.rowTitle}
               />
-              <Text style={[t.rowSub, { color: colors.bone, marginTop: 4 }]}>
+              <Text style={[t.rowSub, { color: colors.text, marginTop: 4 }]}>
                 {new Date(show.start).toLocaleDateString(undefined, {
                   day: 'numeric',
                   month: 'long',

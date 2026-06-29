@@ -425,12 +425,12 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
                   {r.isLive ? (
                     <View style={s.nowChip}><Text style={s.nowChipText}>NOW</Text></View>
                   ) : (
-                    <Text style={[s.time, { color: colors.bone }]} numberOfLines={1}>{r.time}</Text>
+                    <Text style={[s.time, { color: colors.text }]} numberOfLines={1}>{r.time}</Text>
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <FormattedShowTitle title={r.title} color={r.isLive ? colors.green : colors.bone} size={22} style={type.rowTitle} />
-                  <Text style={[type.rowSub, { color: colors.bone, marginTop: 4 }]}>{r.artist}</Text>
+                  <FormattedShowTitle title={r.title} color={r.isLive ? colors.green : colors.text} size={22} style={type.rowTitle} />
+                  <Text style={[type.rowSub, { color: colors.text, marginTop: 4 }]}>{r.artist}</Text>
                 </View>
               </Pressable>
             ))}

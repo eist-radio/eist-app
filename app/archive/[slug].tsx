@@ -132,7 +132,7 @@ export default function ArchiveShowScreen() {
               {show.artistName}
             </Text>
           </Pressable>
-          <Text style={[t.meta, { color: colors.bone }]}>
+          <Text style={[t.meta, { color: colors.text }]}>
             {`· ${formatDate(show.start)}`}
           </Text>
         </View>
@@ -176,7 +176,7 @@ export default function ArchiveShowScreen() {
         {paragraphs.map((p, i) => (
           <Text
             key={i}
-            style={[t.bio, { color: colors.bone, marginTop: i === 0 ? 30 : 14 }]}
+            style={[t.bio, { color: colors.text, marginTop: i === 0 ? 30 : 14 }]}
           >
             {p}
           </Text>
@@ -208,7 +208,7 @@ export default function ArchiveShowScreen() {
                     style={t.rowTitle}
                   />
                   <Text
-                    style={[t.rowSub, { color: colors.bone, marginTop: 4 }]}
+                    style={[t.rowSub, { color: colors.text, marginTop: 4 }]}
                   >
                     {formatDate(r.start)}
                   </Text>

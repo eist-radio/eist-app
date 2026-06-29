@@ -248,7 +248,7 @@ export default function ShowScreen() {
               </Text>
             </Pressable>
           ) : null}
-          <Text style={[t.meta, { color: colors.bone }]}>
+          <Text style={[t.meta, { color: colors.text }]}>
             {hosts[0]?.name
               ? `· ${dateString}, ${timeString}`
               : `${dateString}, ${timeString}`}
@@ -262,7 +262,7 @@ export default function ShowScreen() {
         />
 
         {plain ? (
-          <Text style={[t.bio, { color: colors.bone, marginTop: 26 }]}>
+          <Text style={[t.bio, { color: colors.text, marginTop: 26 }]}>
             {plain}
           </Text>
         ) : null}

@@ -4,8 +4,8 @@ import { TextStyle } from 'react-native';
 export const colors = {
   purple: '#4733FF',
   green: '#AFFC41',
-  bone: '#EFE9DA',
-  boneDim: 'rgba(239,233,218,0.55)',
+  text: 'rgba(175,252,65,0.9)',
+  textDim: 'rgba(175,252,65,0.55)',
   pillDim: 'rgba(175,252,65,0.28)',
 } as const;
 
@@ -15,7 +15,7 @@ export const font = {
   body: 'FunnelSans',
 } as const;
 
-export const PAGE_COUNT = 5;
+export const PAGE_COUNT = 6;
 export const space = { screenX: 30, topGap: 6 } as const;
 
 // shared text fragments (colour applied at call site)

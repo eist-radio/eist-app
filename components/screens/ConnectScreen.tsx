@@ -11,6 +11,7 @@ const LINKS = [
   { label: 'SoundCloud', url: 'https://soundcloud.com/eistcork' },
   { label: 'Mixcloud', url: 'https://www.mixcloud.com/eistcork/' },
   { label: 'Website', url: 'https://eist.radio' },
+  { label: 'Support us', url: 'https://eist.radio/support/' },
   { label: 'Email', url: 'mailto:info@eist.radio' },
 ];
 
@@ -25,7 +26,7 @@ export default function ConnectScreen({ pageIndex }: { pageIndex: number; isActi
           </Pressable>
         ))}
       </ScrollView>
-      <Text style={[type.eyebrow, { color: colors.boneDim }]}>
+      <Text style={[type.eyebrow, { color: colors.textDim }]}>
         éist · Cork, Ireland
       </Text>
     </PageScaffold>
