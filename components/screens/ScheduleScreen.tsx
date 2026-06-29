@@ -284,7 +284,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
     for (const sec of sections) {
       for (const it of sec.data) {
         const id = it.artistIds?.[0]
-        if (id && !artistMapping?.[id]?.name && !artistsById[id] && !extraNames[id]) missing.add(id)
+        if (id && !artistMapping?.[id]?.name && !artistsById[id] && !(id in extraNames)) missing.add(id)
       }
     }
     if (missing.size === 0) return
@@ -306,11 +306,12 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
         })
       )
       if (cancelled) return
-      const resolved = entries.filter(([, name]) => name)
-      if (resolved.length > 0) {
+      // Record every fetched id — including empties/not-found (cached as '') —
+      // so unresolved ids aren't re-fetched on every sections/extraNames change.
+      if (entries.length > 0) {
         setExtraNames((prev) => {
           const next = { ...prev }
-          for (const [id, name] of resolved) next[id] = name
+          for (const [id, name] of entries) next[id] = name
           return next
         })
       }
