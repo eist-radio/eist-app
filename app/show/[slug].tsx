@@ -17,6 +17,7 @@ import { useNotifications } from '../../hooks/useNotifications';
 import { useTimezoneChange } from '../../hooks/useTimezoneChange';
 import { colors, font, type as t } from '../../theme/tokens';
 import { stripFormatting } from '../../utils/stripFormatting';
+import { formatClockTime } from '../../utils/formatTime';
 
 const STATION_ID = 'eist-radio';
 const fallbackImage = require('../../assets/images/eist_online.png');
@@ -77,14 +78,7 @@ async function fetchHostArtist(artistId: string): Promise<Artist> {
 }
 
 function formatShowTime(start: string, end: string, timezone: string): string {
-  const startDate = new Date(start);
-
-  return startDate.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-    timeZone: timezone,
-  });
+  return formatClockTime(start, timezone);
 }
 
 function formatShowDate(start: string, timezone: string): string {
@@ -199,7 +193,14 @@ export default function ShowScreen() {
     hosts[0]?.logo?.['512x512'] ||
     hosts[0]?.logo?.['256x256'] ||
     hosts[0]?.logo?.default;
-  const imageSource = artistImageUrl && !imageFailed ? { uri: artistImageUrl } : fallbackImage;
+  // While the first host query is still resolving we don't yet know whether an
+  // artist image exists — render no image rather than flashing the fallback.
+  const firstHostPending = Boolean(hostIds[0]) && host1.isLoading;
+  const imageSource = artistImageUrl && !imageFailed
+    ? { uri: artistImageUrl }
+    : firstHostPending
+      ? null
+      : fallbackImage;
 
   return (
     <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>

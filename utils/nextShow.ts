@@ -5,6 +5,7 @@
 // artist detail page and the Active reminders screen.
 
 import { apiKey } from '../config';
+import { formatClockTime } from './formatTime';
 
 const STATION_ID = 'eist-radio';
 
@@ -76,14 +77,7 @@ export function formatNextShowDate(isoString: string): string {
   const tomorrowStr = tomorrowDate.toISOString().split('T')[0];
   const showDateStr = showTime.toISOString().split('T')[0];
 
-  const timeStr = showTime
-    .toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    })
-    .toLowerCase()
-    .replace(' ', '');
+  const timeStr = formatClockTime(showTime);
 
   if (showDateStr === todayStr) {
     return `Today, ${timeStr}`;

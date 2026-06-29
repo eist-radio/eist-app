@@ -58,12 +58,15 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
   const [artistName, setArtistName] = useState('éist · off air')
   const [remoteImageUrl, setRemoteImageUrl] = useState<string | null>(null)
   const [imageFailed, setImageFailed] = useState(false)
-  const [broadcastStatus, setBroadcastStatus] = useState('off air')
+  // 'loading' is the initial, undetermined state (before the first schedule
+  // fetch resolves) — distinct from a real 'off air'/'error' status so we can
+  // avoid flashing the offline placeholder before we know anything.
+  const [broadcastStatus, setBroadcastStatus] = useState('loading')
   const [nextShowId, setNextShowId] = useState<string | null>(null)
   const [nextShowTitle, setNextShowTitle] = useState('')
   const [artistId, setArtistId] = useState<string | null>(null)
   const [currentShowId, setCurrentShowId] = useState<string | null>(null)
-  const [, setIsContentLoading] = useState(false)
+  const [isContentLoading, setIsContentLoading] = useState(false)
   const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
   const [isCarConnected, setIsCarConnected] = useState(false)
   const carRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -533,10 +536,30 @@ export default function ListenScreen({ pageIndex, isActive }: { pageIndex: numbe
     }
   }, [togglePlayStop])
 
+  // Image priority:
+  //  - live with a usable artist image → that image (persists across refreshes)
+  //  - live but still resolving the artist → nothing (avoid placeholder flash)
+  //  - live with no/failed artist image → eist_online.png default
+  //  - off air / error → eist_offline.png
+  //  - initial undetermined load → nothing
+  let artworkSource: React.ComponentProps<typeof ShowArtworkBackground>['source']
+  if (broadcastStatus === 'schedule') {
+    artworkSource =
+      remoteImageUrl && !imageFailed
+        ? { uri: remoteImageUrl }
+        : isContentLoading
+          ? null
+          : placeholderArtistImage
+  } else if (broadcastStatus === 'loading') {
+    artworkSource = null
+  } else {
+    artworkSource = placeholderOfflineImage
+  }
+
   return (
     <PageScaffold left={<Pills active={pageIndex} />} transparentBg>
       <ShowArtworkBackground
-        source={broadcastStatus === 'schedule' && remoteImageUrl && !imageFailed ? { uri: remoteImageUrl } : placeholderOfflineImage}
+        source={artworkSource}
         onError={() => setImageFailed(true)} />
 
       <View style={s.onair}><View style={s.dot} /><Eyebrow color={colors.green}>on air</Eyebrow></View>

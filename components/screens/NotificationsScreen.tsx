@@ -11,17 +11,17 @@ import { PageScaffold } from '../ui/PageScaffold';
 import { Pills } from '../ui/Pills';
 import { Eyebrow } from '../ui/Eyebrow';
 import { FormattedShowTitle } from '../FormattedShowTitle';
+import { formatClockTime } from '../../utils/formatTime';
 
 function formatReminderDate(iso: string): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleString(undefined, {
+  const datePart = d.toLocaleDateString(undefined, {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
   });
+  return `${datePart}, ${formatClockTime(d)}`;
 }
 
 function ClearButton({ onPress, label }: { onPress: () => void; label: string }) {

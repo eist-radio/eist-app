@@ -10,6 +10,7 @@ import { FormattedShowTitle } from '../FormattedShowTitle'
 import { apiKey } from '../../config'
 import { useArtistMapping, useArtists } from '../../hooks/useArtists'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
+import { formatClockTime } from '../../utils/formatTime'
 
 const STATION_ID = 'eist-radio'
 const NUM_DAYS = 7
@@ -101,17 +102,7 @@ function groupByDate(items: RawScheduleItem[], currentTimezone: string): Section
     }
   })
 
-  const formatTime = (utcString: string) => {
-    const d = new Date(utcString)
-    return d
-      .toLocaleTimeString('en-US', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: currentTimezone,
-      })
-      .replace(':00 ', ' ') // drop :00 but keep AM/PM
-  }
+  const formatTime = (utcString: string) => formatClockTime(utcString, currentTimezone)
 
   const getDayName = (dateKey: string): string => {
     if (dateKey === todayKey) return 'Today'

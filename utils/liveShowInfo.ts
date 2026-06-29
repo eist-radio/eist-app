@@ -1,4 +1,5 @@
 import { apiKey } from '../config'
+import { formatClockTime } from './formatTime'
 
 const STATION_ID = 'eist-radio'
 const API_BASE = `https://api.radiocult.fm/api/station/${STATION_ID}`
@@ -40,12 +41,6 @@ function resolveTimeZone(timeZone?: string) {
 export function formatShowTimeRange(start?: string, end?: string, timeZone?: string) {
   if (!start || !end) return ''
   const tz = resolveTimeZone(timeZone)
-  const formatter = new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: tz,
-  })
 
   const startDate = new Date(start)
   const endDate = new Date(end)
@@ -53,7 +48,7 @@ export function formatShowTimeRange(start?: string, end?: string, timeZone?: str
     return ''
   }
 
-  return `${formatter.format(startDate)}–${formatter.format(endDate)}`
+  return `${formatClockTime(startDate, tz)}–${formatClockTime(endDate, tz)}`
 }
 
 async function fetchArtistInfo(artistId: string, headers: Record<string, string>): Promise<ArtistInfo> {
