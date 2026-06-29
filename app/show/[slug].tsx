@@ -52,11 +52,15 @@ type Artist = {
 };
 
 async function fetchEventById(id: string): Promise<RawScheduleItem> {
-  const today = new Date();
-  const end = new Date(today);
+  // Start the window one day earlier (yesterday 00:00) so a show that began
+  // before today's UTC midnight — including the currently-live and late-night
+  // shows — still falls inside the lookup range (matches ScheduleScreen).
+  const start = new Date();
+  start.setDate(start.getDate() - 1);
+  const end = new Date();
   end.setDate(end.getDate() + 7);
 
-  const startIso = `${today.toISOString().split('T')[0]}T00:00:00Z`;
+  const startIso = `${start.toISOString().split('T')[0]}T00:00:00Z`;
   const endIso = `${end.toISOString().split('T')[0]}T23:59:59Z`;
 
   const url =
@@ -121,7 +125,7 @@ export default function ShowScreen() {
   const [imageFailed, setImageFailed] = useState(false);
 
   // All hooks must run before any early return (rules of hooks)
-  const { data: event } = useQuery({
+  const { data: event, isError: eventNotFound } = useQuery({
     queryKey: ['show', slug],
     queryFn: () => fetchEventById(slug || ''),
     enabled: !!slug,
@@ -181,7 +185,15 @@ export default function ShowScreen() {
 
   // Loading / not-found guard
   if (!event) {
-    return <PageScaffold left={<HeaderLeftNav />}>{null}</PageScaffold>;
+    return (
+      <PageScaffold left={<HeaderLeftNav />}>
+        {eventNotFound ? (
+          <Text style={[t.bio, { color: colors.text, marginTop: 26 }]}>
+            Show not found.
+          </Text>
+        ) : null}
+      </PageScaffold>
+    );
   }
 
   const plain = stripFormatting(event.description?.content || []);
