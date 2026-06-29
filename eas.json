@@ -27,6 +27,9 @@
       "node": "20.18.1",
       "autoIncrement": "true",
       "distribution": "store",
+      "ios": {
+        "image": "latest"
+      },
       "env": {
         "API_KEY": "@API_KEY",
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
@@ -37,6 +40,9 @@
       "node": "20.18.1",
       "autoIncrement": true,
       "distribution": "store",
+      "ios": {
+        "image": "latest"
+      },
       "env": {
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
         "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"

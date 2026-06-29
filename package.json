@@ -5,7 +5,8 @@
         "exclude": [
           "react-native-track-player",
           "@fortawesome/fontawesome-svg-core",
-          "@fortawesome/free-brands-svg-icons"
+          "@fortawesome/free-brands-svg-icons",
+          "react-native-dotenv"
         ],
         "listUnknownPackages": false
       }
@@ -34,7 +35,7 @@
     "@react-navigation/native": "^7.1.6",
     "@tanstack/react-query": "^5.77.2",
     "ajv": "^6.12.6",
-    "expo": "~53.0.26",
+    "expo": "~53.0.27",
     "expo-audio": "~0.4.9",
     "expo-blur": "~14.1.5",
     "expo-clipboard": "~7.1.5",
