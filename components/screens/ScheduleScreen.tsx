@@ -346,7 +346,7 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
 
   // Try to satisfy a pending centring request. Called after every layout event
   // (and from the effects) so it fires the instant the live row is measured.
-  const maybeCenter = useCallback(() => {
+  const maybeScrollToNow = useCallback(() => {
     if (!pending.current) return
     const animated = pendingAnimated.current
     const id = currentShowId
@@ -354,7 +354,10 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
       const r = rowOffsets.current[id]
       if (r && dayOffsets.current[r.day] != null) {
         const absY = dayOffsets.current[r.day] + r.y
-        const target = Math.max(0, absY - viewportH.current / 2 + r.h / 2)
+        // Top-align the live row so it reads as the first item under the day
+        // heading. Centring it (the old behaviour) left Yesterday's rows — and
+        // the "Yesterday" heading — showing above it for early-morning shows.
+        const target = Math.max(0, absY)
         scrollRef.current?.scrollTo({ y: target, animated })
         pending.current = false
       }
@@ -368,21 +371,21 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
     }
   }, [currentShowId])
 
-  const requestCenter = useCallback((animated: boolean) => {
+  const requestScrollToNow = useCallback((animated: boolean) => {
     pending.current = true
     pendingAnimated.current = animated
-    requestAnimationFrame(maybeCenter)
-  }, [maybeCenter])
+    requestAnimationFrame(maybeScrollToNow)
+  }, [maybeScrollToNow])
 
   // Centre on the current show on first load / whenever it changes, and each
   // time the page is swiped back into view.
   useEffect(() => {
-    requestCenter(false)
-  }, [currentShowId, requestCenter])
+    requestScrollToNow(false)
+  }, [currentShowId, requestScrollToNow])
 
   useEffect(() => {
-    if (isActive) requestCenter(true)
-  }, [isActive, requestCenter])
+    if (isActive) requestScrollToNow(true)
+  }, [isActive, requestScrollToNow])
 
   const onScroll = (e: { nativeEvent: { contentOffset: { y: number } } }) => {
     const y = e.nativeEvent.contentOffset.y + 8
@@ -409,14 +412,14 @@ export default function ScheduleScreen({ pageIndex, isActive }: { pageIndex: num
         {days.map((d) => (
           <View
             key={d.key}
-            onLayout={(e) => { dayOffsets.current[d.dayName] = e.nativeEvent.layout.y; maybeCenter() }}
+            onLayout={(e) => { dayOffsets.current[d.dayName] = e.nativeEvent.layout.y; maybeScrollToNow() }}
           >
             {d.rows.map((r) => (
               <Pressable
                 key={r.id}
                 style={s.row}
                 onPress={() => router.push(`/show/${r.id}`)}
-                onLayout={(e) => { rowOffsets.current[r.id] = { day: d.dayName, y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height }; maybeCenter() }}
+                onLayout={(e) => { rowOffsets.current[r.id] = { day: d.dayName, y: e.nativeEvent.layout.y, h: e.nativeEvent.layout.height }; maybeScrollToNow() }}
               >
                 <View style={s.timeCol}>
                   {r.isLive ? (
