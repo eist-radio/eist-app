@@ -33,7 +33,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       iosStartDiscoveryAfterFirstTapOnCastButton: false,
       iosSuspendSessionsWhenBackgrounded: false
     }],
-    "./plugins/withAndroidAuto"
+    "./plugins/withAndroidAuto",
+    "./plugins/withFmtConstevalFix"
   ],
   ios: {
     ...config.ios,

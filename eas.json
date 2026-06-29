@@ -28,7 +28,7 @@
       "autoIncrement": "true",
       "distribution": "store",
       "ios": {
-        "image": "latest"
+        "image": "macos-tahoe-26.4-xcode-26.4"
       },
       "env": {
         "API_KEY": "@API_KEY",
@@ -41,7 +41,7 @@
       "autoIncrement": true,
       "distribution": "store",
       "ios": {
-        "image": "latest"
+        "image": "macos-tahoe-26.4-xcode-26.4"
       },
       "env": {
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
