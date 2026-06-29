@@ -242,7 +242,7 @@ export default function ArtistScreen() {
     <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>
       <ShowArtworkBackground source={imageSource} onError={() => setImageFailed(true)} />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Eyebrow color={colors.text}>host</Eyebrow>
+        <Eyebrow>host</Eyebrow>
 
         <Text style={[t.pagehead, { color: colors.green, marginTop: 8 }]}>
           {artist.name}

@@ -88,7 +88,7 @@ export default function ArchiveShowScreen() {
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 40 }}
       >
-        <Eyebrow color={colors.text}>listen back</Eyebrow>
+        <Eyebrow>listen back</Eyebrow>
 
         <View style={{ height: 18 }} />
 

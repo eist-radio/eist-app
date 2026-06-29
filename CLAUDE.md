@@ -98,7 +98,8 @@ Two distinct backends — keep them straight:
 - **éist worker API** (`EIST_API_BASE_URL` = `https://eist-api.johnocallaghan.workers.dev`, endpoints in `EIST_API_ENDPOINTS`): archive shows and artist stats/mapping. Used by `hooks/useArchiveShows.ts` and `hooks/useArtists.ts`. **This is production code.** Source lives in `workers/eist-api/` (a separate Cloudflare Worker project with its own deps/tsconfig — its TypeScript errors are unrelated to the app build).
 
 #### Theming (`theme/tokens.ts`)
-- `colors` — `purple` (bg), `green` (`#AFFC41`), `text` (`#E7E5E5` "Alabaster gray", secondary text), `textDim` (translucent gray for eyebrows/placeholders), `pillDim`. There is **no** `bone`/`boneDim` token (renamed to `text`/`textDim`).
+- `colors` — `purple` (bg), `green` (`#AFFC41`), `text` (`#E7E5E5` "Alabaster gray", secondary text), `textDim` (translucent gray for placeholders), `pillDim`. There is **no** `bone`/`boneDim` token (renamed to `text`/`textDim`).
+- **Eyebrows** (`components/ui/Eyebrow.tsx`) default to `text` (Alabaster gray); the only green eyebrow is the Listen screen "on air" live indicator (explicit `color={colors.green}`).
 - **Colour convention:** `green` is used for headings/titles, links, and the "now playing" context — the Listen screen's current-show artist and the schedule live ("NOW") row (whole row green). `text`/`textDim` (gray) is for all other secondary text — body/descriptions, dates/times, captions, and **artist-name subtitles in lists** (archive, non-live schedule rows).
 - `font`, `type` (shared text-style fragments; colour applied at call site), `space`, `PAGE_COUNT`.
 
