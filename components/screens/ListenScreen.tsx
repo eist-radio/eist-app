@@ -555,13 +555,19 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     artworkSource = placeholderOfflineImage
   }
 
+  // Match the other pages' frozen indicator: green "live now: <DJ>" when live,
+  // dimmed "off air" otherwise.
+  const isLive = broadcastStatus === 'schedule'
+  const liveTint = isLive ? colors.green : colors.textDim
+  const liveLabel = isLive ? `live now: ${artistName || 'éist'}` : 'off air'
+
   return (
     <PageScaffold transparentBg>
       <ShowArtworkBackground
         source={artworkSource}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}><View style={s.dot} /><Eyebrow color={colors.green}>on air</Eyebrow></View>
+      <View style={s.onair}><View style={[s.dot, { backgroundColor: liveTint }]} /><Eyebrow color={liveTint}>{liveLabel}</Eyebrow></View>
       <View style={s.castRow}>
         <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.text} />
       </View>
