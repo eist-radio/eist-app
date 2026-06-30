@@ -568,9 +568,9 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         source={artworkSource}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}><MaterialCommunityIcons name="headphones" size={17} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></View>
+      <View style={s.onair}><MaterialCommunityIcons name="headphones" size={19} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></View>
       <View style={s.castRow}>
-        <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.text} />
+        <CastButton size={31} tintColor={isCastConnected ? colors.green : colors.text} />
       </View>
 
       <View style={{ flex: 1 }} />
@@ -622,5 +622,5 @@ const s = StyleSheet.create({
   upNext: { marginTop: 22, gap: 6 },
   upNextText: { fontFamily: font.body, fontWeight: '500', fontSize: 16, color: colors.text },
   player: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 30 },
-  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 17, letterSpacing: 0.2, color: colors.green },
+  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 20, letterSpacing: 0.2, color: colors.green },
 });

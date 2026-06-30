@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Platform } from 'react-native'
+import { AppState, Platform } from 'react-native'
 import {
   loadMediaOnCast,
   updateCastMediaMetadata,
@@ -90,6 +90,12 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
 
   // Media status polling interval
   const mediaStatusInterval = useRef<NodeJS.Timeout | null>(null)
+  // Independent cast-state polling interval. Keeps castState (and therefore the
+  // Cast button colour) in sync with the real session even when the
+  // onCastStateChanged event is missed — e.g. events that fire while JS is
+  // suspended in the background, so the button doesn't go stale/grey while a
+  // cast is still active after returning to the app.
+  const castStateInterval = useRef<NodeJS.Timeout | null>(null)
 
   // Initialize cast and set up listeners
   useEffect(() => {
@@ -100,12 +106,39 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     let castStateSubscription: any
     let sessionStartedSubscription: any
     let sessionEndedSubscription: any
+    let appStateSubscription: any
+
+    // Re-read the authoritative cast state from the SDK and reconcile our
+    // React state with it. Cheap native call; setState bails out when the
+    // value is unchanged, so polling this does not cause needless re-renders.
+    const syncCastState = async () => {
+      try {
+        const currentState = await GoogleCast.getCastState()
+        setCastState(currentState)
+
+        if (currentState === CAST_STATE.CONNECTED) {
+          // Make sure the device name reflects the live session (it can be
+          // lost if the onSessionStarted event was missed while backgrounded).
+          try {
+            const sessionManager = GoogleCast.getSessionManager()
+            const session = await sessionManager.getCurrentCastSession()
+            if (session) {
+              const device = await session.getCastDevice()
+              setCastDeviceName(device?.friendlyName || 'Cast Device')
+            }
+          } catch (e) {
+            // Session not ready yet — leave the existing name in place.
+          }
+        }
+      } catch (error) {
+        // Silently ignore transient SDK errors; next poll will retry.
+      }
+    }
 
     const initializeCast = async () => {
       try {
         // Get initial cast state
-        const currentState = await GoogleCast.getCastState()
-        setCastState(currentState)
+        await syncCastState()
 
         // Listen for cast state changes
         castStateSubscription = GoogleCast.onCastStateChanged((state: string) => {
@@ -129,6 +162,17 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
           setIsCastPlaying(false)
         })
 
+        // Independent poller: keeps the button state accurate regardless of
+        // whether change events arrive.
+        castStateInterval.current = setInterval(syncCastState, 3000)
+
+        // Resync immediately whenever the app returns to the foreground, so
+        // the button reflects the true state without waiting for the next poll.
+        appStateSubscription = AppState.addEventListener('change', (next) => {
+          if (next === 'active') {
+            syncCastState()
+          }
+        })
       } catch (error) {
         console.error('Failed to initialize cast:', error)
       }
@@ -140,6 +184,11 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
       castStateSubscription?.remove?.()
       sessionStartedSubscription?.remove?.()
       sessionEndedSubscription?.remove?.()
+      appStateSubscription?.remove?.()
+      if (castStateInterval.current) {
+        clearInterval(castStateInterval.current)
+        castStateInterval.current = null
+      }
     }
   }, [isWeb])
 
