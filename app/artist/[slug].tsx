@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -70,6 +71,29 @@ async function fetchArtistById(id: string): Promise<RawArtist> {
   const json = (await res.json()) as { artist?: RawArtist };
   if (!json.artist) throw new Error('Artist not found');
   return json.artist;
+}
+
+// RadioCult socials are inconsistent: instagram/mixcloud are bare handles
+// (sometimes @-prefixed), soundcloud is a handle OR a full URL, site is a full
+// URL. Resolve each to an absolute URL, accepting either form.
+function resolveSocialUrl(value: string, base: string): string {
+  const v = value.trim();
+  if (/^https?:\/\//i.test(v)) return v;
+  return base + v.replace(/^@/, '');
+}
+
+function buildArtistLinks(socials?: RawArtist['socials']): { label: string; url: string }[] {
+  if (!socials) return [];
+  const links: { label: string; url: string }[] = [];
+  if (socials.instagramHandle)
+    links.push({ label: 'Instagram', url: resolveSocialUrl(socials.instagramHandle, 'https://instagram.com/') });
+  if (socials.soundcloud)
+    links.push({ label: 'SoundCloud', url: resolveSocialUrl(socials.soundcloud, 'https://soundcloud.com/') });
+  if (socials.mixcloud)
+    links.push({ label: 'Mixcloud', url: resolveSocialUrl(socials.mixcloud, 'https://www.mixcloud.com/') });
+  if (socials.site)
+    links.push({ label: 'Website', url: resolveSocialUrl(socials.site, 'https://') });
+  return links;
 }
 
 export default function ArtistScreen() {
@@ -147,6 +171,7 @@ export default function ArtistScreen() {
   }
 
   const plain = stripFormatting(artist.description?.content);
+  const artistLinks = buildArtistLinks(artist.socials);
   const tags = artist.tags ?? [];
 
   // Extract genres from tags
@@ -198,6 +223,19 @@ export default function ArtistScreen() {
             {plain}
           </Text>
         ) : null}
+
+        {artistLinks.length > 0 && (
+          <Text style={[t.meta, { marginTop: 18 }]}>
+            {artistLinks.map((l, i) => (
+              <Text key={l.label}>
+                {i > 0 ? <Text style={{ color: colors.textDim }}>{'  /  '}</Text> : null}
+                <Text style={{ color: colors.green }} onPress={() => Linking.openURL(l.url)}>
+                  {l.label}
+                </Text>
+              </Text>
+            ))}
+          </Text>
+        )}
 
         {archivedShows.length > 0 && (
           <View style={{ marginTop: 34, marginBottom: 12 }}>
