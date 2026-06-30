@@ -2,8 +2,9 @@
 
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { Ionicons } from '@expo/vector-icons';
+import NetInfo from '@react-native-community/netinfo';
 import { ThemeProvider } from '@react-navigation/native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, onlineManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -11,6 +12,8 @@ import React, { Suspense, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Animated,
+    AppState,
+    AppStateStatus,
     Image,
     Platform,
     StyleSheet,
@@ -20,6 +23,20 @@ import { CastProvider } from '../context/CastContext';
 import { NotificationProvider } from '../context/NotificationContext';
 import { TrackPlayerProvider } from '../context/TrackPlayerContext';
 import { EistDarkTheme, EistLightTheme } from '../themes';
+
+// React Query doesn't know about connectivity in React Native unless wired up.
+// Without this it assumes "always online", so queries that fail in airplane
+// mode exhaust their retries and never refetch when the network returns —
+// leaving the Artists and Listen-back pages stuck empty. Wiring onlineManager
+// to NetInfo makes offline queries pause and automatically resume/refetch on
+// reconnect.
+if (Platform.OS !== 'web') {
+  onlineManager.setEventListener((setOnline) => {
+    return NetInfo.addEventListener((state) => {
+      setOnline(!!state.isConnected);
+    });
+  });
+}
 
 const queryClient = new QueryClient();
 
@@ -41,6 +58,18 @@ export default function RootLayout() {
 
   const scheme = useColorScheme();
   const theme = scheme === 'dark' ? EistDarkTheme : EistLightTheme;
+
+  // Tell React Query when the app is foregrounded so it can refetch stale
+  // queries on return (complements onlineManager for the navigate-away case).
+  useEffect(() => {
+    const onAppStateChange = (status: AppStateStatus) => {
+      if (Platform.OS !== 'web') {
+        focusManager.setFocused(status === 'active');
+      }
+    };
+    const sub = AppState.addEventListener('change', onAppStateChange);
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     const prepareApp = async () => {

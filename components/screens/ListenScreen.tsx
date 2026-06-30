@@ -559,6 +559,11 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   // Match the other pages' frozen indicator: green "live now: <DJ>" when live,
   // dimmed "off air" otherwise.
   const isLive = broadcastStatus === 'schedule'
+  // Don't show an indicator until the real state is known: the initial
+  // 'loading' status, or live-but-artist-still-resolving (artistName is still
+  // the off-air placeholder), would otherwise flash "live now: éist · off air".
+  const isStateResolving =
+    broadcastStatus === 'loading' || (isLive && artistName === 'éist · off air')
   const liveTint = isLive ? colors.green : colors.textDim
   const liveLabel = isLive ? `live now: ${artistName || 'éist'}` : 'off air'
 
@@ -568,7 +573,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         source={artworkSource}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}><MaterialCommunityIcons name="headphones" size={19} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></View>
+      <View style={s.onair}>{!isStateResolving && (<><MaterialCommunityIcons name="headphones" size={19} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></>)}</View>
       <View style={s.castRow}>
         <CastButton size={31} tintColor={isCastConnected ? colors.green : colors.text} />
       </View>
@@ -594,7 +599,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
           onPress={() => nextShowId && router.push(`/show/${nextShowId}` as any)}
           disabled={!nextShowId}
         >
-          <Eyebrow>up next</Eyebrow>
+          <Eyebrow>up next:</Eyebrow>
           <Text style={s.upNextText} numberOfLines={1}>
             {nextShowTitle}
           </Text>
