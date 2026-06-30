@@ -16,7 +16,14 @@ export function PageScaffold({
         <View>{right}</View>
       </View>
       <View style={[styles.content, { paddingTop: insets.top + 86 }]}>
-        {liveNow && <LiveNowIndicator />}
+        {/* zIndex keeps the indicator above detail pages' absolute-fill
+            ShowArtworkBackground, which is a later sibling and would otherwise
+            paint over it. */}
+        {liveNow && (
+          <View style={styles.liveNow}>
+            <LiveNowIndicator />
+          </View>
+        )}
         {children}
       </View>
     </View>
@@ -26,4 +33,5 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   top: { position: 'absolute', left: space.screenX, right: space.screenX, zIndex: 5, height: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   content: { flex: 1, paddingHorizontal: space.screenX, paddingBottom: 40 },
+  liveNow: { zIndex: 2 },
 });
