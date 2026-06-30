@@ -87,6 +87,24 @@ Scan the start QR code to build and serve in the dev server
 
 Make changes and uprev the `app.json` version.
 
+### Both platforms in one command
+
+Build iOS + Android together, and submit both to the stores:
+
+```cmd
+eas build --platform all --profile production --auto-submit
+```
+
+This requires submit credentials for **both** platforms in `eas.json` (`submit.production`):
+
+- **Android** — `serviceAccountKeyPath` → `./google-service-account.json` (already configured).
+- **iOS** — an App Store Connect API key. Create one in App Store Connect → Users and Access → Integrations → App Store Connect API, download the `.p8`, save it as `./asc-api-key.p8` (git-ignored), then fill in the placeholders in `eas.json`:
+  - `ascApiKeyId` — the key's Key ID
+  - `ascApiKeyIssuerId` — the Issuer ID shown on the same page
+  - `ascAppId` — the app's Apple ID (App Store Connect → App → App Information → "Apple ID")
+
+Until the iOS placeholders are filled in, `--auto-submit` submits Android and fails on the iOS submit step. To build both without submitting, drop `--auto-submit`.
+
 ### iOS
 
 **Note:** You must have an Apple developer licence.

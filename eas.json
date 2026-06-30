@@ -55,6 +55,12 @@
         "serviceAccountKeyPath": "./google-service-account.json",
         "track": "internal",
         "releaseStatus": "draft"
+      },
+      "ios": {
+        "ascApiKeyPath": "./asc-api-key.p8",
+        "ascApiKeyId": "REPLACE_ASC_KEY_ID",
+        "ascApiKeyIssuerId": "REPLACE_ASC_ISSUER_ID",
+        "ascAppId": "REPLACE_APP_STORE_CONNECT_APP_ID"
       }
     }
   }

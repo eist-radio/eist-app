@@ -568,7 +568,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         source={artworkSource}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}><MaterialCommunityIcons name="headphones" size={17} color={colors.green} /><Eyebrow color={liveTint}>{liveLabel}</Eyebrow></View>
+      <View style={s.onair}><MaterialCommunityIcons name="headphones" size={17} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></View>
       <View style={s.castRow}>
         <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.text} />
       </View>
@@ -612,7 +612,9 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
 }
 
 const s = StyleSheet.create({
-  onair: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  // paddingRight matches LiveNowIndicator so the line clears the top-right
+  // spinning logo and wraps consistently with the other pages.
+  onair: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 96 },
   castRow: { marginTop: 18, marginBottom: 20 },
   title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 33, lineHeight: 34, letterSpacing: -0.5, color: colors.green },
   artist: { fontFamily: font.body, fontWeight: '500', fontSize: 20, color: colors.green, marginTop: 9 },
