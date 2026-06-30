@@ -89,6 +89,8 @@ export default function ArchiveShowScreen() {
           title={show.title}
           color={colors.green}
           size={34}
+          numberOfLines={4}
+          adjustsFontSizeToFit
           style={{
             fontFamily: font.headingBold,
             fontWeight: '700',

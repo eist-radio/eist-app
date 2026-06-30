@@ -581,6 +581,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
           size={33}
           style={s.title}
           numberOfLines={3}
+          adjustsFontSizeToFit
         />
       </Pressable>
       <Pressable onPress={() => artistId && router.push(`/artist/${artistId}` as any)} disabled={!artistId}>

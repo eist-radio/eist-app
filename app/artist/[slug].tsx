@@ -192,7 +192,12 @@ export default function ArtistScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Eyebrow>host</Eyebrow>
 
-        <Text style={[t.pagehead, { color: colors.green, marginTop: 8 }]}>
+        <Text
+          style={[t.pagehead, { color: colors.green, marginTop: 8 }]}
+          numberOfLines={3}
+          adjustsFontSizeToFit
+          minimumFontScale={0.5}
+        >
           {artist.name}
         </Text>
 

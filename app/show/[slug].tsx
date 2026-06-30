@@ -224,6 +224,8 @@ export default function ShowScreen() {
           title={event.title}
           color={colors.green}
           size={40}
+          numberOfLines={4}
+          adjustsFontSizeToFit
           style={{
             fontFamily: font.headingBold,
             fontWeight: '700',
