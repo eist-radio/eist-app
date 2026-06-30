@@ -394,7 +394,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
       <Text style={[type.pagehead, { color: colors.green, marginTop: 8 }]}>{activeDay}</Text>
       <ScrollView
         ref={scrollRef}
-        style={{ marginTop: 32 }}
+        style={{ flex: 1, marginTop: 32 }}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={onScroll}

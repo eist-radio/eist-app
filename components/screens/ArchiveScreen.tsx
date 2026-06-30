@@ -60,7 +60,7 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
         returnKeyType="search"
         clearButtonMode="while-editing"
       />
-      <ScrollView style={{ marginTop: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" onScroll={onScroll} scrollEventThrottle={16}>
+      <ScrollView style={{ flex: 1, marginTop: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" onScroll={onScroll} scrollEventThrottle={16}>
         {items.map((it) => (
           <Pressable key={it.slug} style={s.row} onPress={() => router.push(`/archive/${it.slug}`)}>
             <View style={{ flex: 1 }}>

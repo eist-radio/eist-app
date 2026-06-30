@@ -33,7 +33,7 @@ export default function ArtistsScreen(_props: { pageIndex: number; isActive: boo
         returnKeyType="search"
         clearButtonMode="while-editing"
       />
-      <ScrollView style={{ marginTop: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView style={{ flex: 1, marginTop: 24 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {filtered.map((a) => (
           <Pressable key={a.slug} style={s.row} onPress={() => router.push(`/artist/${encodeURIComponent(a.slug)}?id=${encodeURIComponent(a.id)}`)}>
             <Text style={[type.rowTitle, { color: colors.green, flex: 1 }]}>{a.name}</Text>

@@ -140,7 +140,7 @@ export default function NotificationsScreen(_props: { pageIndex: number; isActiv
         </Text>
       ) : (
         <ScrollView
-          style={{ marginTop: 24 }}
+          style={{ flex: 1, marginTop: 24 }}
           contentContainerStyle={{ paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
         >
