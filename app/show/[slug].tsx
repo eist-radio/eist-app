@@ -215,7 +215,7 @@ export default function ShowScreen() {
       : fallbackImage;
 
   return (
-    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>
+    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg liveNow>
       <ShowArtworkBackground source={imageSource} onError={() => setImageFailed(true)} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <Eyebrow>coming up</Eyebrow>

@@ -71,7 +71,7 @@ export default function ArchiveShowScreen() {
     .filter((p) => p);
 
   return (
-    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>
+    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg liveNow>
       <ShowArtworkBackground
         source={imageSource}
         onError={() => setImageFailed(true)}

@@ -1,8 +1,9 @@
 // components/Pager.tsx
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBar, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PAGE_COUNT, colors, space } from '../theme/tokens';
+import { registerListenScroll } from '../utils/listenNav';
 import { PageScaffold } from './ui/PageScaffold';
 import { Pills } from './ui/Pills';
 import { SpinningLogo } from './ui/SpinningLogo';
@@ -19,13 +20,23 @@ export function Pager() {
   const [active, setActive] = useState(0);
   const insets = useSafeAreaInsets();
   const scrollX = useRef(new Animated.Value(0)).current;
+  const scrollRef = useRef<any>(null);
   const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
     setActive(Math.round(e.nativeEvent.contentOffset.x / width));
+
+  // Let the frozen LiveNowIndicator (on any page) swipe us back to Listen.
+  useEffect(() => {
+    registerListenScroll(() => {
+      scrollRef.current?.scrollTo?.({ x: 0, animated: true });
+      setActive(0);
+    });
+    return () => registerListenScroll(null);
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.purple }}>
       <StatusBar barStyle="light-content" />
-      <Animated.ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
+      <Animated.ScrollView ref={scrollRef} horizontal pagingEnabled showsHorizontalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
         onMomentumScrollEnd={onEnd} removeClippedSubviews={false}>

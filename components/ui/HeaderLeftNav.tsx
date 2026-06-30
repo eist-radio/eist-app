@@ -1,14 +1,13 @@
 import React from 'react';
 import { View } from 'react-native';
 import { BackTriangle } from './BackTriangle';
-import { HomeButton } from './HomeButton';
 
-// Back triangle on the left, home icon to its right.
+// Back triangle only. The home icon was removed — the frozen "live now" line
+// (LiveNowIndicator) now links back to the Listen page on every sub page.
 export function HeaderLeftNav() {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       <BackTriangle />
-      <HomeButton />
     </View>
   );
 }

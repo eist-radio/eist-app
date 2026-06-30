@@ -187,7 +187,7 @@ export default function ArtistScreen() {
   const imageSource = artistImageUrl && !imageFailed ? { uri: artistImageUrl } : fallbackImage;
 
   return (
-    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg>
+    <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg liveNow>
       <ShowArtworkBackground source={imageSource} onError={() => setImageFailed(true)} />
       <ScrollView showsVerticalScrollIndicator={false}>
         <Eyebrow>host</Eyebrow>

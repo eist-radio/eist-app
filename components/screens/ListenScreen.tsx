@@ -1,4 +1,5 @@
 // components/screens/ListenScreen.tsx
+import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -567,7 +568,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         source={artworkSource}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}><View style={[s.dot, { backgroundColor: liveTint }]} /><Eyebrow color={liveTint}>{liveLabel}</Eyebrow></View>
+      <View style={s.onair}><MaterialCommunityIcons name="headphones" size={17} color={liveTint} /><Eyebrow color={liveTint}>{liveLabel}</Eyebrow></View>
       <View style={s.castRow}>
         <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.text} />
       </View>
@@ -612,7 +613,6 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
 
 const s = StyleSheet.create({
   onair: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.green },
   castRow: { marginTop: 18, marginBottom: 20 },
   title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 33, lineHeight: 34, letterSpacing: -0.5, color: colors.green },
   artist: { fontFamily: font.body, fontWeight: '500', fontSize: 20, color: colors.green, marginTop: 9 },
