@@ -95,15 +95,18 @@ Build iOS + Android together, and submit both to the stores:
 eas build --platform all --profile production --auto-submit
 ```
 
-This requires submit credentials for **both** platforms in `eas.json` (`submit.production`):
+This requires submit credentials for **both** platforms:
 
-- **Android** — `serviceAccountKeyPath` → `./google-service-account.json` (already configured).
-- **iOS** — an App Store Connect API key. Create one in App Store Connect → Users and Access → Integrations → App Store Connect API, download the `.p8`, save it as `./asc-api-key.p8` (git-ignored), then fill in the placeholders in `eas.json`:
-  - `ascApiKeyId` — the key's Key ID
-  - `ascApiKeyIssuerId` — the Issuer ID shown on the same page
-  - `ascAppId` — the app's Apple ID (App Store Connect → App → App Information → "Apple ID")
+- **Android** — `serviceAccountKeyPath` → `./google-service-account.json` in `eas.json` (already configured).
+- **iOS** — an App Store Connect API key, managed by EAS. Set it up once with:
 
-Until the iOS placeholders are filled in, `--auto-submit` submits Android and fails on the iOS submit step. To build both without submitting, drop `--auto-submit`.
+  ```cmd
+  eas credentials --platform ios
+  ```
+
+  Choose **App Store Connect: Manage your API Key** and create/store the key. EAS then uses it automatically for submission; the app is resolved by its bundle ID (`com.oootini.eistapp`), so no key file or IDs are needed in `eas.json`.
+
+To build both without submitting, drop `--auto-submit`. If a submit ever can't resolve the app automatically, add the numeric Apple ID under `submit.production.ios` as `"ascAppId": "<App Store Connect Apple ID>"`.
 
 ### iOS
 
