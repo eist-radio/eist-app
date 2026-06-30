@@ -63,7 +63,7 @@ export function LiveNowIndicator() {
       accessibilityRole="link"
       accessibilityLabel="Go to Listen"
     >
-      <MaterialCommunityIcons name="headphones" size={17} color={tint} />
+      <MaterialCommunityIcons name="headphones" size={17} color={colors.green} />
       <Text style={[t.eyebrow, s.label, { color: tint }]}>{label}</Text>
     </Pressable>
   );

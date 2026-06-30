@@ -568,7 +568,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         source={artworkSource}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}><MaterialCommunityIcons name="headphones" size={17} color={liveTint} /><Eyebrow color={liveTint}>{liveLabel}</Eyebrow></View>
+      <View style={s.onair}><MaterialCommunityIcons name="headphones" size={17} color={colors.green} /><Eyebrow color={liveTint}>{liveLabel}</Eyebrow></View>
       <View style={s.castRow}>
         <CastButton size={26} tintColor={isCastConnected ? colors.green : colors.text} />
       </View>
