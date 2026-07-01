@@ -7,7 +7,7 @@ import { FormattedShowTitle } from '../../components/FormattedShowTitle';
 import { HeaderLeftNav } from '../../components/ui/HeaderLeftNav';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { PageScaffold } from '../../components/ui/PageScaffold';
-import { PlayDisc } from '../../components/ui/PlayDisc';
+import { PlatformDisc } from '../../components/ui/PlatformDisc';
 import { ShowArtworkBackground } from '../../components/ui/ShowArtworkBackground';
 import { SpinningLogo } from '../../components/ui/SpinningLogo';
 import { useArchiveShowBySlug } from '../../hooks/useArchiveShows';
@@ -88,14 +88,14 @@ export default function ArchiveShowScreen() {
         <FormattedShowTitle
           title={show.title}
           color={colors.green}
-          size={34}
+          size={42}
           numberOfLines={4}
           adjustsFontSizeToFit
           style={{
             fontFamily: font.headingBold,
             fontWeight: '700',
-            letterSpacing: -0.5,
-            lineHeight: 36,
+            letterSpacing: -0.8,
+            lineHeight: 43,
           }}
         />
 
@@ -120,7 +120,7 @@ export default function ArchiveShowScreen() {
               style={{
                 fontFamily: font.body,
                 fontWeight: '600',
-                fontSize: 18,
+                fontSize: 16,
                 color: colors.green,
               }}
             >
@@ -137,7 +137,7 @@ export default function ArchiveShowScreen() {
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 20,
+              gap: 21,
               marginTop: 28,
             }}
           >
@@ -146,24 +146,24 @@ export default function ArchiveShowScreen() {
               accessibilityRole="button"
               accessibilityLabel={
                 primaryPlatform === 'soundcloud'
-                  ? 'Play on SoundCloud'
-                  : 'Play on Mixcloud'
+                  ? 'Listen on SoundCloud'
+                  : 'Listen on Mixcloud'
               }
             >
-              <PlayDisc size={66} />
+              <PlatformDisc platform={primaryPlatform} size={68} />
             </Pressable>
             <Text
               style={{
                 fontFamily: font.body,
                 fontWeight: '600',
-                fontSize: 17,
+                fontSize: 26,
                 letterSpacing: 0.2,
                 color: colors.green,
               }}
             >
               {primaryPlatform === 'soundcloud'
-                ? 'Play on SoundCloud'
-                : 'Play on Mixcloud'}
+                ? 'Listen on SoundCloud'
+                : 'Listen on Mixcloud'}
             </Text>
           </View>
         )}
