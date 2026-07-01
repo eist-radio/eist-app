@@ -156,9 +156,10 @@ export default function ArchiveShowScreen() {
               style={{
                 fontFamily: font.body,
                 fontWeight: '600',
-                fontSize: 26,
+                fontSize: 20,
                 letterSpacing: 0.2,
                 color: colors.green,
+                flexShrink: 1,
               }}
             >
               {primaryPlatform === 'soundcloud'
