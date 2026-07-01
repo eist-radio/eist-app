@@ -90,12 +90,8 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
 
   // Media status polling interval
   const mediaStatusInterval = useRef<NodeJS.Timeout | null>(null)
-  // Independent cast-state polling interval. Keeps castState (and therefore the
-  // Cast button colour) in sync with the real session even when the
-  // onCastStateChanged event is missed — e.g. events that fire while JS is
-  // suspended in the background, so the button doesn't go stale/grey while a
-  // cast is still active after returning to the app.
-  const castStateInterval = useRef<NodeJS.Timeout | null>(null)
+  // Pending cast-state resync timers scheduled on foreground return (see below).
+  const resyncTimeouts = useRef<NodeJS.Timeout[]>([])
 
   // Initialize cast and set up listeners
   useEffect(() => {
@@ -162,15 +158,18 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
           setIsCastPlaying(false)
         })
 
-        // Independent poller: keeps the button state accurate regardless of
-        // whether change events arrive.
-        castStateInterval.current = setInterval(syncCastState, 3000)
-
-        // Resync immediately whenever the app returns to the foreground, so
-        // the button reflects the true state without waiting for the next poll.
+        // Resync whenever the app returns to the foreground. onCastStateChanged
+        // events that fire while JS is suspended are dropped, and getCastState()
+        // can be briefly stale right as iOS wakes the app, so resync immediately
+        // and retry a couple of times to settle on the true session state.
         appStateSubscription = AppState.addEventListener('change', (next) => {
           if (next === 'active') {
             syncCastState()
+            resyncTimeouts.current.forEach(clearTimeout)
+            resyncTimeouts.current = [
+              setTimeout(syncCastState, 600),
+              setTimeout(syncCastState, 1500),
+            ]
           }
         })
       } catch (error) {
@@ -185,10 +184,8 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
       sessionStartedSubscription?.remove?.()
       sessionEndedSubscription?.remove?.()
       appStateSubscription?.remove?.()
-      if (castStateInterval.current) {
-        clearInterval(castStateInterval.current)
-        castStateInterval.current = null
-      }
+      resyncTimeouts.current.forEach(clearTimeout)
+      resyncTimeouts.current = []
     }
   }, [isWeb])
 

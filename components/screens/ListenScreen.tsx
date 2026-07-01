@@ -70,6 +70,11 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
   const [isCarConnected, setIsCarConnected] = useState(false)
   const carRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  // Bumped on every foreground return to force the native Cast button to
+  // remount and re-read the live session state — its native view can go stale
+  // (shows disconnected while a cast is still active) while JS is suspended in
+  // the background.
+  const [castButtonNonce, setCastButtonNonce] = useState(0)
 
 
   const parseDescription = (blocks: any[]): string =>
@@ -511,6 +516,9 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
+        // Force the native Cast button to remount so it re-reads the live cast
+        // session state (which can go stale while backgrounded).
+        setCastButtonNonce((n) => n + 1)
         // Only refresh if we're playing - use lightweight function
         if (isPlaying) {
           fetchLiveScheduleOnly()
@@ -575,7 +583,11 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
 
       <View style={s.onair}>{!isStateResolving && (<><MaterialCommunityIcons name="headphones" size={19} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></>)}</View>
       <View style={s.castRow}>
-        <CastButton size={31} tintColor={isCastConnected ? colors.green : colors.text} />
+        <CastButton
+          key={`cast-${castButtonNonce}-${isCastConnected}`}
+          size={31}
+          tintColor={isCastConnected ? colors.green : colors.text}
+        />
       </View>
 
       <View style={{ flex: 1 }} />
