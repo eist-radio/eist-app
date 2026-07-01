@@ -432,6 +432,17 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     }
   }, [fetchLiveScheduleOnly, isPlaying])
 
+  // The Pager keeps every page mounted, so swiping away from Listen leaves this
+  // screen's native Cast button alive but offscreen — where GCKUICastButton can
+  // go stale and render grey/disconnected even though the session (and
+  // isCastConnected) is still live. Remount it each time Listen becomes the
+  // active page so it re-reads the session and re-applies the tint, mirroring
+  // the foreground remount above (in-app navigation never backgrounds the app,
+  // so that handler alone doesn't cover this path).
+  useEffect(() => {
+    if (isActive) setCastButtonNonce((n) => n + 1)
+  }, [isActive])
+
   const handlePlayButtonPress = useCallback(async () => {
     try {
       await togglePlayStop()
