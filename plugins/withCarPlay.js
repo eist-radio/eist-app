@@ -1,6 +1,7 @@
 const {
   withEntitlementsPlist,
   withInfoPlist,
+  withAppDelegate,
   withDangerousMod,
   withXcodeProject,
   IOSConfig,
@@ -16,21 +17,34 @@ const path = require('path');
  * `com.apple.developer.carplay-audio` entitlement it adds must first be:
  *   1. requested from / approved by Apple for the App ID, and
  *   2. present in the EAS signing (provisioning) profile.
- * Until then, leaving it disabled keeps the current build completely unaffected.
  *
- * What it does when enabled:
- *   - adds the `com.apple.developer.carplay-audio` entitlement
- *   - declares a CarPlay scene in Info.plist (CarPlay role only; the main app
- *     window keeps its existing AppDelegate-managed UIWindow, so RN rendering is
- *     unchanged)
- *   - drops in a small Swift scene delegate that roots CarPlay on the system
- *     Now Playing template
+ * ── Why this touches the app window (read before editing) ──────────────────
+ * CarPlay is a second UIScene living alongside the phone UI, so enabling it
+ * forces the whole app onto the iOS *scene* lifecycle (UIScene, iOS 13+). Once
+ * `UIApplicationSupportsMultipleScenes` is true, UIKit stops using the
+ * AppDelegate's hand-made `self.window`; every window must belong to a
+ * UIWindowScene. The previous version of this plugin declared ONLY the CarPlay
+ * scene and left the AppDelegate creating its own window — which orphaned the
+ * phone window and produced a BLACK SCREEN that never launched on device.
+ *
+ * The correct setup (per Apple + react-native-carplay) is a full scene
+ * conversion of the phone UI:
+ *   - Info.plist declares BOTH scene roles: a phone `UIWindowSceneSessionRole-
+ *     Application` (PhoneSceneDelegate) and the CarPlay
+ *     `CPTemplateApplicationSceneSessionRoleApplication` (CarPlaySceneDelegate).
+ *   - AppDelegate builds the React Native root view but no longer creates a
+ *     UIWindow (the scene owns it) — see withCarPlayAppDelegate.
+ *   - PhoneSceneDelegate creates the phone UIWindow from its UIWindowScene and
+ *     hosts the shared RN root view.
+ *   - CarPlaySceneDelegate roots CarPlay on the system Now Playing template.
  *
  * The Now Playing screen (éist logo artwork + play/stop) is driven entirely by
  * the MPNowPlayingInfoCenter / MPRemoteCommandCenter data that
- * react-native-track-player already publishes. The play/stop buttons invoke the
- * same MPRemoteCommandCenter commands handled in trackPlayerService.js, so there
- * is no second audio engine and no JS bridge to maintain.
+ * react-native-track-player already sets, so there is no second audio engine
+ * and no JS bridge on the CarPlay side.
+ *
+ * NOTE: `ios/` is gitignored / prebuild-generated, so all of this lives in the
+ * plugin — editing ios/ by hand would be wiped on the next prebuild/EAS build.
  */
 
 const CARPLAY_AUDIO_ENTITLEMENT = 'com.apple.developer.carplay-audio';
@@ -66,6 +80,38 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 }
 `;
 
+// Hosts the normal phone UI. Because CarPlay puts the app on the scene
+// lifecycle, the phone window must be created here (from its UIWindowScene)
+// rather than in the AppDelegate. It reuses the React Native root view the
+// AppDelegate built at launch (AppDelegate.reactRootView).
+const PHONE_SCENE_DELEGATE_SWIFT = `import UIKit
+
+@objc(PhoneSceneDelegate)
+class PhoneSceneDelegate: UIResponder, UIWindowSceneDelegate {
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene else { return }
+
+    let window = UIWindow(windowScene: windowScene)
+    let rootViewController = UIViewController()
+
+    if let appDelegate = UIApplication.shared.delegate as? AppDelegate,
+       let rootView = appDelegate.reactRootView {
+      rootViewController.view = rootView
+    }
+
+    window.rootViewController = rootViewController
+    self.window = window
+    window.makeKeyAndVisible()
+  }
+}
+`;
+
 function withCarPlayEntitlement(config) {
   return withEntitlementsPlist(config, (config) => {
     config.modResults[CARPLAY_AUDIO_ENTITLEMENT] = true;
@@ -78,19 +124,26 @@ function withCarPlaySceneManifest(config) {
     const infoPlist = config.modResults;
     const existing = infoPlist.UIApplicationSceneManifest || {};
 
-    // Declare ONLY the CarPlay scene role. We intentionally do not declare a
-    // UIWindowSceneSessionRoleApplication role, so the phone app keeps using its
-    // AppDelegate-managed window and React Native rendering is untouched.
+    // Declare BOTH scene roles. The phone window role is what keeps the normal
+    // app UI alive once multiple scenes are enabled; the CarPlay role adds the
+    // car Now Playing screen. $(PRODUCT_MODULE_NAME) is expanded by Xcode at
+    // build time, e.g. "eist.PhoneSceneDelegate".
     infoPlist.UIApplicationSceneManifest = {
       ...existing,
       UIApplicationSupportsMultipleScenes: true,
       UISceneConfigurations: {
         ...(existing.UISceneConfigurations || {}),
+        UIWindowSceneSessionRoleApplication: [
+          {
+            UISceneConfigurationName: 'Phone',
+            UISceneClassName: 'UIWindowScene',
+            UISceneDelegateClassName: '$(PRODUCT_MODULE_NAME).PhoneSceneDelegate',
+          },
+        ],
         CPTemplateApplicationSceneSessionRoleApplication: [
           {
             UISceneConfigurationName: 'CarPlay',
-            // $(PRODUCT_MODULE_NAME) is expanded by Xcode at build time, e.g.
-            // "eist.CarPlaySceneDelegate".
+            UISceneClassName: 'CPTemplateApplicationScene',
             UISceneDelegateClassName: '$(PRODUCT_MODULE_NAME).CarPlaySceneDelegate',
           },
         ],
@@ -101,8 +154,76 @@ function withCarPlaySceneManifest(config) {
   });
 }
 
-function withCarPlaySceneDelegateFile(config) {
-  // Write the Swift source into ios/<project>/.
+/**
+ * Patch the (generated) AppDelegate so it no longer creates its own UIWindow
+ * and instead exposes the RN root view for PhoneSceneDelegate to display.
+ *
+ * Fails loudly if the expected code shape isn't found — better a clear build
+ * error than silently shipping the old black-screen behaviour.
+ */
+function withCarPlayAppDelegate(config) {
+  return withAppDelegate(config, (config) => {
+    if (config.modResults.language !== 'swift') {
+      throw new Error(
+        '[withCarPlay] Expected a Swift AppDelegate; found ' +
+          config.modResults.language
+      );
+    }
+
+    let contents = config.modResults.contents;
+
+    // Idempotency: skip if we've already patched.
+    if (contents.includes('var reactRootView: UIView?')) {
+      return config;
+    }
+
+    // 1. Expose the RN root view so PhoneSceneDelegate can host it.
+    if (!/var window: UIWindow\?/.test(contents)) {
+      throw new Error(
+        "[withCarPlay] Could not find `var window: UIWindow?` in AppDelegate — " +
+          'the generated AppDelegate shape changed; update plugins/withCarPlay.js.'
+      );
+    }
+    contents = contents.replace(
+      /var window: UIWindow\?/,
+      'var window: UIWindow?\n  // Built in didFinishLaunching; attached to the phone window by\n  // PhoneSceneDelegate (CarPlay forces the scene lifecycle). See withCarPlay.js.\n  var reactRootView: UIView?'
+    );
+
+    // 2. Replace the AppDelegate's window creation + startReactNative(in:) with
+    //    root-view creation only. The scene owns the window now.
+    const windowBootRegex =
+      /window = UIWindow\(frame: UIScreen\.main\.bounds\)\s*\n\s*factory\.startReactNative\(\s*withModuleName:\s*"main",\s*in:\s*window,\s*launchOptions:\s*launchOptions\)/;
+
+    if (!windowBootRegex.test(contents)) {
+      throw new Error(
+        '[withCarPlay] Could not find the AppDelegate window/startReactNative ' +
+          'block to convert to scene-based launch; the generated AppDelegate ' +
+          'shape changed. Update the regex in plugins/withCarPlay.js.'
+      );
+    }
+    contents = contents.replace(
+      windowBootRegex,
+      '// CarPlay scene support (plugins/withCarPlay.js): build the RN root view\n' +
+        '    // here and let PhoneSceneDelegate attach it to the phone UIWindowScene.\n' +
+        '    // The app delegate must NOT create a UIWindow under the scene lifecycle.\n' +
+        '    reactRootView = factory.rootViewFactory.view(\n' +
+        '      withModuleName: "main",\n' +
+        '      initialProperties: nil,\n' +
+        '      launchOptions: launchOptions)'
+    );
+
+    config.modResults.contents = contents;
+    return config;
+  });
+}
+
+function withCarPlaySceneDelegateFiles(config) {
+  const files = [
+    { name: 'CarPlaySceneDelegate.swift', source: CARPLAY_SCENE_DELEGATE_SWIFT },
+    { name: 'PhoneSceneDelegate.swift', source: PHONE_SCENE_DELEGATE_SWIFT },
+  ];
+
+  // Write the Swift sources into ios/<project>/.
   config = withDangerousMod(config, [
     'ios',
     (config) => {
@@ -114,25 +235,25 @@ function withCarPlaySceneDelegateFile(config) {
       if (!fs.existsSync(iosSourceDir)) {
         fs.mkdirSync(iosSourceDir, { recursive: true });
       }
-      fs.writeFileSync(
-        path.join(iosSourceDir, 'CarPlaySceneDelegate.swift'),
-        CARPLAY_SCENE_DELEGATE_SWIFT
-      );
+      for (const file of files) {
+        fs.writeFileSync(path.join(iosSourceDir, file.name), file.source);
+      }
       return config;
     },
   ]);
 
-  // Register the Swift file with the Xcode target so it compiles.
+  // Register each Swift file with the Xcode target so it compiles.
   config = withXcodeProject(config, (config) => {
     const projectName = config.modRequest.projectName;
-    const filepath = `${projectName}/CarPlaySceneDelegate.swift`;
-
-    if (!config.modResults.hasFile(filepath)) {
-      IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
-        filepath,
-        groupName: projectName,
-        project: config.modResults,
-      });
+    for (const file of files) {
+      const filepath = `${projectName}/${file.name}`;
+      if (!config.modResults.hasFile(filepath)) {
+        IOSConfig.XcodeUtils.addBuildSourceFileToGroup({
+          filepath,
+          groupName: projectName,
+          project: config.modResults,
+        });
+      }
     }
     return config;
   });
@@ -143,7 +264,8 @@ function withCarPlaySceneDelegateFile(config) {
 function withCarPlay(config) {
   config = withCarPlayEntitlement(config);
   config = withCarPlaySceneManifest(config);
-  config = withCarPlaySceneDelegateFile(config);
+  config = withCarPlayAppDelegate(config);
+  config = withCarPlaySceneDelegateFiles(config);
   return config;
 }
 
