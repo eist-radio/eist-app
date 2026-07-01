@@ -35,6 +35,11 @@ const CAST_STATE = {
   CONNECTED: 'connected',
 }
 
+// A cast media status is "playing" for our purposes while it is actively
+// playing or buffering (buffering resolves to playing without user action).
+const isPlayingStatus = (status: any): boolean =>
+  status?.playerState === 'playing' || status?.playerState === 'buffering'
+
 export type CastSessionState =
   | 'no_devices'
   | 'not_connected'
@@ -88,8 +93,6 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     artist: '',
   })
 
-  // Media status polling interval
-  const mediaStatusInterval = useRef<NodeJS.Timeout | null>(null)
   // Pending cast-state resync timers scheduled on foreground return (see below).
   const resyncTimeouts = useRef<NodeJS.Timeout[]>([])
 
@@ -101,6 +104,7 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
 
     let castStateSubscription: any
     let sessionStartedSubscription: any
+    let sessionResumedSubscription: any
     let sessionEndedSubscription: any
     let appStateSubscription: any
 
@@ -113,14 +117,24 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
         setCastState(currentState)
 
         if (currentState === CAST_STATE.CONNECTED) {
-          // Make sure the device name reflects the live session (it can be
-          // lost if the onSessionStarted event was missed while backgrounded).
+          // Make sure the device name AND play state reflect the live session.
+          // Both can be lost if the onSessionStarted / onSessionResumed and
+          // onMediaStatusUpdated events were missed while JS was suspended in
+          // the background.
           try {
             const sessionManager = GoogleCast.getSessionManager()
             const session = await sessionManager.getCurrentCastSession()
             if (session) {
               const device = await session.getCastDevice()
               setCastDeviceName(device?.friendlyName || 'Cast Device')
+
+              try {
+                const client = session.getClient()
+                const status = await client?.getMediaStatus()
+                setIsCastPlaying(isPlayingStatus(status))
+              } catch {
+                // Client not ready yet — the media-status effect will catch up.
+              }
             }
           } catch (e) {
             // Session not ready yet — leave the existing name in place.
@@ -141,17 +155,28 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
           setCastState(state)
         })
 
-        // Listen for session events via session manager
+        // Listen for session events via session manager. A session becomes
+        // active either freshly (onSessionStarted) or by being resumed after
+        // the app was backgrounded/suspended or relaunched (onSessionResumed).
+        // iOS delivers the return-from-background case as a *resume*, not a
+        // fresh start, so both must be handled or the device name / play state
+        // never comes back when the app returns.
         const sessionManager = GoogleCast.getSessionManager()
 
-        sessionStartedSubscription = sessionManager.onSessionStarted(async (session: any) => {
+        const handleSessionActive = async (session: any) => {
           try {
             const device = await session.getCastDevice()
             setCastDeviceName(device?.friendlyName || 'Cast Device')
           } catch (e) {
             setCastDeviceName('Cast Device')
           }
-        })
+          // Reconcile derived state (button tint) and play state with the
+          // now-active session.
+          syncCastState()
+        }
+
+        sessionStartedSubscription = sessionManager.onSessionStarted(handleSessionActive)
+        sessionResumedSubscription = sessionManager.onSessionResumed(handleSessionActive)
 
         sessionEndedSubscription = sessionManager.onSessionEnded(() => {
           setCastDeviceName(null)
@@ -182,6 +207,7 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       castStateSubscription?.remove?.()
       sessionStartedSubscription?.remove?.()
+      sessionResumedSubscription?.remove?.()
       sessionEndedSubscription?.remove?.()
       appStateSubscription?.remove?.()
       resyncTimeouts.current.forEach(clearTimeout)
@@ -207,41 +233,51 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     return 'not_connected'
   }
 
-  // Monitor media status for play state when connected
+  // Monitor media status for play state while connected. Idiomatic RNGC:
+  // subscribe to the client's onMediaStatusUpdated event (this is what the
+  // library's own useMediaStatus hook does) rather than polling — the receiver
+  // pushes status changes, so this stays accurate without a timer. The
+  // foreground resync (syncCastState) re-seeds this after a background gap,
+  // where in-background events would have been dropped.
   useEffect(() => {
     if (!isCastConnected || isWeb || !GoogleCast) {
       setIsCastPlaying(false)
-      if (mediaStatusInterval.current) {
-        clearInterval(mediaStatusInterval.current)
-        mediaStatusInterval.current = null
-      }
       return
     }
 
-    const checkMediaStatus = async () => {
+    let cancelled = false
+    let statusSubscription: any
+
+    const subscribe = async () => {
       try {
         const sessionManager = GoogleCast.getSessionManager()
         const session = await sessionManager.getCurrentCastSession()
-        if (session) {
-          const client = session.getClient()
+        if (!session || cancelled) return
+
+        const client = session.getClient()
+        if (!client) return
+
+        // Seed the current status, then subscribe for pushes.
+        try {
           const status = await client.getMediaStatus()
-          const isPlaying =
-            status?.playerState === 'playing' || status?.playerState === 'buffering'
-          setIsCastPlaying(isPlaying)
+          if (!cancelled) setIsCastPlaying(isPlayingStatus(status))
+        } catch {
+          // Client not ready yet — the event subscription will deliver it.
         }
+
+        statusSubscription = client.onMediaStatusUpdated((status: any) => {
+          setIsCastPlaying(isPlayingStatus(status))
+        })
       } catch (error) {
-        // Silently ignore - client might not be ready
+        // Silently ignore - session/client might not be ready
       }
     }
 
-    checkMediaStatus()
-    mediaStatusInterval.current = setInterval(checkMediaStatus, 2000)
+    subscribe()
 
     return () => {
-      if (mediaStatusInterval.current) {
-        clearInterval(mediaStatusInterval.current)
-        mediaStatusInterval.current = null
-      }
+      cancelled = true
+      statusSubscription?.remove?.()
     }
   }, [isCastConnected, isWeb])
 
