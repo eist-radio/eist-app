@@ -497,7 +497,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
       <View style={s.castRow}>
         <CastButton
           key={`cast-${castButtonNonce}-${isCastConnected}`}
-          size={34}
+          size={40}
           tintColor={isCastConnected ? colors.green : colors.text}
         />
       </View>
@@ -549,7 +549,10 @@ const s = StyleSheet.create({
   // info blocks, widest before the play action. Type is a φ ladder anchored on
   // the shared 16px eyebrow: 16 → 26 (×φ) → 42 (×φ²).
   onair: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 96 },
-  castRow: { marginTop: 13, marginBottom: 21 },
+  // marginLeft pulls the native cast glyph flush with the content edge (the
+  // headphones/"live now"/title above): GCKUICastButton centres its glyph inside
+  // its size box, so without this it reads as indented from everything else.
+  castRow: { marginTop: 13, marginBottom: 21, marginLeft: -6 },
   title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 42, lineHeight: 43, letterSpacing: -0.8, color: colors.green },
   artist: { fontFamily: font.body, fontWeight: '500', fontSize: 26, color: colors.green, marginTop: 8 },
   upNext: { marginTop: 21, gap: 8 },
