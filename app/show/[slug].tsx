@@ -3,9 +3,12 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import React, { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { FormattedShowTitle } from '../../components/FormattedShowTitle';
+import { ShareCard } from '../../components/share/ShareCard';
+import { useShareShow } from '../../hooks/useShareShow';
 import { HeaderLeftNav } from '../../components/ui/HeaderLeftNav';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { NotifyControl } from '../../components/ui/NotifyControl';
@@ -183,6 +186,16 @@ export default function ShowScreen() {
     }
   }, [event, isToggling, isLoading, hasStarted, toggleShowReminder, hosts]);
 
+  // Share-card wiring must sit above the early return (rules of hooks). The
+  // artwork URL only needs hosts, which resolve independently of the event guard.
+  const artistImageUrl =
+    hosts[0]?.logo?.['1024x1024'] ||
+    hosts[0]?.logo?.['512x512'] ||
+    hosts[0]?.logo?.['256x256'] ||
+    hosts[0]?.logo?.default;
+  const shareCardRef = useRef<View>(null);
+  const { share, isSharing } = useShareShow({ cardRef: shareCardRef, artworkUrl: artistImageUrl });
+
   // Loading / not-found guard
   if (!event) {
     return (
@@ -200,11 +213,6 @@ export default function ShowScreen() {
   const timeString = formatShowTime(event.startDateUtc, event.endDateUtc, currentTimezone);
   const dateString = formatShowDate(event.startDateUtc, currentTimezone);
 
-  const artistImageUrl =
-    hosts[0]?.logo?.['1024x1024'] ||
-    hosts[0]?.logo?.['512x512'] ||
-    hosts[0]?.logo?.['256x256'] ||
-    hosts[0]?.logo?.default;
   // While the first host query is still resolving we don't yet know whether an
   // artist image exists — render no image rather than flashing the fallback.
   const firstHostPending = Boolean(hostIds[0]) && host1.isLoading;
@@ -213,12 +221,33 @@ export default function ShowScreen() {
     : firstHostPending
       ? null
       : fallbackImage;
+  // The share card always needs a concrete image (never the pending null), so it
+  // falls straight back to the bundled éist artwork.
+  const shareArtwork = artistImageUrl && !imageFailed ? { uri: artistImageUrl } : fallbackImage;
 
   return (
+    <>
     <PageScaffold left={<HeaderLeftNav />} right={<SpinningLogo />} transparentBg liveNow>
       <ShowArtworkBackground source={imageSource} onError={() => setImageFailed(true)} />
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Eyebrow>coming up</Eyebrow>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Eyebrow>coming up</Eyebrow>
+          {Platform.OS !== 'web' ? (
+            <Pressable
+              onPress={share}
+              disabled={isSharing}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Share this show"
+            >
+              {isSharing ? (
+                <ActivityIndicator color={colors.green} />
+              ) : (
+                <Ionicons name="share-outline" size={26} color={colors.green} />
+              )}
+            </Pressable>
+          ) : null}
+        </View>
 
         <FormattedShowTitle
           title={event.title}
@@ -280,5 +309,19 @@ export default function ShowScreen() {
         ) : null}
       </ScrollView>
     </PageScaffold>
+
+    {/* Off-screen 1080×1920 share card: laid out for capture, never visible. */}
+    {Platform.OS !== 'web' ? (
+      <View pointerEvents="none" style={{ position: 'absolute', top: -20000, left: 0 }}>
+        <ShareCard
+          ref={shareCardRef}
+          title={event.title}
+          artistName={hosts[0]?.name}
+          dateTime={`${dateString} · ${timeString}`}
+          artworkSource={shareArtwork}
+        />
+      </View>
+    ) : null}
+    </>
   );
 }
