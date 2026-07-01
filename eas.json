@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "EXPO_ENABLE_CARPLAY": "true",
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
         "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
       }
@@ -32,6 +33,7 @@
       },
       "env": {
         "API_KEY": "@API_KEY",
+        "EXPO_ENABLE_CARPLAY": "true",
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
         "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
       }
@@ -44,6 +46,7 @@
         "image": "macos-tahoe-26.4-xcode-26.4"
       },
       "env": {
+        "EXPO_ENABLE_CARPLAY": "true",
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
         "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
       }
