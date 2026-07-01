@@ -130,7 +130,6 @@ Local Android build:
 
 ```cmd
 eas build --profile development --platform android --local
-
 ```
 
 ```cmd

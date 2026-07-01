@@ -84,6 +84,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const [showArtist, setShowArtist] = useState<string>('');
   const [showArtworkUrl, setShowArtworkUrl] = useState<string | undefined>(undefined);
   const showTimeRef = useRef<string>('');
+  // End time (ISO) of the current live show, used to schedule the next Now
+  // Playing refresh for exactly when the show changes rather than guessing.
+  const currentEndDateRef = useRef<string | undefined>(undefined);
 
   const hasInitialized = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -102,8 +105,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isRecovering = useRef(false);
   const retryTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Metadata refresh interval
-  const metadataRefreshInterval = useRef<NodeJS.Timeout | null>(null);
+  // Deadline-driven metadata refresh timer (fires just after the current show ends)
+  const metadataRefreshTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Network connectivity tracking
   const networkState = useNetworkConnectivity()
@@ -391,7 +394,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   // Fetch the latest show metadata from the radiocult API and update state/metadata
   // Returns the fetched metadata for immediate use (since setState is async)
-  const fetchAndUpdateShowMetadata = async (): Promise<{ title: string; artist: string; artworkUrl?: string; showTime: string } | null> => {
+  const fetchAndUpdateShowMetadata = async (): Promise<{ title: string; artist: string; artworkUrl?: string; showTime: string; endDateUtc?: string } | null> => {
     try {
       const liveInfo = await getLiveShowInfo()
       if (!liveInfo) {
@@ -402,6 +405,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const artist = liveInfo.djName || ''
       let artworkUrl = liveInfo.artworkUrl || undefined
       const showTime = liveInfo.showTime || ''
+      const endDateUtc = liveInfo.endDateUtc
 
       // Check if metadata has actually changed
       const hasMetadataChanged =
@@ -434,6 +438,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setShowArtist(artist)
       setShowArtworkUrl(artworkUrl)
       showTimeRef.current = showTime
+      currentEndDateRef.current = endDateUtc
 
       // Update track metadata if it changed
       if (hasMetadataChanged) {
@@ -452,7 +457,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Return the metadata for immediate use
-      return { title, artist, artworkUrl, showTime }
+      return { title, artist, artworkUrl, showTime, endDateUtc }
     } catch (err) {
       console.error('Failed to fetch or update show metadata:', err)
       // Fallback to previous state/metadata
@@ -779,6 +784,22 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     setupPlayer()
 
     if (!isWeb) {
+      // Seed the Now Playing item at cold launch so CarPlay / the lock screen
+      // show the current show and expose a working play control before the
+      // phone UI is ever opened. Without this the CarPlay CPNowPlayingTemplate
+      // is empty (no metadata, no play target) until the user presses play in
+      // the app, which they can't do from the car. ensureTrackForDisplay adds a
+      // stopped-state track and fetchAndUpdateShowMetadata populates it.
+      ;(async () => {
+        try {
+          await setupPlayer()
+          await ensureTrackForDisplay()
+          await fetchAndUpdateShowMetadata()
+        } catch (error) {
+          console.error('Initial now-playing seed failed:', error)
+        }
+      })()
+
       const onState = TrackPlayer.addEventListener(
         Event.PlaybackState,
         async ({ state }: any) => {
@@ -861,33 +882,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       })
 
-      // Set up periodic metadata refresh for Android lockscreen
-      if (Platform.OS === 'android') {
-        metadataRefreshInterval.current = setInterval(async () => {
-          // This interval is created once on mount, so it captured isPlaying as
-          // its initial value (false). Read the live ref instead so background
-          // metadata actually refreshes while playing.
-          if (isPlayingRef.current) {
-            try {
-              await fetchAndUpdateShowMetadata()
-            } catch (error) {
-              console.error('Periodic metadata refresh failed:', error)
-            }
-          }
-        }, 30000) // Refresh every 30 seconds when playing
-      }
+      // Now Playing refresh while playing is scheduled deadline-driven in a
+      // dedicated effect below (keyed on isPlaying), off the current show's
+      // actual end time rather than a wall-clock guess.
 
       return () => {
         onState.remove()
         onError.remove()
         onQueueEnded.remove()
         onAppState.remove()
-        
-        // Clear metadata refresh interval
-        if (metadataRefreshInterval.current) {
-          clearInterval(metadataRefreshInterval.current)
-          metadataRefreshInterval.current = null
-        }
         
         // Clear retry timeout
         if (retryTimeout.current) {
@@ -897,6 +900,64 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, [])
+
+  // Deadline-driven Now Playing refresh. CarPlay's CPNowPlayingTemplate (and the
+  // lock screen / Android Auto) mirror MPNowPlayingInfoCenter, which only
+  // changes when we rewrite RNTP metadata. Rather than guessing when the show
+  // changes, we schedule the next refresh for the moment the CURRENT show ends —
+  // a timestamp the live API already gives us (endDateUtc) — then re-arm off the
+  // next show's end time. This stays correct for any show length or start
+  // minute. The loop lives exactly as long as playback: background audio keeps
+  // the JS run loop alive so it fires in the car with the phone backgrounded,
+  // and it's torn down on stop (a fresh fetch runs on the next play — see play()
+  // and the PlaybackState → Playing handler).
+  useEffect(() => {
+    if (isWeb || !isPlaying) return
+
+    // Fire just after the show ends so the backend schedule has rolled over.
+    const BUFFER_MS = 20_000
+    // Never sooner than the live-info cache TTL, so each refetch returns fresh
+    // data and we don't busy-loop when a deadline is already in the past.
+    const MIN_MS = 60_000
+    // Safety cap so a missing/erroneous end time still refreshes eventually.
+    const MAX_MS = 60 * 60_000
+
+    let cancelled = false
+
+    const armFor = (endDateUtc?: string) => {
+      let delay = MAX_MS
+      if (endDateUtc) {
+        const end = new Date(endDateUtc).getTime()
+        if (!Number.isNaN(end)) {
+          delay = end + BUFFER_MS - Date.now()
+        }
+      }
+      delay = Math.min(MAX_MS, Math.max(MIN_MS, delay))
+
+      metadataRefreshTimer.current = setTimeout(async () => {
+        if (cancelled) return
+        let nextEnd: string | undefined
+        try {
+          const meta = await fetchAndUpdateShowMetadata()
+          nextEnd = meta?.endDateUtc
+        } catch (error) {
+          console.error('Scheduled metadata refresh failed:', error)
+        }
+        if (!cancelled) armFor(nextEnd)
+      }, delay)
+    }
+
+    // Align the first refresh to the show that's already playing.
+    armFor(currentEndDateRef.current)
+
+    return () => {
+      cancelled = true
+      if (metadataRefreshTimer.current) {
+        clearTimeout(metadataRefreshTimer.current)
+        metadataRefreshTimer.current = null
+      }
+    }
+  }, [isPlaying, isWeb])
 
   const forceMetadataRefresh = async () => {
     try {

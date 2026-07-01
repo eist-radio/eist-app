@@ -1,7 +1,7 @@
 // components/screens/ListenScreen.tsx
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   Alert,
   AppState,
@@ -24,18 +24,6 @@ import { PageScaffold } from '../ui/PageScaffold'
 import { PlayDisc } from '../ui/PlayDisc'
 import { ShowArtworkBackground } from '../ui/ShowArtworkBackground'
 
-// Only import TrackPlayer on mobile platforms
-let TrackPlayer: any, Event: any;
-if (Platform.OS !== 'web') {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const trackPlayerModule = require('react-native-track-player');
-    TrackPlayer = trackPlayerModule.default;
-    Event = trackPlayerModule.Event;
-  } catch {
-    console.warn('TrackPlayer not available');
-  }
-}
 
 const placeholderArtistImage = require('../../assets/images/eist_online.png')
 const placeholderOfflineImage = require('../../assets/images/eist_offline.png')
@@ -68,8 +56,6 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   const [currentShowId, setCurrentShowId] = useState<string | null>(null)
   const [isContentLoading, setIsContentLoading] = useState(false)
   const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
-  const [isCarConnected, setIsCarConnected] = useState(false)
-  const carRefreshIntervalRef = useRef<NodeJS.Timeout | null>(null)
   // Bumped on every foreground return to force the native Cast button to
   // remount and re-read the live session state — its native view can go stale
   // (shows disconnected while a cast is still active) while JS is suspended in
@@ -412,94 +398,9 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     }
   }, [])
 
-  // Function to calculate time until next 1 minute past the hour
-  const getTimeUntilNextRefresh = () => {
-    const now = new Date()
-    const nextRefresh = new Date(now)
-    nextRefresh.setMinutes(1, 0, 0) // Set to 1 minute past the hour
-    nextRefresh.setSeconds(0, 0)
-
-    // If we're already past 1 minute, move to next hour
-    if (now.getMinutes() >= 1) {
-      nextRefresh.setHours(nextRefresh.getHours() + 1)
-    }
-
-    return nextRefresh.getTime() - now.getTime()
-  }
-
-  // Function to refresh metadata at exactly 1 minute past the hour
-  const scheduleCarRefresh = useCallback(() => {
-    if (!isCarConnected || !isPlaying) return
-
-    // Clear existing interval
-    if (carRefreshIntervalRef.current) {
-      clearTimeout(carRefreshIntervalRef.current)
-    }
-
-    const timeUntilRefresh = getTimeUntilNextRefresh()
-
-    carRefreshIntervalRef.current = setTimeout(() => {
-      // Refresh metadata
-      fetchLiveScheduleOnly()
-
-      // Schedule next refresh (every hour)
-      carRefreshIntervalRef.current = setInterval(() => {
-        if (isCarConnected && isPlaying) {
-          fetchLiveScheduleOnly()
-        }
-      }, 60 * 60 * 1000) // 1 hour
-    }, timeUntilRefresh)
-  }, [isCarConnected, isPlaying, fetchLiveScheduleOnly])
-
-  // Car connectivity detection
-  useEffect(() => {
-    let remotePlayListener: any
-    let remoteStopListener: any
-    let remotePauseListener: any
-
-    const setupCarDetection = async () => {
-      if (Platform.OS === 'web' || !TrackPlayer) {
-        // Don't set up car detection on web or if TrackPlayer is not available
-        return;
-      }
-      try {
-        // Listen for remote events which indicate car connectivity
-        remotePlayListener = TrackPlayer.addEventListener(Event.RemotePlay, () => {
-          setIsCarConnected(true)
-        })
-
-        remoteStopListener = TrackPlayer.addEventListener(Event.RemoteStop, () => {
-          setIsCarConnected(true)
-        })
-
-        remotePauseListener = TrackPlayer.addEventListener(Event.RemotePause, () => {
-          setIsCarConnected(true)
-        })
-      } catch {
-        // Don't let errors propagate - just log them
-      }
-    }
-
-    setupCarDetection()
-
-    return () => {
-      if (remotePlayListener) remotePlayListener.remove()
-      if (remoteStopListener) remoteStopListener.remove()
-      if (remotePauseListener) remotePauseListener.remove()
-    }
-  }, [])
-
-  // Schedule car refresh when car connectivity or playing state changes
-  useEffect(() => {
-    scheduleCarRefresh()
-
-    return () => {
-      if (carRefreshIntervalRef.current) {
-        clearTimeout(carRefreshIntervalRef.current)
-        carRefreshIntervalRef.current = null
-      }
-    }
-  }, [scheduleCarRefresh])
+  // Note: periodic Now Playing refresh for a connected car head unit
+  // (CarPlay / Android Auto) is handled centrally in TrackPlayerContext, which
+  // is always mounted. This screen no longer schedules its own car refresh.
 
   useEffect(() => {
     if (!isActive) return;
