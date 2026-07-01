@@ -14,8 +14,6 @@ import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native
 import { colors, font } from '../../theme/tokens';
 import { FormattedShowTitle } from '../FormattedShowTitle';
 
-const wordmark = require('../../assets/images/eist-logo-header.png');
-
 export const SHARE_CARD_WIDTH = 1080;
 export const SHARE_CARD_HEIGHT = 1920;
 
@@ -45,9 +43,6 @@ export const ShareCard = React.forwardRef<View, ShareCardProps>(
           locations={[0.5, 0.72, 1]}
           style={StyleSheet.absoluteFill}
         />
-
-        {/* Brand stamp, top-left, clear of the show text. */}
-        <Image source={wordmark} style={s.wordmark} resizeMode="contain" />
 
         {/* Show text, superimposed bottom-left. */}
         <View style={s.textBlock}>
@@ -80,9 +75,6 @@ const shadow = {
 
 const s = StyleSheet.create({
   card: { width: SHARE_CARD_WIDTH, height: SHARE_CARD_HEIGHT, backgroundColor: colors.purple },
-  // top: 200 keeps the wordmark clear of Instagram Story's top chrome (progress
-  // bar + account handle), which covers roughly the top ~200px of the 1920 canvas.
-  wordmark: { position: 'absolute', top: 200, left: 72, width: 220, height: 90 },
   textBlock: { position: 'absolute', left: 72, right: 72, bottom: 120 },
   title: {
     fontFamily: font.headingBold,
@@ -104,7 +96,7 @@ const s = StyleSheet.create({
   dateTime: {
     fontFamily: font.body,
     fontWeight: '500',
-    fontSize: 40,
+    fontSize: 50,
     color: 'rgba(231,229,229,0.8)',
     marginTop: 21,
     ...shadow,

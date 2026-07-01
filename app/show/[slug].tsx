@@ -241,9 +241,9 @@ export default function ShowScreen() {
               accessibilityLabel="Share this show"
             >
               {isSharing ? (
-                <ActivityIndicator color={colors.green} />
+                <ActivityIndicator color={colors.text} />
               ) : (
-                <Ionicons name="share-outline" size={26} color={colors.green} />
+                <Ionicons name="share-outline" size={26} color={colors.text} />
               )}
             </Pressable>
           ) : null}
