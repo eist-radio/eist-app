@@ -150,7 +150,7 @@ export default function NotificationsScreen(_props: { pageIndex: number; isActiv
           {reminderList.map((r) => (
             <View key={r.showId} style={s.row}>
               <View style={{ flex: 1 }}>
-                <FormattedShowTitle title={r.showTitle} color={colors.green} size={22} style={type.rowTitle} />
+                <FormattedShowTitle title={r.showTitle} color={colors.green} size={26} style={type.rowTitle} />
                 <Text style={[type.rowSub, { color: colors.text, marginTop: 4 }]}>
                   {[r.artistName, formatReminderDate(r.startDateUtc)].filter(Boolean).join(' · ')}
                 </Text>

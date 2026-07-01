@@ -21,7 +21,7 @@ export default function ConnectScreen(_props: { pageIndex: number; isActive: boo
       <ScrollView style={{ flex: 1, marginTop: 14 }} contentContainerStyle={{ gap: 22, paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
         {LINKS.map((l) => (
           <Pressable key={l.url} onPress={() => Linking.openURL(l.url)}>
-            <Text style={{ fontFamily: font.headingBold, fontWeight: '700', fontSize: 40, lineHeight: 40, letterSpacing: -0.8, color: colors.green }}>{l.label}</Text>
+            <Text style={{ fontFamily: font.headingBold, fontWeight: '700', fontSize: 42, lineHeight: 43, letterSpacing: -0.8, color: colors.green }}>{l.label}</Text>
           </Pressable>
         ))}
       </ScrollView>

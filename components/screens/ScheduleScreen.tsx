@@ -420,7 +420,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
                   )}
                 </View>
                 <View style={{ flex: 1 }}>
-                  <FormattedShowTitle title={r.title} color={r.isLive ? colors.green : colors.text} size={22} style={type.rowTitle} />
+                  <FormattedShowTitle title={r.title} color={r.isLive ? colors.green : colors.text} size={26} style={type.rowTitle} />
                   <Text style={[type.rowSub, { color: r.isLive ? colors.green : colors.text, marginTop: 4 }]}>{r.artist}</Text>
                 </View>
               </Pressable>
@@ -435,7 +435,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 30 },
   timeCol: { width: 84 },
-  time: { fontFamily: font.body, fontWeight: '600', fontSize: 15 },
+  time: { fontFamily: font.body, fontWeight: '600', fontSize: 16 },
   nowChip: { alignSelf: 'flex-start', backgroundColor: colors.green, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3, marginTop: 1 },
   nowChipText: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 13, letterSpacing: 0.4, color: colors.purple },
 })

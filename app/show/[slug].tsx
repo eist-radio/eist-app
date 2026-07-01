@@ -223,14 +223,14 @@ export default function ShowScreen() {
         <FormattedShowTitle
           title={event.title}
           color={colors.green}
-          size={40}
+          size={42}
           numberOfLines={4}
           adjustsFontSizeToFit
           style={{
             fontFamily: font.headingBold,
             fontWeight: '700',
             letterSpacing: -0.8,
-            lineHeight: 42,
+            lineHeight: 43,
             marginTop: 8,
           }}
         />
@@ -254,7 +254,7 @@ export default function ShowScreen() {
                 style={{
                   fontFamily: font.body,
                   fontWeight: '600',
-                  fontSize: 18,
+                  fontSize: 16,
                   color: colors.green,
                 }}
               >

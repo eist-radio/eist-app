@@ -482,11 +482,11 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         source={artworkSource}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}>{!isStateResolving && (<><MaterialCommunityIcons name="headphones" size={19} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></>)}</View>
+      <View style={s.onair}>{!isStateResolving && (<><MaterialCommunityIcons name="headphones" size={21} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></>)}</View>
       <View style={s.castRow}>
         <CastButton
           key={`cast-${castButtonNonce}-${isCastConnected}`}
-          size={31}
+          size={34}
           tintColor={isCastConnected ? colors.green : colors.text}
         />
       </View>
@@ -496,7 +496,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         <FormattedShowTitle
           title={broadcastStatus === 'schedule' && showTitle ? showTitle : 'éist'}
           color={colors.green}
-          size={33}
+          size={42}
           style={s.title}
           numberOfLines={3}
           adjustsFontSizeToFit
@@ -522,7 +522,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
       <View style={s.player}>
         <Pressable onPress={handlePlayButtonPress} accessibilityRole="button"
           accessibilityLabel={isPlaying ? 'Stop playback' : 'Start playback'}>
-          <PlayDisc playing={isPlaying} size={72} />
+          <PlayDisc playing={isPlaying} size={68} />
         </Pressable>
         <Text style={s.playlabel}>{isPlaying ? 'Stop' : 'Listen now'}</Text>
       </View>
@@ -533,12 +533,16 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
 const s = StyleSheet.create({
   // paddingRight matches LiveNowIndicator so the line clears the top-right
   // spinning logo and wraps consistently with the other pages.
-  onair: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 96 },
-  castRow: { marginTop: 18, marginBottom: 20 },
-  title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 33, lineHeight: 34, letterSpacing: -0.5, color: colors.green },
-  artist: { fontFamily: font.body, fontWeight: '500', fontSize: 20, color: colors.green, marginTop: 9 },
-  upNext: { marginTop: 22, gap: 6 },
+  // Spacing follows an ascending φ/Fibonacci rhythm (8 → 21 → 34) so the gaps
+  // themselves encode grouping: tight within the title block, wider between
+  // info blocks, widest before the play action. Type is a φ ladder anchored on
+  // the shared 16px eyebrow: 16 → 26 (×φ) → 42 (×φ²).
+  onair: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 96 },
+  castRow: { marginTop: 13, marginBottom: 21 },
+  title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 42, lineHeight: 43, letterSpacing: -0.8, color: colors.green },
+  artist: { fontFamily: font.body, fontWeight: '500', fontSize: 26, color: colors.green, marginTop: 8 },
+  upNext: { marginTop: 21, gap: 8 },
   upNextText: { fontFamily: font.body, fontWeight: '500', fontSize: 16, color: colors.text },
-  player: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 30 },
-  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 20, letterSpacing: 0.2, color: colors.green },
+  player: { flexDirection: 'row', alignItems: 'center', gap: 21, marginTop: 34 },
+  playlabel: { fontFamily: font.body, fontWeight: '600', fontSize: 26, letterSpacing: 0.2, color: colors.green },
 });

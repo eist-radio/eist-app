@@ -64,7 +64,7 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
         {items.map((it) => (
           <Pressable key={it.slug} style={s.row} onPress={() => router.push(`/archive/${it.slug}`)}>
             <View style={{ flex: 1 }}>
-              <FormattedShowTitle title={it.title} color={colors.green} size={22} style={type.rowTitle} />
+              <FormattedShowTitle title={it.title} color={colors.green} size={26} style={type.rowTitle} />
               <Text style={[type.rowSub, { color: colors.text, marginTop: 4 }]}>{it.artistName}</Text>
               {formatDate(it.start) && (
                 <Text style={[type.meta, { color: colors.textDim, marginTop: 2 }]}>{formatDate(it.start)}</Text>
@@ -88,5 +88,5 @@ export default function ArchiveScreen(_props: { pageIndex: number; isActive: boo
 
 const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 30 },
-  search: { fontFamily: font.body, fontWeight: '500', fontSize: 19, color: colors.green, marginTop: 18, paddingVertical: 4 },
+  search: { fontFamily: font.body, fontWeight: '500', fontSize: 16, color: colors.green, marginTop: 18, paddingVertical: 4 },
 });

@@ -263,7 +263,7 @@ export default function ArtistScreen() {
               <FormattedShowTitle
                 title={show.title}
                 color={colors.green}
-                size={22}
+                size={26}
                 style={t.rowTitle}
               />
               <Text style={[t.rowSub, { color: colors.text, marginTop: 4 }]}>
