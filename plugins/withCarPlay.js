@@ -36,7 +36,9 @@ const path = require('path');
  *     UIWindow (the scene owns it) — see withCarPlayAppDelegate.
  *   - PhoneSceneDelegate creates the phone UIWindow from its UIWindowScene and
  *     hosts the shared RN root view.
- *   - CarPlaySceneDelegate roots CarPlay on the system Now Playing template.
+ *   - CarPlaySceneDelegate roots CarPlay on a one-item CPListTemplate ("éist
+ *     radio") and pushes the system Now Playing template when it's tapped. Apple
+ *     forbids CPNowPlayingTemplate as a root template, so it must be pushed.
  *
  * The Now Playing screen (éist logo artwork + play/stop) is driven entirely by
  * the MPNowPlayingInfoCenter / MPRemoteCommandCenter data that
@@ -52,9 +54,20 @@ const CARPLAY_AUDIO_ENTITLEMENT = 'com.apple.developer.carplay-audio';
 const CARPLAY_SCENE_DELEGATE_SWIFT = `import CarPlay
 import MediaPlayer
 
-// Roots CarPlay on the shared Now Playing template. Artwork + transport controls
-// come from the MPNowPlayingInfoCenter / MPRemoteCommandCenter data that
-// react-native-track-player already sets, so no extra wiring is needed here.
+// ── Why the root is a CPListTemplate, not CPNowPlayingTemplate ──────────────
+// Apple does NOT allow CPNowPlayingTemplate as an audio app's ROOT template. Per
+// the CarPlay docs/forums it may only be *pushed* on top of a browsable root
+// (list/tab/grid), or is auto-pushed by the system once playback starts. The
+// previous version set CPNowPlayingTemplate.shared as the root, which is why the
+// car screen "didn't work well": metadata painted (it mirrors MPNowPlayingInfo-
+// Center, shared with the lock screen) but the template sat in an unsupported
+// position with flaky controls and no browse UI.
+//
+// So we root on a single-item CPListTemplate (mirroring the one "éist radio" item
+// Android Auto exposes) and *push* the shared Now Playing template when the item
+// is tapped. Artwork + play/stop still come entirely from the MPNowPlayingInfo-
+// Center / MPRemoteCommandCenter data react-native-track-player already sets, so
+// there's still no second audio engine and no JS bridge on the CarPlay side.
 @objc(CarPlaySceneDelegate)
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   var interfaceController: CPInterfaceController?
@@ -64,11 +77,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
-
-    let nowPlaying = CPNowPlayingTemplate.shared
-    nowPlaying.isUpNextButtonEnabled = false
-    nowPlaying.isAlbumArtistButtonEnabled = false
-    interfaceController.setRootTemplate(nowPlaying, animated: true, completion: nil)
+    interfaceController.setRootTemplate(makeRootTemplate(), animated: true, completion: nil)
   }
 
   func templateApplicationScene(
@@ -76,6 +85,28 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didDisconnectInterfaceController interfaceController: CPInterfaceController
   ) {
     self.interfaceController = nil
+  }
+
+  private func makeRootTemplate() -> CPListTemplate {
+    let item = CPListItem(text: "éist radio", detailText: "Live")
+    item.handler = { [weak self] _, completion in
+      self?.showNowPlaying()
+      completion()
+    }
+    let section = CPListSection(items: [item])
+    return CPListTemplate(title: "éist", sections: [section])
+  }
+
+  // Push (never root) the system Now Playing screen. Its play/stop button drives
+  // MPRemoteCommandCenter, which react-native-track-player handles in
+  // trackPlayerService.js — so tapping play here starts the live stream.
+  private func showNowPlaying() {
+    let nowPlaying = CPNowPlayingTemplate.shared
+    nowPlaying.isUpNextButtonEnabled = false
+    nowPlaying.isAlbumArtistButtonEnabled = false
+    if interfaceController?.topTemplate !== nowPlaying {
+      interfaceController?.pushTemplate(nowPlaying, animated: true, completion: nil)
+    }
   }
 }
 `;
