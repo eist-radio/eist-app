@@ -98,11 +98,30 @@ class PhoneSceneDelegate: UIResponder, UIWindowSceneDelegate {
     guard let windowScene = scene as? UIWindowScene else { return }
 
     let window = UIWindow(windowScene: windowScene)
-    let rootViewController = UIViewController()
+    // Brand purple (#4733FF) so any moment the RN view isn't mounted reads as
+    // the éist background, not a bare black screen — and makes a genuine
+    // wiring failure diagnosable rather than silent.
+    window.backgroundColor = UIColor(red: 71.0 / 255.0, green: 51.0 / 255.0, blue: 255.0 / 255.0, alpha: 1.0)
 
-    if let appDelegate = UIApplication.shared.delegate as? AppDelegate,
-       let rootView = appDelegate.reactRootView {
-      rootViewController.view = rootView
+    let rootViewController = UIViewController()
+    rootViewController.view.backgroundColor = window.backgroundColor
+
+    // Reuse the root view the AppDelegate built at launch. Fall back to building
+    // it here (and cache it back) if it's missing — e.g. odd launch ordering or
+    // a scene reconnect — so the phone UI never comes up empty.
+    if let appDelegate = UIApplication.shared.delegate as? AppDelegate {
+      var rootView = appDelegate.reactRootView
+      if rootView == nil {
+        rootView = appDelegate.reactNativeFactory?.rootViewFactory.view(
+          withModuleName: "main",
+          initialProperties: nil,
+          launchOptions: nil
+        )
+        appDelegate.reactRootView = rootView
+      }
+      if let rootView = rootView {
+        rootViewController.view = rootView
+      }
     }
 
     window.rootViewController = rootViewController
