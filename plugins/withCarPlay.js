@@ -88,7 +88,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   }
 
   private func makeRootTemplate() -> CPListTemplate {
-    let item = CPListItem(text: "éist radio", detailText: "Live")
+    let item = CPListItem(text: "éist", detailText: "live")
     item.handler = { [weak self] _, completion in
       self?.showNowPlaying()
       completion()
