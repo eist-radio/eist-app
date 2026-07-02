@@ -1,8 +1,0 @@
-name = "eist-api"
-main = "src/index.ts"
-compatibility_date = "2024-01-01"
-
-# R2 bucket binding for shows.json storage
-[[r2_buckets]]
-binding = "DATA_BUCKET"
-bucket_name = "eist-data"

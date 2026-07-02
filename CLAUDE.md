@@ -95,7 +95,7 @@ To add/remove a swipe page: update `PAGE_COUNT` in `theme/tokens.ts` and the ind
 #### Data APIs (`config.ts`)
 Two distinct backends — keep them straight:
 - **RadioCult** (`https://api.radiocult.fm`): live metadata, schedule, show & artist detail pages. Authenticated with `apiKey` (from EAS/Expo `extra`). Used by ListenScreen, ScheduleScreen, `app/show/[slug].tsx`, `app/artist/[slug].tsx`.
-- **éist worker API** (`EIST_API_BASE_URL` = `https://eist-api.johnocallaghan.workers.dev`, endpoints in `EIST_API_ENDPOINTS`): archive shows and artist stats/mapping. Used by `hooks/useArchiveShows.ts` and `hooks/useArtists.ts`. **This is production code.** Source lives in `workers/eist-api/` (a separate Cloudflare Worker project with its own deps/tsconfig — its TypeScript errors are unrelated to the app build).
+- **éist worker API** (`EIST_API_BASE_URL` = `https://eist-api.johnocallaghan.workers.dev`, endpoints in `EIST_API_ENDPOINTS`): archive shows and artist stats/mapping. Used by `hooks/useArchiveShows.ts` and `hooks/useArtists.ts`. **This is production code.** The worker source is **not** in this repo — it's a separate Cloudflare Worker project maintained in its own repository, and the app only talks to the deployed URL above over HTTP.
 
 #### Theming (`theme/tokens.ts`)
 - `colors` — `purple` (bg), `green` (`#AFFC41`), `text` (`#E7E5E5` "Alabaster gray", secondary text), `textDim` (translucent gray for placeholders), `pillDim`. There is **no** `bone`/`boneDim` token (renamed to `text`/`textDim`).
