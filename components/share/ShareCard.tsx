@@ -4,10 +4,11 @@
 // show. Purely presentational and fully determined by props — the show page
 // mounts it off-screen and captures its ref with react-native-view-shot.
 //
-// Three stacked layers, no band or hairline: full-bleed artwork, a subtle éist-
-// purple wash whose transparent→purple ramp crosses the golden line (so φ still
-// governs the composition), and the show title / artist / date·time superimposed
-// bottom-left. A faint text shadow guarantees legibility over any artwork.
+// Stacked layers, no band or hairline: full-bleed artwork, a subtle éist-purple
+// wash (an even all-over cast plus a bottom-only deepen that eases in from the
+// golden line, so φ still governs the composition), and the show title / artist /
+// date·time superimposed bottom-left. A faint text shadow guarantees legibility
+// over any artwork.
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
@@ -36,11 +37,16 @@ export const ShareCard = React.forwardRef<View, ShareCardProps>(
           onLoad={onArtworkLoad}
         />
 
-        {/* Purple wash: transparent through the top half, ramping to near-solid
-            éist purple at the bottom. The φ line (0.618) sits inside the ramp. */}
+        {/* Purple wash, two layers: an even éist-purple cast across the whole
+            card, plus a bottom-only deepen that eases in from the φ-ish 0.5 line
+            so the text stays legible over any artwork. */}
         <LinearGradient
-          colors={['rgba(71,51,255,0)', 'rgba(71,51,255,0.55)', 'rgba(71,51,255,0.92)']}
-          locations={[0.5, 0.72, 1]}
+          colors={['rgba(71,51,255,0.28)', 'rgba(71,51,255,0.28)']}
+          style={StyleSheet.absoluteFill}
+        />
+        <LinearGradient
+          colors={['rgba(71,51,255,0)', 'rgba(71,51,255,0.75)']}
+          locations={[0.5, 1]}
           style={StyleSheet.absoluteFill}
         />
 
