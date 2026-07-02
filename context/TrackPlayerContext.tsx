@@ -15,6 +15,7 @@ import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
 import { setupTrackPlayer } from '../utils/trackPlayerSetup';
 import { getLiveShowInfo } from '../utils/liveShowInfo';
+import { resolveIsPlaying } from '../utils/playbackUiState';
 
 // Only import TrackPlayer on mobile platforms
 let TrackPlayer: any, Event: any, State: any;
@@ -804,7 +805,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         Event.PlaybackState,
         async ({ state }: any) => {
           const wasPlaying = isPlayingRef.current
-          const playing = state === State.Playing
+          // Reflect the listening session, not the instantaneous decoder state.
+          // RNTP passes through Loading/Buffering/Ready on startup and every
+          // mid-stream rebuffer; mapping those to "stopped" flickers the button
+          // Stop→Listen→Stop right after play(). Hold steady through them while
+          // the user intends to play. See utils/playbackUiState.
+          const playing = resolveIsPlaying(state, userPlay.current)
           setIsPlaying(playing)
 
           // Only clear user intent if the stop was intentional (not due to network/error)
