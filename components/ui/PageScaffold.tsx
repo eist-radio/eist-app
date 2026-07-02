@@ -6,8 +6,8 @@ import { colors, space } from '../../theme/tokens';
 import { LiveNowIndicator } from './LiveNowIndicator';
 
 export function PageScaffold({
-  children, left, right, transparentBg = false, liveNow = false,
-}: { children: React.ReactNode; left?: React.ReactNode; right?: React.ReactNode; transparentBg?: boolean; liveNow?: boolean }) {
+  children, left, right, transparentBg = false, liveNow = false, frozenLiveNow = false,
+}: { children: React.ReactNode; left?: React.ReactNode; right?: React.ReactNode; transparentBg?: boolean; liveNow?: boolean; frozenLiveNow?: boolean }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.root, !transparentBg && { backgroundColor: colors.purple }]}>
@@ -21,6 +21,20 @@ export function PageScaffold({
             paint over it. */}
         {liveNow && (
           <View style={styles.liveNow}>
+            <LiveNowIndicator />
+          </View>
+        )}
+        {/* Swipe pages: the visible "live now" line is a single frozen overlay in
+            the Pager (so it stays put during swipes, like the logo and pills).
+            Here we render an invisible copy purely to reserve the identical
+            height — it self-syncs with the real one's text wrapping. */}
+        {frozenLiveNow && (
+          <View
+            style={[styles.liveNow, { opacity: 0 }]}
+            pointerEvents="none"
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          >
             <LiveNowIndicator />
           </View>
         )}

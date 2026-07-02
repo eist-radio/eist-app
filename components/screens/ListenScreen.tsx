@@ -1,5 +1,4 @@
 // components/screens/ListenScreen.tsx
-import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import React, { useCallback, useEffect, useState } from 'react'
 import {
@@ -476,24 +475,18 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     artworkSource = placeholderOfflineImage
   }
 
-  // Match the other pages' frozen indicator: green "live now: <DJ>" when live,
-  // dimmed "off air" otherwise.
-  const isLive = broadcastStatus === 'schedule'
-  // Don't show an indicator until the real state is known: the initial
-  // 'loading' status, or live-but-artist-still-resolving (artistName is still
-  // the off-air placeholder), would otherwise flash "live now: éist · off air".
-  const isStateResolving =
-    broadcastStatus === 'loading' || (isLive && artistName === 'éist · off air')
-  const liveTint = isLive ? colors.green : colors.textDim
-  const liveLabel = isLive ? `live now: ${artistName || 'éist'}` : 'off air'
-
   return (
-    <PageScaffold transparentBg>
+    // frozenLiveNow reserves the "live now" slot at the top; the visible line is
+    // the Pager's shared fixed overlay (drawn on every page, Listen included),
+    // so it stays put during swipes instead of scrolling with this page. Note:
+    // that overlay refreshes on its own ~60s clock (getLiveShowInfo), separate
+    // from this screen's schedule fetch that drives the artwork/title — so the
+    // two can briefly disagree at a show boundary before both settle.
+    <PageScaffold transparentBg frozenLiveNow>
       <ShowArtworkBackground
         source={artworkSource}
         onError={() => setImageFailed(true)} />
 
-      <View style={s.onair}>{!isStateResolving && (<><MaterialCommunityIcons name="headphones" size={21} color={colors.green} /><Eyebrow color={liveTint} style={{ flexShrink: 1 }}>{liveLabel}</Eyebrow></>)}</View>
       <View style={s.castRow}>
         <CastButton
           key={`cast-${castButtonNonce}-${isCastConnected}`}
@@ -542,17 +535,15 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
 }
 
 const s = StyleSheet.create({
-  // paddingRight matches LiveNowIndicator so the line clears the top-right
-  // spinning logo and wraps consistently with the other pages.
   // Spacing follows an ascending φ/Fibonacci rhythm (8 → 21 → 34) so the gaps
   // themselves encode grouping: tight within the title block, wider between
   // info blocks, widest before the play action. Type is a φ ladder anchored on
   // the shared 16px eyebrow: 16 → 26 (×φ) → 42 (×φ²).
-  onair: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 96 },
   // marginLeft pulls the native cast glyph flush with the content edge (the
-  // headphones/"live now"/title above): GCKUICastButton centres its glyph inside
-  // its size box, so without this it reads as indented from everything else.
-  castRow: { marginTop: 13, marginBottom: 21, marginLeft: -6 },
+  // "live now"/title above): GCKUICastButton centres its glyph inside its size
+  // box, so without this it reads as indented from everything else. No marginTop
+  // — the frozenLiveNow spacer above already provides the gap.
+  castRow: { marginBottom: 21, marginLeft: -6 },
   title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 42, lineHeight: 43, letterSpacing: -0.8, color: colors.green },
   artist: { fontFamily: font.body, fontWeight: '500', fontSize: 26, color: colors.green, marginTop: 8 },
   upNext: { marginTop: 21, gap: 8 },

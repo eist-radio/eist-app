@@ -13,12 +13,12 @@ import { requestListen } from '../../utils/listenNav';
 // getLiveShowInfo() sets this exact title when the station is off air.
 const OFF_AIR_TITLE = 'éist · off air';
 
-// Frozen indicator shown above the page eyebrow on every sub page. Tapping it
-// returns to the Listen page. Renders:
+// Frozen indicator the Pager draws as a fixed overlay on every page (Listen
+// included). Tapping it returns to the Listen page. Renders:
 //   • "live now: <DJ>" (green) while a show is broadcasting
-//   • "offline" (dimmed) once we've confirmed the network is down or there's no
-//      current show
-//   • nothing while still loading / unconfirmed (avoids a premature "offline" flash)
+//   • "off air" (dimmed) once the live schedule resolves with no current show
+//   • "offline" (dimmed) once we've confirmed the network is down
+//   • nothing while still loading / unconfirmed (avoids a premature flash)
 export function LiveNowIndicator() {
   const router = useRouter();
   const timeZone = useTimezoneChange();
@@ -43,9 +43,9 @@ export function LiveNowIndicator() {
     tint = colors.green;
     label = `live now: ${data!.djName || 'éist'}`;
   } else if (data) {
-    // Live schedule resolved with no current show.
+    // Live schedule resolved with no current show — the station isn't broadcasting.
     tint = colors.textDim;
-    label = 'offline';
+    label = 'off air';
   } else {
     // Still loading / unconfirmed — show nothing.
     return null;

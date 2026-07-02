@@ -4,6 +4,7 @@ import { Animated, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBa
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PAGE_COUNT, colors, space } from '../theme/tokens';
 import { registerListenScroll } from '../utils/listenNav';
+import { LiveNowIndicator } from './ui/LiveNowIndicator';
 import { PageScaffold } from './ui/PageScaffold';
 import { Pills } from './ui/Pills';
 import { SpinningLogo } from './ui/SpinningLogo';
@@ -62,6 +63,20 @@ export function Pager() {
           match the detail pages' logo (centred in a 100px top row) */}
       <View pointerEvents="none" style={{ position: 'absolute', top: insets.top + space.topGap, right: space.screenX }}>
         <SpinningLogo size={100} />
+      </View>
+      {/* shared "live now" line, frozen above all pages exactly like the logo
+          and pills — fully persistent, Listen page included, so it never moves
+          during a swipe. Positioned to match the reserved slot at the top of
+          each page's content (insets.top + 86); every page (Listen via a
+          spacer) reserves that height beneath it. Inert on the Listen page (0)
+          — tapping "go to Listen" there is a no-op; on sub pages box-none lets
+          the tap reach the inner Pressable while the empty band passes through
+          to the page below. */}
+      <View
+        pointerEvents={active === 0 ? 'none' : 'box-none'}
+        style={{ position: 'absolute', top: insets.top + 86, left: space.screenX, right: space.screenX }}
+      >
+        <LiveNowIndicator />
       </View>
     </View>
   );
