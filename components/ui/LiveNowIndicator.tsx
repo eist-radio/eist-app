@@ -63,7 +63,7 @@ export function LiveNowIndicator() {
       accessibilityRole="link"
       accessibilityLabel="Go to Listen"
     >
-      <MaterialCommunityIcons name="headphones" size={17} color={colors.green} />
+      <MaterialCommunityIcons name="headphones" size={19} color={colors.green} style={s.icon} />
       <Text style={[t.eyebrow, s.label, { color: tint }]}>{label}</Text>
     </Pressable>
   );
@@ -73,6 +73,13 @@ const s = StyleSheet.create({
   // marginBottom separates the row from the gray page eyebrow below it;
   // paddingRight keeps the text clear of the top-right spinning logo. The label
   // wraps instead of truncating, so long DJ names show in full.
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, paddingRight: 96 },
-  label: { flexShrink: 1 },
+  // alignItems flex-start (not center) so the icon stays pinned to the FIRST
+  // text line when the label wraps to two lines, rather than centering on the
+  // whole block.
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 16, paddingRight: 96 },
+  // lineHeight fixes the first line's box so the icon's marginTop can center it
+  // on that line's midpoint (with a 1px nudge down, letting it dip slightly
+  // below the text baseline).
+  label: { flexShrink: 1, lineHeight: 20 },
+  icon: { marginTop: 1 },
 });
