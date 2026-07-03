@@ -781,23 +781,42 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     previousNetworkState.current = current
   }, [networkState, attemptStreamRestart, isPlaying]) // Keep isPlaying in deps for logging
 
-  // Start playback when the éist item is tapped in CarPlay. CarPlay's Now Playing
-  // template can only control the already-active now-playing app — it can't
-  // cold-start audio — so the native CarPlay scene posts a notification that the
-  // EistCarPlayBridge module (only present in CarPlay builds) forwards here, and we
-  // kick off the real play() path. Once playing, iOS populates the car Now Playing
-  // screen with the show metadata/art and its transport controls go live.
+  // Start playback when the éist item is tapped in CarPlay. Uses a fast path
+  // that skips metadata fetch and Google Cast checks — just starts the stream
+  // so éist becomes the now-playing app and the system transport controls go
+  // live. Metadata is backfilled after playback begins.
   useEffect(() => {
     if (isWeb || Platform.OS !== 'ios') return
     const bridge = NativeModules.EistCarPlayBridge
     if (!bridge) return
 
     const emitter = new NativeEventEmitter(bridge)
-    const sub = emitter.addListener('EistCarPlayPlay', () => {
-      play().catch((error) => console.error('CarPlay play request failed:', error))
+    const sub = emitter.addListener('EistCarPlayPlay', async () => {
+      try {
+        if (!isPlayerReadyRef.current) {
+          await setupPlayer()
+        }
+        userPlay.current = true
+        await TrackPlayer.reset()
+        await TrackPlayer.add({
+          id: 'radio-stream-' + Date.now(),
+          url: STREAM_URL,
+          title: 'éist',
+          artist: '',
+          album: 'éist',
+          artwork: require('../assets/images/eist-logo.png'),
+          isLiveStream: true,
+        })
+        await TrackPlayer.play()
+        setIsPlaying(true)
+        storeLastPlayedState(true)
+        fetchAndUpdateShowMetadata().catch(() => {})
+      } catch (error) {
+        console.error('CarPlay play request failed:', error)
+      }
     })
     return () => sub.remove()
-  }, [isWeb, play])
+  }, [isWeb, setupPlayer, fetchAndUpdateShowMetadata])
 
   useEffect(() => {
     setupPlayer()

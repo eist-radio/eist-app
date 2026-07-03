@@ -77,13 +77,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
-    // Apple forbids CPNowPlayingTemplate as a ROOT template, so we still root on a
-    // one-item list — but the user never has to see or tap it. As soon as the
-    // CarPlay scene connects we start playback and push Now Playing (un-animated),
-    // so opening éist in the car lands straight on the transport screen.
-    interfaceController.setRootTemplate(makeRootTemplate(), animated: false) { [weak self] _, _ in
-      self?.startPlaybackAndShowNowPlaying(animated: false)
-    }
+    interfaceController.setRootTemplate(makeRootTemplate(), animated: false, completion: nil)
   }
 
   func templateApplicationScene(
@@ -96,8 +90,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   private func makeRootTemplate() -> CPListTemplate {
     let item = CPListItem(text: "éist", detailText: "live")
     item.handler = { [weak self] _, completion in
-      // Fallback path: the list is normally skipped (see didConnect), but if the
-      // user backs out to it, tapping the item still starts playback + Now Playing.
       self?.startPlaybackAndShowNowPlaying(animated: true)
       completion()
     }
