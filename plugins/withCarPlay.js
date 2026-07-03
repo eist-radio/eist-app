@@ -77,7 +77,13 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
-    interfaceController.setRootTemplate(makeRootTemplate(), animated: true, completion: nil)
+    // Apple forbids CPNowPlayingTemplate as a ROOT template, so we still root on a
+    // one-item list — but the user never has to see or tap it. As soon as the
+    // CarPlay scene connects we start playback and push Now Playing (un-animated),
+    // so opening éist in the car lands straight on the transport screen.
+    interfaceController.setRootTemplate(makeRootTemplate(), animated: false) { [weak self] _, _ in
+      self?.startPlaybackAndShowNowPlaying(animated: false)
+    }
   }
 
   func templateApplicationScene(
@@ -90,30 +96,37 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   private func makeRootTemplate() -> CPListTemplate {
     let item = CPListItem(text: "éist", detailText: "live")
     item.handler = { [weak self] _, completion in
-      // Start the live stream, THEN show Now Playing. CPNowPlayingTemplate can only
-      // *control* the app that is already the system now-playing app — it cannot
-      // cold-start playback. So tapping the item must kick off éist's own audio
-      // (react-native-track-player, JS side); once it's playing, éist becomes the
-      // now-playing app and iOS fills in this Now Playing screen with title/art and
-      // makes the transport controls live. EistCarPlayBridge forwards this
-      // notification to JS, which calls TrackPlayer play(). See withCarPlay.js.
-      NotificationCenter.default.post(name: EistCarPlayBridge.playRequested, object: nil)
-      self?.showNowPlaying()
+      // Fallback path: the list is normally skipped (see didConnect), but if the
+      // user backs out to it, tapping the item still starts playback + Now Playing.
+      self?.startPlaybackAndShowNowPlaying(animated: true)
       completion()
     }
     let section = CPListSection(items: [item])
     return CPListTemplate(title: "éist", sections: [section])
   }
 
+  // Post the play request to JS (react-native-track-player, via EistCarPlayBridge)
+  // then push Now Playing. Kept together because Now Playing's transport controls
+  // only go live once éist is the active now-playing app, which only happens after
+  // JS actually starts the stream.
+  private func startPlaybackAndShowNowPlaying(animated: Bool) {
+    // Set the buffer flag FIRST, then post. If the JS runtime isn't ready yet
+    // (cold CarPlay launch), the post is dropped but EistCarPlayBridge replays this
+    // flag as soon as JS subscribes — so the play request is never lost.
+    EistCarPlayBridge.pendingPlay = true
+    NotificationCenter.default.post(name: EistCarPlayBridge.playRequested, object: nil)
+    showNowPlaying(animated: animated)
+  }
+
   // Push (never root) the system Now Playing screen. Its play/stop button drives
   // MPRemoteCommandCenter, which react-native-track-player handles in
   // trackPlayerService.js — so tapping play here starts the live stream.
-  private func showNowPlaying() {
+  private func showNowPlaying(animated: Bool) {
     let nowPlaying = CPNowPlayingTemplate.shared
     nowPlaying.isUpNextButtonEnabled = false
     nowPlaying.isAlbumArtistButtonEnabled = false
     if interfaceController?.topTemplate !== nowPlaying {
-      interfaceController?.pushTemplate(nowPlaying, animated: true, completion: nil)
+      interfaceController?.pushTemplate(nowPlaying, animated: animated, completion: nil)
     }
   }
 }
@@ -188,6 +201,17 @@ class EistCarPlayBridge: RCTEventEmitter {
   // Emitted to JS (listened for in TrackPlayerContext).
   static let playEvent = "EistCarPlayPlay"
 
+  // ── Cold-start race buffer ────────────────────────────────────────────────
+  // The CarPlay list/Now Playing UI is drawn NATIVELY by CarPlaySceneDelegate, so
+  // it appears and accepts a tap before React Native has finished starting and this
+  // module has registered its notification observer. A tap in that window would
+  // post into the void and be lost — the exact "dead play button on first open"
+  // symptom. So CarPlaySceneDelegate ALSO sets this static flag on tap, and we
+  // replay it the moment JS attaches its listener (startObserving). Static because
+  // the flag must survive from "scene tapped" until "module instantiated + JS
+  // subscribed", which may span the whole RN cold-launch.
+  static var pendingPlay = false
+
   private var hasListeners = false
 
   override static func requiresMainQueueSetup() -> Bool { false }
@@ -195,8 +219,6 @@ class EistCarPlayBridge: RCTEventEmitter {
   override func supportedEvents() -> [String]! { [EistCarPlayBridge.playEvent] }
 
   // RCTEventEmitter calls these when JS adds/removes its first/last listener.
-  // Only observe the notification while JS is listening so events aren't dropped
-  // into a bridge with no observers (which logs a warning).
   override func startObserving() {
     hasListeners = true
     NotificationCenter.default.addObserver(
@@ -204,6 +226,11 @@ class EistCarPlayBridge: RCTEventEmitter {
       selector: #selector(handlePlayRequested),
       name: EistCarPlayBridge.playRequested,
       object: nil)
+    // Deliver a tap that landed before JS was ready to hear it.
+    if EistCarPlayBridge.pendingPlay {
+      EistCarPlayBridge.pendingPlay = false
+      sendEvent(withName: EistCarPlayBridge.playEvent, body: nil)
+    }
   }
 
   override func stopObserving() {
@@ -212,7 +239,8 @@ class EistCarPlayBridge: RCTEventEmitter {
   }
 
   @objc private func handlePlayRequested() {
-    guard hasListeners else { return }
+    // JS is subscribed, so consume the buffered intent and forward immediately.
+    EistCarPlayBridge.pendingPlay = false
     sendEvent(withName: EistCarPlayBridge.playEvent, body: nil)
   }
 }
