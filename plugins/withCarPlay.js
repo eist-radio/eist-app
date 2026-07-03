@@ -90,6 +90,14 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   private func makeRootTemplate() -> CPListTemplate {
     let item = CPListItem(text: "éist", detailText: "live")
     item.handler = { [weak self] _, completion in
+      // Start the live stream, THEN show Now Playing. CPNowPlayingTemplate can only
+      // *control* the app that is already the system now-playing app — it cannot
+      // cold-start playback. So tapping the item must kick off éist's own audio
+      // (react-native-track-player, JS side); once it's playing, éist becomes the
+      // now-playing app and iOS fills in this Now Playing screen with title/art and
+      // makes the transport controls live. EistCarPlayBridge forwards this
+      // notification to JS, which calls TrackPlayer play(). See withCarPlay.js.
+      NotificationCenter.default.post(name: EistCarPlayBridge.playRequested, object: nil)
       self?.showNowPlaying()
       completion()
     }
@@ -160,6 +168,63 @@ class PhoneSceneDelegate: UIResponder, UIWindowSceneDelegate {
     window.makeKeyAndVisible()
   }
 }
+`;
+
+// Tiny native → JS bridge so the CarPlay list-item tap can start playback.
+// CarPlay's Now Playing template cannot cold-start audio (it only controls the
+// already-active now-playing app), and playback lives in react-native-track-
+// player on the JS side. This RCTEventEmitter forwards a NotificationCenter post
+// (from CarPlaySceneDelegate) to JS, where TrackPlayerContext calls play().
+// newArch is off in this app, so a classic RCTEventEmitter + RCT_EXTERN_MODULE
+// registration is the right shape. The module only exists in CarPlay builds; JS
+// guards on NativeModules.EistCarPlayBridge being present.
+const EIST_CARPLAY_BRIDGE_SWIFT = `import Foundation
+import React
+
+@objc(EistCarPlayBridge)
+class EistCarPlayBridge: RCTEventEmitter {
+  // Posted by CarPlaySceneDelegate when the éist list item is tapped.
+  static let playRequested = Notification.Name("EistCarPlayPlayRequested")
+  // Emitted to JS (listened for in TrackPlayerContext).
+  static let playEvent = "EistCarPlayPlay"
+
+  private var hasListeners = false
+
+  override static func requiresMainQueueSetup() -> Bool { false }
+
+  override func supportedEvents() -> [String]! { [EistCarPlayBridge.playEvent] }
+
+  // RCTEventEmitter calls these when JS adds/removes its first/last listener.
+  // Only observe the notification while JS is listening so events aren't dropped
+  // into a bridge with no observers (which logs a warning).
+  override func startObserving() {
+    hasListeners = true
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handlePlayRequested),
+      name: EistCarPlayBridge.playRequested,
+      object: nil)
+  }
+
+  override func stopObserving() {
+    hasListeners = false
+    NotificationCenter.default.removeObserver(self)
+  }
+
+  @objc private func handlePlayRequested() {
+    guard hasListeners else { return }
+    sendEvent(withName: EistCarPlayBridge.playEvent, body: nil)
+  }
+}
+`;
+
+// ObjC registration is required for a Swift RCTEventEmitter to be exported to the
+// JS module registry under the old architecture.
+const EIST_CARPLAY_BRIDGE_OBJC = `#import <React/RCTBridgeModule.h>
+#import <React/RCTEventEmitter.h>
+
+@interface RCT_EXTERN_MODULE(EistCarPlayBridge, RCTEventEmitter)
+@end
 `;
 
 function withCarPlayEntitlement(config) {
@@ -271,6 +336,8 @@ function withCarPlaySceneDelegateFiles(config) {
   const files = [
     { name: 'CarPlaySceneDelegate.swift', source: CARPLAY_SCENE_DELEGATE_SWIFT },
     { name: 'PhoneSceneDelegate.swift', source: PHONE_SCENE_DELEGATE_SWIFT },
+    { name: 'EistCarPlayBridge.swift', source: EIST_CARPLAY_BRIDGE_SWIFT },
+    { name: 'EistCarPlayBridge.m', source: EIST_CARPLAY_BRIDGE_OBJC },
   ];
 
   // Write the Swift sources into ios/<project>/.

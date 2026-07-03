@@ -9,7 +9,7 @@ import {
   useRef,
   useState
 } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
@@ -780,6 +780,24 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     previousNetworkState.current = current
   }, [networkState, attemptStreamRestart, isPlaying]) // Keep isPlaying in deps for logging
+
+  // Start playback when the éist item is tapped in CarPlay. CarPlay's Now Playing
+  // template can only control the already-active now-playing app — it can't
+  // cold-start audio — so the native CarPlay scene posts a notification that the
+  // EistCarPlayBridge module (only present in CarPlay builds) forwards here, and we
+  // kick off the real play() path. Once playing, iOS populates the car Now Playing
+  // screen with the show metadata/art and its transport controls go live.
+  useEffect(() => {
+    if (isWeb || Platform.OS !== 'ios') return
+    const bridge = NativeModules.EistCarPlayBridge
+    if (!bridge) return
+
+    const emitter = new NativeEventEmitter(bridge)
+    const sub = emitter.addListener('EistCarPlayPlay', () => {
+      play().catch((error) => console.error('CarPlay play request failed:', error))
+    })
+    return () => sub.remove()
+  }, [isWeb, play])
 
   useEffect(() => {
     setupPlayer()
