@@ -4,12 +4,10 @@
 // show. Purely presentational and fully determined by props — the show page
 // mounts it off-screen and captures its ref with react-native-view-shot.
 //
-// Stacked layers, no band or hairline: full-bleed artwork, a subtle éist-purple
-// wash (an even all-over cast plus a bottom-only deepen that eases in from the
-// golden line, so φ still governs the composition), and the show title / artist /
-// date·time superimposed bottom-left. A faint text shadow guarantees legibility
-// over any artwork.
-import { LinearGradient } from 'expo-linear-gradient';
+// Stacked layers, no band or hairline: full-bleed artwork, an éist-purple wash (a
+// single even all-over cast — no bottom deepen — so the whole image reads as one
+// uniform wash), and the show title / artist / date·time superimposed bottom-left.
+// A faint text shadow guarantees legibility over any artwork.
 import React from 'react';
 import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 import { colors, font } from '../../theme/tokens';
@@ -37,18 +35,10 @@ export const ShareCard = React.forwardRef<View, ShareCardProps>(
           onLoad={onArtworkLoad}
         />
 
-        {/* Purple wash, two layers: an even éist-purple cast across the whole
-            card, plus a bottom-only deepen that eases in from the φ-ish 0.5 line
-            so the text stays legible over any artwork. */}
-        <LinearGradient
-          colors={['rgba(71,51,255,0.28)', 'rgba(71,51,255,0.28)']}
-          style={StyleSheet.absoluteFill}
-        />
-        <LinearGradient
-          colors={['rgba(71,51,255,0)', 'rgba(71,51,255,0.75)']}
-          locations={[0.5, 1]}
-          style={StyleSheet.absoluteFill}
-        />
+        {/* Purple wash: a single even éist-purple cast across the whole card
+            (no bottom deepen), so the whole image reads as one uniform wash. The
+            text shadow below carries legibility over any artwork. */}
+        <View style={[StyleSheet.absoluteFill, s.wash]} />
 
         {/* Show text, superimposed bottom-left. */}
         <View style={s.textBlock}>
@@ -81,6 +71,7 @@ const shadow = {
 
 const s = StyleSheet.create({
   card: { width: SHARE_CARD_WIDTH, height: SHARE_CARD_HEIGHT, backgroundColor: colors.purple },
+  wash: { backgroundColor: 'rgba(71,51,255,0.40)' },
   textBlock: { position: 'absolute', left: 72, right: 72, bottom: 120 },
   title: {
     fontFamily: font.headingBold,
