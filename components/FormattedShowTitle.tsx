@@ -11,6 +11,8 @@ interface FormattedShowTitleProps {
   numberOfLines?: number;
   noWrap?: boolean;
   asContent?: boolean;
+  adjustsFontSizeToFit?: boolean;
+  minimumFontScale?: number;
 }
 
 const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
@@ -22,13 +24,25 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
   numberOfLines,
   noWrap = false,
   asContent = false,
+  adjustsFontSizeToFit = false,
+  minimumFontScale,
 }) => {
   const iconSize = Platform.OS === 'ios' ? size * 0.9 : size;
 
   // apply line constraints only when needed
   const lines = noWrap ? 1 : numberOfLines;
-  const lineProps =
-    lines != null ? { numberOfLines: lines as number, ellipsizeMode: 'tail' as const } : {};
+  // When shrinking to fit, numberOfLines must be set for adjustsFontSizeToFit to
+  // take effect; long words shrink the whole title uniformly instead of breaking.
+  const lineProps = adjustsFontSizeToFit
+    ? {
+        adjustsFontSizeToFit: true,
+        minimumFontScale: minimumFontScale ?? 0.5,
+        numberOfLines: (lines ?? 2) as number,
+        ellipsizeMode: 'tail' as const,
+      }
+    : lines != null
+      ? { numberOfLines: lines as number, ellipsizeMode: 'tail' as const }
+      : {};
 
   // Case 1: exactly "éist arís"
   if (title === 'éist arís') {

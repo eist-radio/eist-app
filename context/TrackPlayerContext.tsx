@@ -9,10 +9,13 @@ import {
   useRef,
   useState
 } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
 import { setupTrackPlayer } from '../utils/trackPlayerSetup';
+import { getLiveShowInfo } from '../utils/liveShowInfo';
+import { resolveIsPlaying } from '../utils/playbackUiState';
 
 // Only import TrackPlayer on mobile platforms
 let TrackPlayer: any, Event: any, State: any;
@@ -32,14 +35,15 @@ const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
 type TrackPlayerContextType = {
   isPlaying: boolean
   isPlayerReady: boolean
-  play: () => Promise<void>
+  play: (options?: { castOnly?: boolean }) => Promise<void>
   stop: () => Promise<void>
   togglePlayStop: () => Promise<void>
   setupPlayer: () => Promise<void>
   updateMetadata: (
     title: string,
     artist: string,
-    artworkUrl?: string
+    artworkUrl?: string,
+    showTime?: string
   ) => Promise<void>
   recoverAudioSession: () => Promise<void>
   forcePlayerReset: () => Promise<void>
@@ -47,6 +51,10 @@ type TrackPlayerContextType = {
   showTitle: string;
   showArtist: string;
   showArtworkUrl: string | undefined;
+  // Cast-related state (exposed from CastContext for convenience)
+  isCastConnected: boolean;
+  isCastPlaying: boolean;
+  castDeviceName: string | null;
 }
 
 const TrackPlayerContext = createContext<TrackPlayerContextType | undefined>(
@@ -62,14 +70,33 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const [isPlaying, setIsPlaying] = useState(false)
   const [isPlayerReady, setIsPlayerReady] = useState(false)
 
+  // Cast context for Chromecast integration
+  const {
+    isCastConnected,
+    isCastPlaying,
+    castDeviceName,
+    castPlay,
+    castStop,
+    updateCastMetadata,
+  } = useCast()
+
   // Store the latest show metadata in state
   const [showTitle, setShowTitle] = useState<string>('éist');
   const [showArtist, setShowArtist] = useState<string>('');
   const [showArtworkUrl, setShowArtworkUrl] = useState<string | undefined>(undefined);
+  const showTimeRef = useRef<string>('');
+  // End time (ISO) of the current live show, used to schedule the next Now
+  // Playing refresh for exactly when the show changes rather than guessing.
+  const currentEndDateRef = useRef<string | undefined>(undefined);
 
   const hasInitialized = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const isPlayingRef = useRef(isPlaying)
+  // Mirror of isPlayerReady so mount-registered listeners / stale closures
+  // (attemptStreamRestart -> play -> setupPlayer) read the LIVE readiness
+  // instead of the value captured on first render. Kept in sync synchronously
+  // alongside every setIsPlayerReady call below.
+  const isPlayerReadyRef = useRef(isPlayerReady)
   const wasPlayingBeforeBackground = useRef(false)
 
   // Separate user intent tracking from actual playback state
@@ -79,8 +106,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isRecovering = useRef(false);
   const retryTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Metadata refresh interval
-  const metadataRefreshInterval = useRef<NodeJS.Timeout | null>(null);
+  // Deadline-driven metadata refresh timer (fires just after the current show ends)
+  const metadataRefreshTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Network connectivity tracking
   const networkState = useNetworkConnectivity()
@@ -122,7 +149,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   // Clean reset of the stream while preserving metadata display
-  const cleanResetPlayer = async () => {
+  // Optional metadata parameter allows passing freshly fetched metadata directly
+  // (since React setState is async and state may not be updated yet)
+  const cleanResetPlayer = async (metadata?: { title: string; artist: string; artworkUrl?: string }) => {
     if (isWeb) {
       // Clean reset for web audio
       if (audioRef.current) {
@@ -148,21 +177,25 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Small delay to ensure cleanup
       await new Promise(resolve => setTimeout(resolve, 100))
 
-      // Re-add fresh stream track with preserved metadata if available
-      let artwork = currentTrack?.artwork || showArtworkUrl || require('../assets/images/eist-logo.png')
-      
+      // Use passed metadata first, then current track, then state fallbacks
+      const trackTitle = metadata?.title || currentTrack?.title || showTitle || 'éist'
+      const trackArtist = metadata?.artist || currentTrack?.artist || showArtist || ''
+      let artwork = metadata?.artworkUrl || currentTrack?.artwork || showArtworkUrl || require('../assets/images/eist-logo.png')
+
       // Use the lock screen image utility for proper Android handling
       artwork = getLockScreenImage(artwork)
-      
+
       const trackToAdd = {
         id: 'radio-stream-' + Date.now(), // Unique ID for fresh track
         url: STREAM_URL,
-        title: currentTrack?.title || showTitle || 'éist',
-        artist: currentTrack?.artist || (showArtist ? `${showArtist} · éist` : 'éist'),
+        title: trackTitle,
+        artist: trackArtist,
+        album: 'éist',
         artwork: artwork,
         isLiveStream: true,
       }
-      
+
+
       try {
         await TrackPlayer.add(trackToAdd)
       } catch (addError) {
@@ -171,10 +204,27 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      console.log('Clean reset completed')
     } catch (err) {
       console.error('Clean reset failed:', err)
       throw err
+    }
+  }
+
+  const stopLocalPlaybackForCast = async () => {
+    if (isWeb) {
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+      setIsPlaying(false)
+      return
+    }
+
+    try {
+      await TrackPlayer.stop()
+    } catch (err) {
+      console.error('Failed to stop local playback for cast:', err)
+    } finally {
+      setIsPlaying(false)
     }
   }
 
@@ -195,7 +245,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           id: 'radio-display-' + Date.now(),
           url: STREAM_URL,
           title: showTitle || 'éist',
-          artist: showArtist ? `${showArtist} · éist` : 'éist',
+          artist: showArtist || '',
+          album: 'éist',
           artwork: artwork,
           isLiveStream: true,
           duration: -1, // Live stream indicator
@@ -213,11 +264,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const setupPlayer = async () => {
-    if (hasInitialized.current && isPlayerReady) {
+    if (hasInitialized.current && isPlayerReadyRef.current) {
       return
     }
 
     if (isWeb) {
+      isPlayerReadyRef.current = true
       setIsPlayerReady(true)
       return
     }
@@ -227,11 +279,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       try {
         const state = await TrackPlayer.getPlaybackState()
         hasInitialized.current = true
+        isPlayerReadyRef.current = true
         setIsPlayerReady(true)
         return
       } catch (checkError) {
         // TrackPlayer not initialized yet, proceed with setup
-        console.log('TrackPlayer not initialized, proceeding with setup')
       }
 
       if (!hasInitialized.current) {
@@ -240,19 +292,20 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         hasInitialized.current = true
       }
 
+      isPlayerReadyRef.current = true
       setIsPlayerReady(true)
-      console.log('Player setup completed')
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message.toLowerCase() : ''
       if (errorMsg.includes('already been initialized')) {
-        console.log('TrackPlayer already initialized, continuing...')
         hasInitialized.current = true
+        isPlayerReadyRef.current = true
         setIsPlayerReady(true)
         return
       }
 
       console.error('Player setup failed:', err)
       hasInitialized.current = false
+      isPlayerReadyRef.current = false
       setIsPlayerReady(false)
       throw err
     }
@@ -264,12 +317,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     
     // Use userPlay instead of isPlayingRef.current
     if (!userPlay.current) {
-      console.log('Not restarting - user has stopped playback')
       return
     }
 
     isRecovering.current = true
-    console.log(`Attempting stream restart due to: ${reason}`)
 
     // Clear any existing retry timeout
     if (retryTimeout.current) {
@@ -307,6 +358,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       // Reset player state
+      isPlayerReadyRef.current = false
       setIsPlayerReady(false)
       hasInitialized.current = false
 
@@ -320,7 +372,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       if (userPlay.current) {
         await setupPlayer()
         await play()
-        console.log(`Stream restart completed after: ${reason}`)
       }
     } catch (err) {
       console.error(`Restart failed after ${reason}:`, err)
@@ -338,32 +389,31 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const retryDelay = Math.min(5000 + Math.random() * 5000, 60000) // 5-10s with max 60s
     
     retryTimeout.current = setTimeout(() => {
-      console.log(`Retrying stream restart after delay for: ${reason}`)
       attemptStreamRestart(`retry-${reason}`)
     }, retryDelay)
   }
 
   // Fetch the latest show metadata from the radiocult API and update state/metadata
-  const fetchAndUpdateShowMetadata = async () => {
+  // Returns the fetched metadata for immediate use (since setState is async)
+  const fetchAndUpdateShowMetadata = async (): Promise<{ title: string; artist: string; artworkUrl?: string; showTime: string; endDateUtc?: string } | null> => {
     try {
-      const response = await fetch('https://api.radiocult.fm/api/station/eist/schedule/live')
-      if (!response.ok) throw new Error('Failed to fetch show metadata')
+      const liveInfo = await getLiveShowInfo()
+      if (!liveInfo) {
+        throw new Error('No live show info available')
+      }
 
-      const data = await response.json()
-      const title = data?.title || 'éist'
-      const artist = data?.artist || ''
-      let artworkUrl = data?.artworkUrl || undefined
+      const title = liveInfo.title || 'éist'
+      const artist = liveInfo.djName || ''
+      let artworkUrl = liveInfo.artworkUrl || undefined
+      const showTime = liveInfo.showTime || ''
+      const endDateUtc = liveInfo.endDateUtc
 
       // Check if metadata has actually changed
-      const hasMetadataChanged = 
-        title !== showTitle || 
-        artist !== showArtist || 
-        artworkUrl !== showArtworkUrl
-
-      if (!hasMetadataChanged) {
-        console.log('Metadata unchanged, skipping update')
-        return
-      }
+      const hasMetadataChanged =
+        title !== showTitle ||
+        artist !== showArtist ||
+        artworkUrl !== showArtworkUrl ||
+        showTime !== showTimeRef.current
 
       // For Android, invalidate previous artwork cache if URL changed
       if (Platform.OS === 'android' && showArtworkUrl && showArtworkUrl !== artworkUrl) {
@@ -388,35 +438,111 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setShowTitle(title)
       setShowArtist(artist)
       setShowArtworkUrl(artworkUrl)
+      showTimeRef.current = showTime
+      currentEndDateRef.current = endDateUtc
 
-      // First update metadata with current state (might use fallback image for Android)
-      await updateMetadata(title, artist, artworkUrl)
+      // Update track metadata if it changed
+      if (hasMetadataChanged) {
+        // First update metadata with current state (might use fallback image for Android)
+        await updateMetadata(title, artist, artworkUrl, showTime)
 
-      // Then preload the lock screen image for Android and update metadata again if successful
-      if (Platform.OS === 'android' && artworkUrl) {
-        const imagePreloaded = await preloadLockScreenImage(artworkUrl)
-        if (imagePreloaded) {
-          // Update metadata again with the validated artwork
-          await updateMetadata(title, artist, artworkUrl)
-          console.log('Lock screen image updated after preload validation')
+        // Then preload the lock screen image for Android and update metadata again if successful
+        if (Platform.OS === 'android' && artworkUrl) {
+          const imagePreloaded = await preloadLockScreenImage(artworkUrl)
+          if (imagePreloaded) {
+            // Update metadata again with the validated artwork
+            await updateMetadata(title, artist, artworkUrl, showTime)
+          }
         }
+
       }
-      
-      console.log('Metadata updated successfully:', { title, artist, artworkUrl })
+
+      // Return the metadata for immediate use
+      return { title, artist, artworkUrl, showTime, endDateUtc }
     } catch (err) {
       console.error('Failed to fetch or update show metadata:', err)
       // Fallback to previous state/metadata
       try {
-        await updateMetadata(showTitle, showArtist, showArtworkUrl)
+        await updateMetadata(showTitle, showArtist, showArtworkUrl, showTimeRef.current)
       } catch (fallbackErr) {
         console.error('Failed to update fallback metadata:', fallbackErr)
       }
+      return null
     }
   }
 
-  const play = useCallback(async () => {
+  const play = useCallback(async (options?: { castOnly?: boolean }) => {
     // Set user intent first
     userPlay.current = true
+    const castOnly = options?.castOnly === true
+
+    // Check if casting - either via state or by checking for active session
+    let shouldCast = isCastConnected
+
+    // Double-check for active cast session in case state hasn't updated yet
+    if (!shouldCast && Platform.OS !== 'web') {
+      try {
+        const GoogleCast = require('react-native-google-cast').default
+        const sessionManager = GoogleCast.getSessionManager()
+        const session = await sessionManager.getCurrentCastSession()
+        if (session) {
+          shouldCast = true
+        }
+      } catch (e) {
+        // Ignore errors - just means no cast session
+      }
+    }
+
+    // If casting, route playback to cast device instead of local
+    if (shouldCast) {
+      try {
+        await stopLocalPlaybackForCast()
+        let castTitle = showTitle || 'éist'
+        let castArtist = showArtist || ''
+        let castArtwork = showArtworkUrl
+        let castShowTime = showTimeRef.current
+
+        try {
+          const liveInfo = await getLiveShowInfo()
+          if (liveInfo) {
+            castTitle = liveInfo.title || castTitle
+            castArtist = liveInfo.djName || castArtist
+            castArtwork = liveInfo.artworkUrl || castArtwork
+            castShowTime = liveInfo.showTime || castShowTime
+
+            setShowTitle(castTitle)
+            setShowArtist(castArtist)
+            setShowArtworkUrl(castArtwork)
+            if (castShowTime) {
+              showTimeRef.current = castShowTime
+            }
+          }
+        } catch (liveErr) {
+          console.warn('Failed to prefetch live show info for cast:', liveErr)
+        }
+
+        const castSuccess = await castPlay(
+          castTitle,
+          castArtist,
+          castArtwork,
+          castShowTime
+        )
+        if (castSuccess) {
+          setIsPlaying(true)
+          await storeLastPlayedState(true)
+          return
+        }
+        if (castOnly) {
+          setIsPlaying(false)
+          await storeLastPlayedState(false)
+          return
+        }
+        // Fall through to local playback
+      } catch (err) {
+        console.error('Cast play failed, falling back to local:', err)
+        // Fall through to local playback
+      }
+    }
 
     if (isWeb) {
       // Clean reset for web
@@ -444,20 +570,23 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Ensure player is ready
-      if (!isPlayerReady) {
+      // Ensure player is ready. Read readiness from the ref (not the captured
+      // isPlayerReady state) so recovery paths driven by mount-registered
+      // listeners see the live value and actually reach TrackPlayer.play().
+      if (!isPlayerReadyRef.current) {
         await setupPlayer()
-        if (!isPlayerReady) {
+        if (!isPlayerReadyRef.current) {
           await attemptStreamRestart('player-not-ready')
           return
         }
       }
 
-      // Always perform clean reset before playing
-      await cleanResetPlayer()
+      // Fetch fresh metadata FIRST and pass directly to cleanResetPlayer
+      // (React setState is async so state won't be updated yet)
+      const metadata = await fetchAndUpdateShowMetadata()
 
-      // Fetch fresh metadata before starting playback
-      await fetchAndUpdateShowMetadata()
+      // Now perform clean reset with fresh metadata passed directly
+      await cleanResetPlayer(metadata || undefined)
 
       // Start playback with muted volume to allow buffering without glitch
       await TrackPlayer.setVolume(0)
@@ -471,7 +600,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Gradually restore volume to avoid jarring audio start
       await TrackPlayer.setVolume(1)
 
-      console.log('Stream started successfully')
     } catch (err) {
       console.error('Play failed:', err)
       
@@ -485,10 +613,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
       // Use unified restart for all play errors
-      console.log('Play failed, attempting restart...')
       await attemptStreamRestart('play-error')
     }
-  }, [isPlayerReady, isWeb, setupPlayer, attemptStreamRestart, cleanResetPlayer, fetchAndUpdateShowMetadata])
+  }, [isPlayerReady, isWeb, setupPlayer, attemptStreamRestart, cleanResetPlayer, fetchAndUpdateShowMetadata, isCastConnected, castPlay, showTitle, showArtist, showArtworkUrl])
 
   const stop = useCallback(async () => {
     // Clear user intent when manually stopping
@@ -498,6 +625,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (retryTimeout.current) {
       clearTimeout(retryTimeout.current)
       retryTimeout.current = null
+    }
+
+    // If casting, stop cast playback
+    if (isCastConnected || isCastPlaying) {
+      try {
+        await castStop()
+      } catch (err) {
+        console.error('Cast stop failed:', err)
+      }
     }
 
     if (isWeb) {
@@ -513,7 +649,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      console.log('Stopping playback...')
 
       // Stop playback but preserve metadata for lock screen/CarPlay
       await TrackPlayer.stop()
@@ -524,14 +659,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setIsPlaying(false)
       await storeLastPlayedState(false)
 
-      console.log('Stream stopped')
     } catch (err) {
       console.error('Stop failed:', err)
       // Force stop even if there's an error
       setIsPlaying(false)
       await storeLastPlayedState(false)
     }
-  }, [isWeb, ensureTrackForDisplay])
+  }, [isWeb, ensureTrackForDisplay, isCastConnected, isCastPlaying, castStop])
 
   const togglePlayStop = async () => {
     if (isPlaying) {
@@ -552,21 +686,42 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const updateMetadata = async (
     title: string,
     artist: string,
-    artworkUrl?: string
+    artworkUrl?: string,
+    showTime?: string
   ) => {
+    if (showTime !== undefined) {
+      showTimeRef.current = showTime
+    }
+    const resolvedShowTime = showTime ?? showTimeRef.current
+
+    // Also update cast metadata if casting
+    if (isCastConnected || isCastPlaying) {
+      try {
+        await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
+      } catch (err) {
+        console.error('Failed to update cast metadata:', err)
+      }
+    }
+
     if (!isPlayerReady || isWeb) return
 
     try {
       const queue = await TrackPlayer.getQueue()
       if (!queue || queue.length === 0) {
-        console.log('No queue available for metadata update')
         return
       }
 
-      const trackIndex = 0
+      // Resolve the live track index instead of assuming 0. The queue can be
+      // reset between getQueue() and updateMetadataForTrack() (stream restarts,
+      // cleanResetPlayer), so derive the active index and bounds-check it to
+      // avoid "The track index is out of bounds".
+      const activeIndex = await TrackPlayer.getActiveTrackIndex().catch(() => undefined)
+      const trackIndex = typeof activeIndex === 'number' ? activeIndex : 0
+      if (trackIndex < 0 || trackIndex >= queue.length) {
+        return
+      }
 
       const isDeadAir = title.trim().length === 0
-      const metadataArtist = !artist || isDeadAir ? '' : `${artist} · éist`
 
       // Use appropriate artwork for Android lock screen and Android Auto compatibility
       let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
@@ -576,7 +731,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       const metadata = {
         title,
-        artist: isDeadAir ? '' : metadataArtist,
+        artist: isDeadAir ? '' : (artist || ''),
+        album: 'éist',
         artwork: artworkToUse,
         // Enhanced metadata for Android Auto and car OS compatibility
         duration: -1, // Live stream indicator
@@ -616,8 +772,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     // Check userPlay instead of isPlaying to handle network disconnection cases
     if (shouldRestart && userPlay.current) {
-      console.log(`Network change detected - Previous: ${previous.type}/${previous.isConnected}, Current: ${current.type}/${current.isConnected}`)
-      console.log(`User wants to play: ${userPlay.current}, Currently playing: ${isPlaying}`)
       
       setTimeout(async () => {
         await attemptStreamRestart(`network-change-${previous.type}-to-${current.type}`)
@@ -627,15 +781,54 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     previousNetworkState.current = current
   }, [networkState, attemptStreamRestart, isPlaying]) // Keep isPlaying in deps for logging
 
+  // Start playback when the éist item is tapped in CarPlay. CarPlay's Now Playing
+  // template can only control the already-active now-playing app — it can't
+  // cold-start audio — so the native CarPlay scene posts a notification that the
+  // EistCarPlayBridge module (only present in CarPlay builds) forwards here, and we
+  // kick off the real play() path. Once playing, iOS populates the car Now Playing
+  // screen with the show metadata/art and its transport controls go live.
+  useEffect(() => {
+    if (isWeb || Platform.OS !== 'ios') return
+    const bridge = NativeModules.EistCarPlayBridge
+    if (!bridge) return
+
+    const emitter = new NativeEventEmitter(bridge)
+    const sub = emitter.addListener('EistCarPlayPlay', () => {
+      play().catch((error) => console.error('CarPlay play request failed:', error))
+    })
+    return () => sub.remove()
+  }, [isWeb, play])
+
   useEffect(() => {
     setupPlayer()
 
     if (!isWeb) {
+      // Seed the Now Playing item at cold launch so CarPlay / the lock screen
+      // show the current show and expose a working play control before the
+      // phone UI is ever opened. Without this the CarPlay CPNowPlayingTemplate
+      // is empty (no metadata, no play target) until the user presses play in
+      // the app, which they can't do from the car. ensureTrackForDisplay adds a
+      // stopped-state track and fetchAndUpdateShowMetadata populates it.
+      ;(async () => {
+        try {
+          await setupPlayer()
+          await ensureTrackForDisplay()
+          await fetchAndUpdateShowMetadata()
+        } catch (error) {
+          console.error('Initial now-playing seed failed:', error)
+        }
+      })()
+
       const onState = TrackPlayer.addEventListener(
         Event.PlaybackState,
         async ({ state }: any) => {
           const wasPlaying = isPlayingRef.current
-          const playing = state === State.Playing
+          // Reflect the listening session, not the instantaneous decoder state.
+          // RNTP passes through Loading/Buffering/Ready on startup and every
+          // mid-stream rebuffer; mapping those to "stopped" flickers the button
+          // Stop→Listen→Stop right after play(). Hold steady through them while
+          // the user intends to play. See utils/playbackUiState.
+          const playing = resolveIsPlaying(state, userPlay.current)
           setIsPlaying(playing)
 
           // Only clear user intent if the stop was intentional (not due to network/error)
@@ -713,30 +906,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       })
 
-      // Set up periodic metadata refresh for Android lockscreen
-      if (Platform.OS === 'android') {
-        metadataRefreshInterval.current = setInterval(async () => {
-          if (isPlaying) {
-            try {
-              await fetchAndUpdateShowMetadata()
-            } catch (error) {
-              console.error('Periodic metadata refresh failed:', error)
-            }
-          }
-        }, 30000) // Refresh every 30 seconds when playing
-      }
+      // Now Playing refresh while playing is scheduled deadline-driven in a
+      // dedicated effect below (keyed on isPlaying), off the current show's
+      // actual end time rather than a wall-clock guess.
 
       return () => {
         onState.remove()
         onError.remove()
         onQueueEnded.remove()
         onAppState.remove()
-        
-        // Clear metadata refresh interval
-        if (metadataRefreshInterval.current) {
-          clearInterval(metadataRefreshInterval.current)
-          metadataRefreshInterval.current = null
-        }
         
         // Clear retry timeout
         if (retryTimeout.current) {
@@ -747,6 +925,64 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
+  // Deadline-driven Now Playing refresh. CarPlay's CPNowPlayingTemplate (and the
+  // lock screen / Android Auto) mirror MPNowPlayingInfoCenter, which only
+  // changes when we rewrite RNTP metadata. Rather than guessing when the show
+  // changes, we schedule the next refresh for the moment the CURRENT show ends —
+  // a timestamp the live API already gives us (endDateUtc) — then re-arm off the
+  // next show's end time. This stays correct for any show length or start
+  // minute. The loop lives exactly as long as playback: background audio keeps
+  // the JS run loop alive so it fires in the car with the phone backgrounded,
+  // and it's torn down on stop (a fresh fetch runs on the next play — see play()
+  // and the PlaybackState → Playing handler).
+  useEffect(() => {
+    if (isWeb || !isPlaying) return
+
+    // Fire just after the show ends so the backend schedule has rolled over.
+    const BUFFER_MS = 20_000
+    // Never sooner than the live-info cache TTL, so each refetch returns fresh
+    // data and we don't busy-loop when a deadline is already in the past.
+    const MIN_MS = 60_000
+    // Safety cap so a missing/erroneous end time still refreshes eventually.
+    const MAX_MS = 60 * 60_000
+
+    let cancelled = false
+
+    const armFor = (endDateUtc?: string) => {
+      let delay = MAX_MS
+      if (endDateUtc) {
+        const end = new Date(endDateUtc).getTime()
+        if (!Number.isNaN(end)) {
+          delay = end + BUFFER_MS - Date.now()
+        }
+      }
+      delay = Math.min(MAX_MS, Math.max(MIN_MS, delay))
+
+      metadataRefreshTimer.current = setTimeout(async () => {
+        if (cancelled) return
+        let nextEnd: string | undefined
+        try {
+          const meta = await fetchAndUpdateShowMetadata()
+          nextEnd = meta?.endDateUtc
+        } catch (error) {
+          console.error('Scheduled metadata refresh failed:', error)
+        }
+        if (!cancelled) armFor(nextEnd)
+      }, delay)
+    }
+
+    // Align the first refresh to the show that's already playing.
+    armFor(currentEndDateRef.current)
+
+    return () => {
+      cancelled = true
+      if (metadataRefreshTimer.current) {
+        clearTimeout(metadataRefreshTimer.current)
+        metadataRefreshTimer.current = null
+      }
+    }
+  }, [isPlaying, isWeb])
+
   const forceMetadataRefresh = async () => {
     try {
       await fetchAndUpdateShowMetadata()
@@ -755,10 +991,53 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  // Sync isPlaying state with cast playing state
+  useEffect(() => {
+    if (isCastConnected && isCastPlaying && !isPlaying) {
+      setIsPlaying(true)
+    } else if (isCastConnected && !isCastPlaying && isPlaying && userPlay.current) {
+      // Cast stopped but user wanted to play - might need to resume locally
+      // For now just sync state; user can press play again
+      setIsPlaying(false)
+    }
+  }, [isCastConnected, isCastPlaying, isPlaying])
+
+  // Handle cast disconnection - resume local playback if user was playing
+  const previousCastConnected = useRef(isCastConnected)
+  useEffect(() => {
+    const wasConnected = previousCastConnected.current
+
+    if (!wasConnected && isCastConnected && !isCastPlaying) {
+      const castOnly = !userPlay.current && !isPlayingRef.current
+      ;(async () => {
+        try {
+          await play({ castOnly })
+        } catch (err) {
+          console.error('Failed to start cast playback after connect:', err)
+        }
+      })()
+    }
+
+    if (wasConnected && !isCastConnected && userPlay.current) {
+      // Cast disconnected while user wanted to play - resume locally
+      // Small delay to let cast session fully end
+      setTimeout(async () => {
+        if (userPlay.current && !isPlayingRef.current) {
+          try {
+            await play()
+          } catch (err) {
+            console.error('Failed to resume local playback after cast disconnect:', err)
+          }
+        }
+      }, 1000)
+    }
+    previousCastConnected.current = isCastConnected
+  }, [isCastConnected, isCastPlaying, play])
+
   return (
     <TrackPlayerContext.Provider
       value={{
-        isPlaying,
+        isPlaying: isPlaying || isCastPlaying,
         isPlayerReady,
         play,
         stop,
@@ -771,6 +1050,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         showTitle,
         showArtist,
         showArtworkUrl,
+        isCastConnected,
+        isCastPlaying,
+        castDeviceName,
       }}
     >
       {children}

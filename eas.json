@@ -8,6 +8,7 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
+        "EXPO_ENABLE_CARPLAY": "true",
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
         "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
       }
@@ -27,8 +28,25 @@
       "node": "20.18.1",
       "autoIncrement": "true",
       "distribution": "store",
+      "ios": {
+        "image": "macos-tahoe-26.4-xcode-26.4"
+      },
       "env": {
         "API_KEY": "@API_KEY",
+        "EXPO_ENABLE_CARPLAY": "true",
+        "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
+        "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
+      }
+    },
+    "production-local": {
+      "node": "20.18.1",
+      "autoIncrement": true,
+      "distribution": "store",
+      "ios": {
+        "image": "macos-tahoe-26.4-xcode-26.4"
+      },
+      "env": {
+        "EXPO_ENABLE_CARPLAY": "true",
         "GRADLE_OPTS": "-Xmx4g -XX:+UseParallelGC",
         "ORG_GRADLE_JVMARGS": "-Xmx4g -XX:MaxMetaspaceSize=512m"
       }
@@ -38,8 +56,10 @@
     "production": {
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",
-        "releaseStatus": "draft"
-      }
+        "track": "production",
+        "releaseStatus": "completed"
+      },
+      "ios": {}
     }
   }
 }

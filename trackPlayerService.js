@@ -1,5 +1,5 @@
 // trackPlayerService.js
-import TrackPlayer, { Event } from 'react-native-track-player';
+import TrackPlayer, { Event, State } from 'react-native-track-player';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
@@ -24,7 +24,8 @@ const startFreshStream = async () => {
       id: 'radio-stream-' + Date.now(), // Unique ID for fresh track
       url: STREAM_URL,
       title: currentTrack?.title || 'éist',
-      artist: currentTrack?.artist || 'éist',
+      artist: currentTrack?.artist || '',
+      album: 'éist',
       artwork: currentTrack?.artwork || require('./assets/images/eist-logo.png'),
       isLiveStream: true,
     };
@@ -65,8 +66,32 @@ module.exports = async function() {
     }
   });
   
-  // For live radio, treat pause as stop (CarPlay/Android Auto compatibility)
-  TrackPlayer.addEventListener(Event.RemotePause, () => TrackPlayer.stop());
+  // For live radio, "pause" means stop while playing. But CarPlay's Now Playing
+  // button is a play/pause toggle, and iOS may route a tap-from-stopped through
+  // the pause/toggle command (RNTP's toggle handler emits RemotePause from any
+  // non-paused state, including .stopped). So make this state-aware: start the
+  // stream when nothing is playing, otherwise stop. This keeps the single car
+  // button working in both directions regardless of which command iOS sends.
+  const NON_PLAYING_STATES = [
+    State.Stopped,
+    State.Paused,
+    State.Ready,
+    State.None,
+    State.Ended,
+  ];
+  TrackPlayer.addEventListener(Event.RemotePause, async () => {
+    try {
+      const { state } = await TrackPlayer.getPlaybackState();
+      if (NON_PLAYING_STATES.includes(state)) {
+        await startFreshStream();
+      } else {
+        await TrackPlayer.stop();
+      }
+    } catch (error) {
+      console.error('Remote pause error:', error);
+      await TrackPlayer.stop().catch(() => {});
+    }
+  });
   
   // Disable previous and next controls - they do nothing for live radio
   TrackPlayer.addEventListener(Event.RemoteNext, () => {

@@ -13,7 +13,6 @@ export function useTimezoneChange() {
     const checkTimezone = () => {
       const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       if (currentTimezone !== timezoneRef.current) {
-        console.log('Timezone changed from', timezoneRef.current, 'to', currentTimezone);
         timezoneRef.current = currentTimezone;
         setTimezone(currentTimezone);
       }

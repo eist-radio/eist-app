@@ -1,9 +1,21 @@
 // app.config.ts
 import { ConfigContext, ExpoConfig } from '@expo/config';
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+export default ({ config }: ConfigContext): ExpoConfig => {
+  // CarPlay is gated behind an env flag: the plugin adds the
+  // `com.apple.developer.carplay-audio` entitlement, which Apple must approve on
+  // the App ID and which must be in the EAS signing profile before it can build.
+  // Until then it stays unloaded, so it cannot affect the current build. To work
+  // on it, build with EXPO_ENABLE_CARPLAY=true (see plugins/withCarPlay.js).
+  const carPlayPlugins =
+    process.env.EXPO_ENABLE_CARPLAY === 'true' ? ['./plugins/withCarPlay'] : [];
+
+  return {
   ...config,
-  name: config.name ?? 'eist-app',
+  // Drives the iOS Xcode project/scheme name (sanitized ASCII). Kept as plain
+  // "eist" so the scheme is "eist" rather than "ist" (the fada in "éist" gets
+  // stripped). The user-facing app name keeps the fada via CFBundleDisplayName.
+  name: 'eist',
   slug: config.slug ?? 'eist-app',
   extra: {
     apiKey: process.env.API_KEY,
@@ -16,15 +28,41 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-router",
     "expo-web-browser",
     "expo-font",
-    "expo-video"
+    "expo-video",
+    ["expo-notifications", {
+      icon: "./assets/images/notification-icon.png",
+      color: "#AFFC41"
+    }],
+    ["react-native-google-cast", {
+      receiverAppId: "7A2782C8",
+      // Pin the Android Cast framework: the default "+" resolves to 22.x, which
+      // is compiled with Kotlin 2.2.0 metadata and fails compileReleaseKotlin
+      // under Expo SDK 53's Kotlin 2.0.21. 21.4.0 is the latest Kotlin-2.0-safe release.
+      androidPlayServicesCastFrameworkVersion: "21.4.0",
+      // Must stay false: the native iOS Cast button hides itself while the
+      // state is noDevicesAvailable, so deferring discovery until "first tap"
+      // is a catch-22 (you can't tap a hidden button). Autostarting discovery
+      // at launch lets the button appear as soon as a device is found.
+      iosStartDiscoveryAfterFirstTapOnCastButton: false,
+      iosSuspendSessionsWhenBackgrounded: false
+    }],
+    "./plugins/withAndroidAuto",
+    "./plugins/withFmtConstevalFix",
+    ...carPlayPlugins
   ],
   ios: {
     ...config.ios,
     infoPlist: {
       ...config.ios?.infoPlist,
+      // Keep the branded name (with fada) on the home screen even though the
+      // Xcode project/scheme is the plain-ASCII "eist".
+      CFBundleDisplayName: "éist",
       UIBackgroundModes: [
-        "audio"
+        "audio",
+        "remote-notification"
       ],
+      NSLocalNetworkUsageDescription: "éist uses the local network to discover Cast devices.",
+      NSBonjourServices: ["_googlecast._tcp", "_7A2782C8._googlecast._tcp"],
       NSMicrophoneUsageDescription: "This app streams audio and does not record you, but a library we use requires an infoPlist entry to work.",
       ITSAppUsesNonExemptEncryption: false,
       // iOS audio session configuration
@@ -82,11 +120,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       "android.permission.MODIFY_AUDIO_SETTINGS",
       "android.permission.ACCESS_NETWORK_STATE",
       "android.permission.BLUETOOTH",
-      "android.permission.BLUETOOTH_CONNECT"
+      "android.permission.BLUETOOTH_CONNECT",
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.SCHEDULE_EXACT_ALARM",
+      "android.permission.RECEIVE_BOOT_COMPLETED"
     ]
   },
   // Disable new architecture for problematic packages
   experiments: {
     tsconfigPaths: true,
   }
-});
+  };
+};

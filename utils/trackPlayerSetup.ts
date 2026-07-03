@@ -30,13 +30,17 @@ export const setupTrackPlayer = async () => {
       android: {
         appKilledPlaybackBehavior: AppKilledPlaybackBehavior.PausePlayback,
         alwaysPauseOnInterruption: true,
-        // Enhanced Android Auto support
-        androidAutoSupported: true,
       },
       
-      // Enhanced capabilities for live radio - Play/Stop only (no pause for CarPlay)
+      // Capabilities for live radio. Pause is REQUIRED for CarPlay: the system
+      // CPNowPlayingTemplate play/pause button is driven by MPRemoteCommandCenter
+      // and stays disabled unless BOTH play and pause commands are registered
+      // (RNTP also auto-registers togglePlayPause once play+pause are present).
+      // We keep the "pause = stop" live-radio behaviour in trackPlayerService.js;
+      // enabling Pause here only makes the car/lock-screen button functional.
       capabilities: [
         Capability.Play,
+        Capability.Pause,
         Capability.Stop,
         Capability.PlayFromId,
         Capability.PlayFromSearch,

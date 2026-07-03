@@ -1,0 +1,17 @@
+# Private/internal files
+AGENTS.md
+docs/
+workers/
+
+# Build artifacts
+*.apk
+*.aab
+
+# Credentials
+google-service-account.json
+
+# Let EAS regenerate native folders (otherwise a stale local prebuild is
+# uploaded and EAS skips prebuild — which is how the Cast SDK / Local Network
+# Info.plist keys went missing from iOS builds).
+android/
+ios/

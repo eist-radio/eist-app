@@ -54,30 +54,54 @@ eas credentials --platform ios                    # Manage iOS credentials
 
 #### Core Context System
 - **TrackPlayerContext** (`context/TrackPlayerContext.tsx`): Central audio management with comprehensive error handling, network recovery, background playback support, and CarPlay/Android Auto integration
+- **NotificationContext** (`context/NotificationContext.tsx`): Manages show reminders and artist subscriptions (local scheduled notifications), permission state, and AsyncStorage persistence. Consumed via the `useNotifications()` hook.
+- **CastContext** (`context/CastContext.tsx`): Google Cast / AirPlay state.
 
-#### File-based Routing Structure
+#### Navigation & Routing
+
+The primary UI is **not** bottom tabs — it's a horizontal **swipe Pager** (`components/Pager.tsx`) rendered by `app/index.tsx`. Each swipe page is a component in `components/screens/`. Detail pages are separate Expo Router routes navigated to via `router.push`.
+
 ```
 app/
-├── _layout.tsx              # Root layout with providers and splash screen
-├── index.tsx                # Main entry redirecting to listen tab
-├── (tabs)/                  # Tab navigation group
-│   ├── _layout.tsx          # Tab layout configuration
-│   ├── listen.tsx           # Main radio player interface
-│   ├── schedule.tsx         # Show schedule with live/upcoming indicators
-│   ├── discord.tsx          # Discord integration
-│   ├── instagram.tsx        # Instagram integration
-│   ├── soundcloud.tsx       # SoundCloud integration
-│   ├── mixcloud.tsx         # Mixcloud integration
-│   ├── artist/[slug].tsx    # Dynamic artist detail pages
-│   └── show/[slug].tsx      # Dynamic show detail pages
+├── _layout.tsx              # Root Stack layout: providers (Query, Cast, TrackPlayer,
+│                            #   Notification) + animated splash screen. Header hidden;
+│                            #   horizontal slide transitions.
+├── index.tsx                # Renders <Pager /> (the swipe deck)
+├── show/[slug].tsx          # Show detail page (radiocult schedule)
+├── artist/[slug].tsx        # Artist detail page
+├── archive/[slug].tsx       # Archived show detail page (worker API)
 └── +not-found.tsx           # 404 error page
+
+components/
+├── Pager.tsx                # Horizontal paging ScrollView; PAGE_COUNT (theme/tokens.ts)
+│                            #   pages, shared spinning-logo overlay, Pills indicator.
+└── screens/                 # One component per swipe page (props: { pageIndex, isActive })
+    ├── ListenScreen.tsx     #   0 · live player
+    ├── ScheduleScreen.tsx   #   1 · schedule (live/upcoming)
+    ├── ArtistsScreen.tsx    #   2 · artists
+    ├── ArchiveScreen.tsx    #   3 · archive / listen back
+    ├── NotificationsScreen.tsx  # 4 · active reminders (clear show reminders/artist subs)
+    └── ConnectScreen.tsx    #   5 · external links, last page (incl. "Support us" → eist.radio/support)
 ```
+
+To add/remove a swipe page: update `PAGE_COUNT` in `theme/tokens.ts` and the index→component mapping in `components/Pager.tsx`. The `Pills` indicator reads `PAGE_COUNT` automatically.
 
 #### Audio Streaming Architecture
 - **TrackPlayerService** (`trackPlayerService.js`): Background service handling remote controls, CarPlay events, and audio session management
 - **Live Metadata API**: Real-time show information from `https://api.radiocult.fm/api/station/eist/schedule/live`
 - **Stream URL**: `https://eist-radio.radiocult.fm/stream`
 - **Cross-platform Support**: Web uses HTML5 Audio, mobile uses react-native-track-player
+
+#### Data APIs (`config.ts`)
+Two distinct backends — keep them straight:
+- **RadioCult** (`https://api.radiocult.fm`): live metadata, schedule, show & artist detail pages. Authenticated with `apiKey` (from EAS/Expo `extra`). Used by ListenScreen, ScheduleScreen, `app/show/[slug].tsx`, `app/artist/[slug].tsx`.
+- **éist worker API** (`EIST_API_BASE_URL` = `https://eist-api.johnocallaghan.workers.dev`, endpoints in `EIST_API_ENDPOINTS`): archive shows and artist stats/mapping. Used by `hooks/useArchiveShows.ts` and `hooks/useArtists.ts`. **This is production code.** The worker source is **not** in this repo — it's a separate Cloudflare Worker project maintained in its own repository, and the app only talks to the deployed URL above over HTTP.
+
+#### Theming (`theme/tokens.ts`)
+- `colors` — `purple` (bg), `green` (`#AFFC41`), `text` (`#E7E5E5` "Alabaster gray", secondary text), `textDim` (translucent gray for placeholders), `pillDim`. There is **no** `bone`/`boneDim` token (renamed to `text`/`textDim`).
+- **Eyebrows** (`components/ui/Eyebrow.tsx`) default to `text` (Alabaster gray); the only green eyebrow is the Listen screen "on air" live indicator (explicit `color={colors.green}`).
+- **Colour convention:** `green` is used for headings/titles, links, and the "now playing" context — the Listen screen's current-show artist and the schedule live ("NOW") row (whole row green). `text`/`textDim` (gray) is for all other secondary text — body/descriptions, dates/times, captions, and **artist-name subtitles in lists** (archive, non-live schedule rows).
+- `font`, `type` (shared text-style fragments; colour applied at call site), `space`, `PAGE_COUNT`.
 
 #### State Management Patterns
 - React Context for global audio state
@@ -99,13 +123,20 @@ app/
 - Media playback service configuration
 - Wake lock permissions
 
+#### In-car (CarPlay / Android Auto)
+Both are custom Expo config plugins (no third-party CarPlay/Android Auto npm package). They surface react-native-track-player's existing media session — éist logo artwork + play/pause on the current show — in the car. No browse UI beyond a single live-radio item.
+- **Android Auto** (`plugins/withAndroidAuto.js`): **enabled.** Injects a native `MediaBrowserService` (Kotlin) that binds to RNTP's `MusicService`, reflects out its `MediaSessionCompat` token, exposes one playable "éist radio" item, and fixes `DISPLAY_SUBTITLE`. Adds the `automotive_app_desc.xml` + manifest declarations.
+- **CarPlay** (`plugins/withCarPlay.js`): **gated, disabled by default** (behind `EXPO_ENABLE_CARPLAY=true`, see `app.config.ts`) only because the `com.apple.developer.carplay-audio` entitlement needs Apple approval + a matching provisioning profile — not because it's incomplete. When enabled it adds that entitlement and converts the app to the UIScene lifecycle, declaring **both** scene roles: a phone `UIWindowSceneSessionRoleApplication` (`PhoneSceneDelegate`, which now owns the RN root window) and the CarPlay `CPTemplateApplicationSceneSessionRoleApplication` (`CarPlaySceneDelegate`). The full scene conversion is required — declaring only the CarPlay scene orphaned the phone window and black-screened on device. `CarPlaySceneDelegate` roots CarPlay on a one-item `CPListTemplate` ("éist") and *pushes* `CPNowPlayingTemplate.shared` when tapped (Apple forbids the Now Playing template as a root template — it must be pushed onto a browsable root). The Now Playing play/pause button reuses the `MPRemoteCommandCenter` commands handled in `trackPlayerService.js`. **Gotcha:** that button stays disabled unless the RNTP `capabilities` include `Pause` as well as `Play` (`utils/trackPlayerSetup.ts`) — Play/Stop alone leaves it inert.
+  - **To turn CarPlay on** (all three required first): 1) request the CarPlay "audio" entitlement for the App ID in the Apple Developer portal and wait for approval; 2) ensure the EAS provisioning profile includes `com.apple.developer.carplay-audio` (`eas credentials`); 3) build with the flag, e.g. `EXPO_ENABLE_CARPLAY=true eas build -p ios` (or `EXPO_ENABLE_CARPLAY=true npx expo prebuild -p ios --clean` locally).
+
 ### Key Features
 - **Live Radio Streaming**: Continuous audio with metadata updates
 - **Background Playback**: Continues playing when app is backgrounded
 - **CarPlay**: Minimal integration with vehicle systems.
 - **Network Recovery**: Automatic reconnection on network changes
 - **Show Schedule**: Live and upcoming show information with FormattedShowTitle component
-- **Social Integration**: Links to Discord, Instagram, SoundCloud, Mixcloud
+- **Notifications**: Per-show reminders and artist subscriptions (local scheduled notifications); the Active Notifications swipe page lists and clears them. Not available on web.
+- **Social Integration**: Links to Discord, Instagram, SoundCloud, Mixcloud, plus "Support us" (eist.radio/support)
 - **Cross-platform**: iOS, Android, and web support
 
 ### UI Components
@@ -118,9 +149,11 @@ app/
   - Platform-specific icon alignment adjustments for iOS/Android
   - Supports both inline (`asContent={true}`) and standalone text rendering
 - **Usage Locations**:
-  - Listen page: For "Next up" show titles and current show titles
-  - Schedule page: For all show titles in the schedule list
-  - Show detail pages: For show title display
+  - Listen screen: "Next up" and current show titles
+  - Schedule screen: all show titles in the schedule list
+  - Archive screen & archive detail (`app/archive/[slug].tsx`): archived show titles
+  - Notifications screen: show-reminder titles
+  - Show & artist detail pages (`app/show/[slug].tsx`, `app/artist/[slug].tsx`)
 - **Text Wrapping**: No ellipsizeMode - titles wrap naturally over multiple lines within their container constraints
 - **Props**: `title`, `color`, `size`, `style`, `numberOfLines`, `asContent`, etc.
 

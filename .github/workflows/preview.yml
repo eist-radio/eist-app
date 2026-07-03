@@ -1,0 +1,51 @@
+name: Preview Deploy
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code (actions/checkout@v4)
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20 (actions/setup-node@v4)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: Build web app (expo export)
+        run: npx expo export --platform web
+        env:
+          API_KEY: ${{ secrets.RADIOCULT_API_KEY }}
+
+      - name: Fix Netlify node_modules exclusion
+        run: |
+          # Netlify ignores node_modules folders, rename to vendor
+          if [ -d "dist/assets/node_modules" ]; then
+            mv dist/assets/node_modules dist/assets/vendor
+            # Update all HTML files to reference vendor instead of node_modules
+            find dist -name "*.html" -exec sed -i 's|/assets/node_modules/|/assets/vendor/|g' {} +
+          fi
+
+      - name: Deploy to Netlify Preview (nwtgck/actions-netlify@v3.0)
+        uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "App PR preview (#${{ github.event.pull_request.number }})"
+          alias: app-preview-${{ github.event.pull_request.number }}
+          overwrites-pull-request-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
