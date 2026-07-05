@@ -32,25 +32,26 @@ export const setupTrackPlayer = async () => {
         alwaysPauseOnInterruption: true,
       },
       
-      // Capabilities for live radio. Pause is REQUIRED for CarPlay: the system
-      // CPNowPlayingTemplate play/pause button is driven by MPRemoteCommandCenter
-      // and stays disabled unless BOTH play and pause commands are registered
-      // (RNTP also auto-registers togglePlayPause once play+pause are present).
-      // We keep the "pause = stop" live-radio behaviour in trackPlayerService.js;
-      // enabling Pause here only makes the car/lock-screen button functional.
+      // Capabilities for live radio. Play+Pause is the standard pattern for
+      // car/lock-screen: a single toggle button. Stop is intentionally omitted —
+      // TrackPlayer.stop() tears down the Android foreground service, which kills
+      // the MusicService and breaks the MediaBrowserService binding. Android Auto
+      // then can't send play commands and the app appears dead (Google Play
+      // rejection: "pressing stop completely stop app"). Pause keeps the service
+      // alive; the RemotePause handler in trackPlayerService.js treats
+      // pause-while-playing as a live-radio stop, and pause-while-stopped as a
+      // fresh-stream start.
       capabilities: [
         Capability.Play,
         Capability.Pause,
-        Capability.Stop,
         Capability.PlayFromId,
         Capability.PlayFromSearch,
         Capability.SetRating,
       ],
-      
-      // Compact capabilities for notification controls - Play/Stop only
+
       compactCapabilities: [
-        Capability.Play, 
-        Capability.Stop, 
+        Capability.Play,
+        Capability.Pause,
       ],
       
       // Progress update interval

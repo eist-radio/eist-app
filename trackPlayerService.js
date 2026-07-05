@@ -50,7 +50,6 @@ const startFreshStream = async () => {
 module.exports = async function() {
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
     try {
-      // Always start fresh stream to avoid playing old buffered audio
       await startFreshStream();
       // Force metadata refresh for Android Auto after play
       const queue = await TrackPlayer.getQueue();
@@ -65,13 +64,33 @@ module.exports = async function() {
       console.error('Remote play error:', error);
     }
   });
-  
+
+  // Android Auto: fired when the user taps a browse-list item (e.g. "éist radio").
+  // Without this handler Android Auto spins on "Getting your selection..." forever.
+  TrackPlayer.addEventListener(Event.RemotePlayId, async () => {
+    try {
+      await startFreshStream();
+    } catch (error) {
+      console.error('Remote play-id error:', error);
+    }
+  });
+
+  TrackPlayer.addEventListener(Event.RemotePlaySearch, async () => {
+    try {
+      await startFreshStream();
+    } catch (error) {
+      console.error('Remote play-search error:', error);
+    }
+  });
+
   // For live radio, "pause" means stop while playing. But CarPlay's Now Playing
   // button is a play/pause toggle, and iOS may route a tap-from-stopped through
   // the pause/toggle command (RNTP's toggle handler emits RemotePause from any
   // non-paused state, including .stopped). So make this state-aware: start the
-  // stream when nothing is playing, otherwise stop. This keeps the single car
+  // stream when nothing is playing, otherwise pause. This keeps the single car
   // button working in both directions regardless of which command iOS sends.
+  // We use pause() instead of stop() to keep the Android foreground service alive
+  // so the media session survives and play can resume from Android Auto / car OS.
   const NON_PLAYING_STATES = [
     State.Stopped,
     State.Paused,
@@ -85,14 +104,14 @@ module.exports = async function() {
       if (NON_PLAYING_STATES.includes(state)) {
         await startFreshStream();
       } else {
-        await TrackPlayer.stop();
+        await TrackPlayer.pause();
       }
     } catch (error) {
       console.error('Remote pause error:', error);
-      await TrackPlayer.stop().catch(() => {});
+      await TrackPlayer.pause().catch(() => {});
     }
   });
-  
+
   // Disable previous and next controls - they do nothing for live radio
   TrackPlayer.addEventListener(Event.RemoteNext, () => {
     // nothing
@@ -100,6 +119,10 @@ module.exports = async function() {
   TrackPlayer.addEventListener(Event.RemotePrevious, () => {
     // nothing
   });
-  
-  TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.stop());
+
+  // Use pause() instead of stop() to keep the Android foreground service alive.
+  // stop() tears down the service, which kills the MusicService and breaks the
+  // MediaBrowserService binding — making it impossible to play again from
+  // Android Auto without restarting the app.
+  TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.pause());
 };

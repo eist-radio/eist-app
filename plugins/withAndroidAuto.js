@@ -61,9 +61,11 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            Log.d(TAG, "Disconnected from MusicService")
+            Log.d(TAG, "Disconnected from MusicService, will rebind")
             musicService = null
             isBound = false
+            retryCount = 0
+            handler.postDelayed({ bindToMusicService() }, RETRY_DELAY_MS)
         }
     }
 
