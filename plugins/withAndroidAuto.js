@@ -19,14 +19,21 @@ import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
 
 /**
- * MediaBrowserService that exposes react-native-track-player's MediaSession to Android Auto.
+ * MediaBrowserService that bridges react-native-track-player (RNTP) to Android Auto.
  *
- * This service binds to the MusicService created by react-native-track-player and extracts
- * its MediaSessionCompat token via reflection, then exposes it to Android Auto clients.
+ * It binds to RNTP's MusicService and reflects out RNTP's MediaSessionCompat, but does
+ * NOT expose RNTP's token to Android Auto (RNTP 4.1.2 never handles playFromMediaId, so
+ * that produced "Could not load your selection"). Instead this service owns its OWN
+ * "proxy" MediaSessionCompat and exposes the proxy's token. The proxy's callback forwards
+ * every start entry point to RNTP's transport controls (which fire Event.RemotePlay and
+ * start the stream), while a controller registered on RNTP's session mirrors RNTP's
+ * playback state + metadata (with the DISPLAY_SUBTITLE fix) back onto the proxy so AA's
+ * Now Playing stays correct. RNTP's own session/notification/lockscreen path is untouched.
  */
 class MediaBrowserService : MediaBrowserServiceCompat() {
 
@@ -36,14 +43,92 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         private const val LIVE_RADIO_ID = "live_radio"
         private const val RETRY_DELAY_MS = 1000L
         private const val MAX_RETRIES = 30
+        // Window (ms) during which we ignore RNTP's transient STOPPED/NONE states
+        // emitted by startFreshStream()'s stop -> reset -> add -> play sequence,
+        // so they cannot overwrite our synchronous BUFFERING and re-trigger
+        // "Could not load your selection" in Android Auto.
+        private const val GRACE_MS = 4000L
+        // Coalesce prepare + play (AA often sends both) into a single restart.
+        private const val DEBOUNCE_MS = 1500L
     }
 
     private var musicService: Any? = null
     private var isBound = false
     private val handler = Handler(Looper.getMainLooper())
     private var retryCount = 0
-    private var mediaController: MediaControllerCompat? = null
-    private var metadataCallback: MediaControllerCompat.Callback? = null
+
+    // Controller on RNTP's OWN session. Used BOTH to forward commands to RNTP
+    // (play/stop/pause) and to mirror RNTP's playback state + metadata onto the
+    // proxy session below. RNTP's session and its callback are never modified.
+    private var rntpController: MediaControllerCompat? = null
+    private var mirrorCallback: MediaControllerCompat.Callback? = null
+
+    // Our OWN MediaSession exposed to Android Auto (the "proxy"). AA sends
+    // transport controls here; we forward them to RNTP. This is purely additive
+    // and never touches RNTP's session, notification or lockscreen path.
+    private var proxySession: MediaSessionCompat? = null
+
+    // Cold-start: a play arrived before RNTP's controller was wired; flush later.
+    private var pendingPlay = false
+    // Debounce timestamp for coalescing prepare + play.
+    private var lastForwardMs = 0L
+    // Ignore RNTP transient idle states until this time (armed on every start).
+    private var suppressIdleUntil = 0L
+
+    // Callback for the PROXY session: every start entry point funnels into
+    // startPlayback(); stop/pause forward to RNTP; skip is a deliberate no-op.
+    private val proxyCallback = object : MediaSessionCompat.Callback() {
+        override fun onPlay() {
+            Log.d(TAG, "proxy onPlay")
+            startPlayback()
+        }
+
+        override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
+            Log.d(TAG, "proxy onPlayFromMediaId: " + mediaId)
+            startPlayback()
+        }
+
+        override fun onPlayFromSearch(query: String?, extras: Bundle?) {
+            Log.d(TAG, "proxy onPlayFromSearch: " + query)
+            startPlayback()
+        }
+
+        override fun onPrepare() {
+            Log.d(TAG, "proxy onPrepare")
+            startPlayback()
+        }
+
+        override fun onPrepareFromMediaId(mediaId: String?, extras: Bundle?) {
+            Log.d(TAG, "proxy onPrepareFromMediaId: " + mediaId)
+            startPlayback()
+        }
+
+        override fun onPrepareFromSearch(query: String?, extras: Bundle?) {
+            Log.d(TAG, "proxy onPrepareFromSearch: " + query)
+            startPlayback()
+        }
+
+        override fun onStop() {
+            Log.d(TAG, "proxy onStop -> forwarding to RNTP")
+            try {
+                rntpController?.transportControls?.stop()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error forwarding stop to RNTP", e)
+            }
+        }
+
+        override fun onPause() {
+            Log.d(TAG, "proxy onPause -> forwarding to RNTP")
+            try {
+                rntpController?.transportControls?.pause()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error forwarding pause to RNTP", e)
+            }
+        }
+
+        override fun onSkipToNext() { /* no-op: live radio */ }
+        override fun onSkipToPrevious() { /* no-op: live radio */ }
+    }
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -54,22 +139,52 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
                 musicService = getServiceMethod?.invoke(binder)
                 Log.d(TAG, "Got MusicService instance: \${musicService?.javaClass?.name}")
                 isBound = true
-                extractAndSetSessionToken()
+                extractAndWireRntp()
             } catch (e: Exception) {
                 Log.e(TAG, "Error getting MusicService from binder", e)
             }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
-            Log.d(TAG, "Disconnected from MusicService")
+            Log.d(TAG, "Disconnected from MusicService, will rebind")
             musicService = null
             isBound = false
+            // Detach the stale mirror so a rebind wires a fresh controller.
+            mirrorCallback?.let { cb ->
+                try { rntpController?.unregisterCallback(cb) } catch (e: Exception) {}
+            }
+            mirrorCallback = null
+            rntpController = null
+            // RNTP's MusicService went away (e.g. process/service restart). Rebind
+            // so the proxy re-wires to the new session and keeps forwarding play.
+            retryCount = 0
+            handler.postDelayed({ bindToMusicService() }, RETRY_DELAY_MS)
         }
     }
 
     override fun onCreate() {
         super.onCreate()
         Log.d(TAG, "MediaBrowserService created")
+
+        // Create our own proxy MediaSession synchronously so onGetRoot always
+        // returns a session with a valid token (fixes the old async-token race).
+        // Deliberately NOT FLAG_HANDLES_MEDIA_BUTTONS + setMediaButtonReceiver(null):
+        // the proxy never competes for hardware/Bluetooth media keys and cannot
+        // steal RNTP's lockscreen controls. AA commands arrive via the session
+        // binder, so the media-button flag is unnecessary.
+        val session = MediaSessionCompat(this, "EistProxySession")
+        session.setFlags(MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
+        session.setMediaButtonReceiver(null)
+        session.setCallback(proxyCallback)
+        session.isActive = true
+        proxySession = session
+        sessionToken = session.sessionToken
+
+        // Seed placeholder metadata + an idle state so AA has something to show
+        // and offers a Play action before RNTP's controller is wired.
+        seedMetadata()
+        publishState(PlaybackStateCompat.STATE_STOPPED)
+
         bindToMusicService()
     }
 
@@ -78,16 +193,28 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         Log.d(TAG, "MediaBrowserService destroyed")
         handler.removeCallbacksAndMessages(null)
 
-        // Unregister metadata callback
-        metadataCallback?.let { callback ->
+        // Unregister the mirror callback from RNTP's session FIRST, so no late
+        // callback can touch the proxy session after it is released.
+        mirrorCallback?.let { callback ->
             try {
-                mediaController?.unregisterCallback(callback)
+                rntpController?.unregisterCallback(callback)
             } catch (e: Exception) {
-                Log.e(TAG, "Error unregistering metadata callback", e)
+                Log.e(TAG, "Error unregistering mirror callback", e)
             }
         }
-        metadataCallback = null
-        mediaController = null
+        mirrorCallback = null
+        rntpController = null
+
+        // Release the proxy session AFTER the mirror is detached.
+        proxySession?.let { session ->
+            try {
+                session.isActive = false
+                session.release()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error releasing proxy session", e)
+            }
+        }
+        proxySession = null
 
         if (isBound) {
             try {
@@ -143,7 +270,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         return null
     }
 
-    private fun extractAndSetSessionToken() {
+    private fun extractAndWireRntp() {
         try {
             val service = musicService ?: run {
                 Log.w(TAG, "MusicService is null")
@@ -160,7 +287,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
 
             if (player == null) {
                 Log.d(TAG, "Player not initialized yet, retrying...")
-                handler.postDelayed({ extractAndSetSessionToken() }, RETRY_DELAY_MS)
+                handler.postDelayed({ extractAndWireRntp() }, RETRY_DELAY_MS)
                 return
             }
 
@@ -193,49 +320,178 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
 
             if (mediaSession == null) {
                 Log.d(TAG, "MediaSession not initialized yet, retrying...")
-                handler.postDelayed({ extractAndSetSessionToken() }, RETRY_DELAY_MS)
+                handler.postDelayed({ extractAndWireRntp() }, RETRY_DELAY_MS)
                 return
             }
 
-            Log.d(TAG, "Got MediaSession, setting session token")
-            sessionToken = mediaSession.sessionToken
-            Log.i(TAG, "Session token set successfully!")
+            Log.d(TAG, "Got RNTP MediaSession, wiring controller + mirror")
 
-            // Register metadata callback to fix DISPLAY_SUBTITLE for Android Auto
-            // Android Auto uses DISPLAY_SUBTITLE for the second line, but kotlin-audio
-            // only sets METADATA_KEY_ARTIST. We intercept and copy artist to display_subtitle.
+            // Build a controller on RNTP's OWN session. Used to (a) forward
+            // commands to RNTP and (b) mirror RNTP's state/metadata onto the
+            // proxy. RNTP's session and its callback are left untouched.
             try {
-                mediaController = MediaControllerCompat(this, mediaSession.sessionToken)
-                metadataCallback = object : MediaControllerCompat.Callback() {
+                // Detach any previous mirror before re-wiring (defensive against
+                // a re-entry that skipped onServiceDisconnected).
+                mirrorCallback?.let { old ->
+                    try { rntpController?.unregisterCallback(old) } catch (e: Exception) {}
+                }
+                val controller = MediaControllerCompat(this, mediaSession.sessionToken)
+                rntpController = controller
+
+                val callback = object : MediaControllerCompat.Callback() {
+                    override fun onPlaybackStateChanged(state: PlaybackStateCompat?) {
+                        mirrorState(state)
+                    }
                     override fun onMetadataChanged(metadata: MediaMetadataCompat?) {
-                        if (metadata == null) return
-
-                        val displaySubtitle = metadata.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE)
-                        val artist = metadata.getString(MediaMetadataCompat.METADATA_KEY_ARTIST)
-
-                        Log.d(TAG, "Metadata changed - artist: \$artist, displaySubtitle: \$displaySubtitle")
-
-                        // If display subtitle is missing but artist exists, fix the metadata
-                        if (displaySubtitle.isNullOrEmpty() && !artist.isNullOrEmpty()) {
-                            Log.d(TAG, "Fixing metadata: copying artist to DISPLAY_SUBTITLE")
-                            val fixedMetadata = MediaMetadataCompat.Builder(metadata)
-                                .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
-                                .build()
-                            mediaSession.setMetadata(fixedMetadata)
-                        }
+                        mirrorMetadata(metadata)
                     }
                 }
-                mediaController?.registerCallback(metadataCallback!!)
-                Log.i(TAG, "Metadata callback registered for Android Auto fix")
+                mirrorCallback = callback
+                controller.registerCallback(callback)
+
+                // Seed the proxy from RNTP's current state so the card is
+                // correct immediately.
+                mirrorMetadata(controller.metadata)
+                mirrorState(controller.playbackState)
+
+                Log.i(TAG, "RNTP controller + mirror wired for Android Auto")
+
+                // Flush a cold-start play that arrived before the controller
+                // existed. Re-publish BUFFERING so the seeded STOPPED does not
+                // linger, then forward the play.
+                if (pendingPlay) {
+                    pendingPlay = false
+                    val n = System.currentTimeMillis()
+                    lastForwardMs = n
+                    suppressIdleUntil = n + GRACE_MS
+                    publishState(PlaybackStateCompat.STATE_BUFFERING)
+                    Log.d(TAG, "Flushing deferred cold-start play")
+                    try {
+                        controller.transportControls.play()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error flushing deferred play", e)
+                    }
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "Error registering metadata callback", e)
+                Log.e(TAG, "Error wiring RNTP controller + mirror", e)
             }
 
         } catch (e: NoSuchFieldException) {
             Log.e(TAG, "Field not found - track-player internals may have changed", e)
         } catch (e: Exception) {
             Log.e(TAG, "Error extracting MediaSession token", e)
-            handler.postDelayed({ extractAndSetSessionToken() }, RETRY_DELAY_MS)
+            handler.postDelayed({ extractAndWireRntp() }, RETRY_DELAY_MS)
+        }
+    }
+
+    // Action mask depending on state: active states offer STOP|PAUSE; idle
+    // states offer PLAY + PLAY/PREPARE_FROM_*. Never advertise SKIP.
+    private fun actionsFor(state: Int): Long {
+        val active = state == PlaybackStateCompat.STATE_PLAYING ||
+            state == PlaybackStateCompat.STATE_BUFFERING ||
+            state == PlaybackStateCompat.STATE_CONNECTING
+        return if (active) {
+            PlaybackStateCompat.ACTION_STOP or PlaybackStateCompat.ACTION_PAUSE
+        } else {
+            PlaybackStateCompat.ACTION_PLAY or
+                PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
+                PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
+                PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID or
+                PlaybackStateCompat.ACTION_PREPARE_FROM_SEARCH
+        }
+    }
+
+    private fun publishState(state: Int) {
+        val playbackState = PlaybackStateCompat.Builder()
+            .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1f)
+            .setActions(actionsFor(state))
+            .build()
+        try {
+            proxySession?.setPlaybackState(playbackState)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error publishing playback state", e)
+        }
+    }
+
+    private fun seedMetadata() {
+        val metadata = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, LIVE_RADIO_ID)
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "éist radio")
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, "éist radio")
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, "Live radio")
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)
+            .build()
+        try {
+            proxySession?.setMetadata(metadata)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error seeding metadata", e)
+        }
+    }
+
+    // Every AA start entry point funnels here.
+    private fun startPlayback() {
+        val now = System.currentTimeMillis()
+        // Synchronously publish BUFFERING to beat AA's playFromMediaId timeout.
+        publishState(PlaybackStateCompat.STATE_BUFFERING)
+        // Arm the grace window so RNTP's transient STOPPED/NONE from
+        // startFreshStream() (stop -> reset -> add -> play) is ignored.
+        suppressIdleUntil = now + GRACE_MS
+        // Coalesce prepare + play into a single forwarded start.
+        if (now - lastForwardMs < DEBOUNCE_MS) {
+            Log.d(TAG, "startPlayback debounced")
+            return
+        }
+        lastForwardMs = now
+        val c = rntpController
+        if (c != null) {
+            Log.d(TAG, "Forwarding play() to RNTP")
+            try {
+                c.transportControls.play()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error forwarding play to RNTP", e)
+            }
+        } else {
+            Log.d(TAG, "RNTP controller not ready; deferring play")
+            pendingPlay = true
+            if (!isBound) bindToMusicService()
+        }
+    }
+
+    // Mirror RNTP's playback state onto the proxy, dropping transient idle
+    // states within the grace window so BUFFERING is not clobbered.
+    private fun mirrorState(state: PlaybackStateCompat?) {
+        if (state == null) return
+        val active = state.state == PlaybackStateCompat.STATE_PLAYING ||
+            state.state == PlaybackStateCompat.STATE_BUFFERING ||
+            state.state == PlaybackStateCompat.STATE_CONNECTING
+        if (active) {
+            suppressIdleUntil = 0L
+        } else if (System.currentTimeMillis() < suppressIdleUntil) {
+            Log.d(TAG, "Suppressing transient RNTP idle state: " + state.state)
+            return
+        }
+        publishState(state.state)
+    }
+
+    // Mirror RNTP's metadata onto the proxy, applying the DISPLAY_SUBTITLE fix.
+    private fun mirrorMetadata(metadata: MediaMetadataCompat?) {
+        if (metadata == null) return
+        val builder = MediaMetadataCompat.Builder(metadata)
+        val displaySubtitle = metadata.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE)
+        val artist = metadata.getString(MediaMetadataCompat.METADATA_KEY_ARTIST)
+        // Requirement #4: AA uses DISPLAY_SUBTITLE for the 2nd line but
+        // kotlin-audio only sets ARTIST. Copy artist -> display_subtitle on the
+        // PROXY only (never write back to RNTP's session).
+        if (displaySubtitle.isNullOrEmpty() && !artist.isNullOrEmpty()) {
+            builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+        }
+        // Associate Now Playing with the browse item; hide the seek bar (live).
+        builder.putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, LIVE_RADIO_ID)
+        builder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, -1L)
+        try {
+            proxySession?.setMetadata(builder.build())
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mirroring metadata", e)
         }
     }
 

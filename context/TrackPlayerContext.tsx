@@ -781,7 +781,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     previousNetworkState.current = current
   }, [networkState, attemptStreamRestart, isPlaying]) // Keep isPlaying in deps for logging
 
-  // Start playback when the éist item is tapped in CarPlay. CarPlay's Now Playing
+  // Start playback whenever the éist CarPlay scene becomes active (and as a fallback, when the hidden list item is tapped). CarPlay's Now Playing
   // template can only control the already-active now-playing app — it can't
   // cold-start audio — so the native CarPlay scene posts a notification that the
   // EistCarPlayBridge module (only present in CarPlay builds) forwards here, and we
@@ -794,6 +794,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     const emitter = new NativeEventEmitter(bridge)
     const sub = emitter.addListener('EistCarPlayPlay', () => {
+      // Fired on every CarPlay scene activation, not just once per connection.
+      // If the stream is already playing (user glanced at Maps and came back),
+      // restarting it would glitch the audio — only start when not playing.
+      if (isPlayingRef.current) return
       play().catch((error) => console.error('CarPlay play request failed:', error))
     })
     return () => sub.remove()

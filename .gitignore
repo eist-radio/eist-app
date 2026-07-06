@@ -48,9 +48,9 @@ android/
 ios/
 .claude/
 AGENTS.md
+docs/
 
 # Release signing (local only)
 android/app/release.keystore
 android/keystore.properties
 .wrangler
-docs

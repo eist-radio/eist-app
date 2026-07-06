@@ -71,18 +71,29 @@ import MediaPlayer
 @objc(CarPlaySceneDelegate)
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   var interfaceController: CPInterfaceController?
+  // Cold-start ordering: sceneDidBecomeActive can fire before setRootTemplate's
+  // completion runs, and pushing Now Playing without a root in place fails. So
+  // activation only auto-plays once the root is set, and an early activation is
+  // parked in pendingAutoPlay for the completion handler to flush.
+  private var rootTemplateSet = false
+  private var pendingAutoPlay = false
 
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
-    // Apple forbids CPNowPlayingTemplate as a ROOT template, so we still root on a
-    // one-item list — but the user never has to see or tap it. As soon as the
-    // CarPlay scene connects we start playback and push Now Playing (un-animated),
-    // so opening éist in the car lands straight on the transport screen.
+    // Apple forbids CPNowPlayingTemplate as a ROOT template, so we root on a
+    // one-item list — but the user never has to see or tap it: every scene
+    // activation (see sceneDidBecomeActive) starts playback and pushes Now
+    // Playing, so opening éist in the car lands straight on the transport screen.
     interfaceController.setRootTemplate(makeRootTemplate(), animated: false) { [weak self] _, _ in
-      self?.startPlaybackAndShowNowPlaying(animated: false)
+      guard let self = self else { return }
+      self.rootTemplateSet = true
+      if self.pendingAutoPlay {
+        self.pendingAutoPlay = false
+        self.startPlaybackAndShowNowPlaying(animated: false)
+      }
     }
   }
 
@@ -91,6 +102,24 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didDisconnectInterfaceController interfaceController: CPInterfaceController
   ) {
     self.interfaceController = nil
+    rootTemplateSet = false
+    pendingAutoPlay = false
+  }
+
+  // Fires on EVERY foreground activation of éist on the car screen — cold start,
+  // warm start, and returning after another audio app was used. didConnect only
+  // fires once per scene connection, so triggering playback there left the app
+  // dead on re-entry (list showing, disabled play button): the other app owned
+  // the now-playing role and no play request ever reached JS. Auto-playing here
+  // reclaims the session every time the user opens éist. The JS side skips the
+  // request when the stream is already playing, so glancing at Maps and back
+  // does not restart a healthy stream.
+  func sceneDidBecomeActive(_ scene: UIScene) {
+    if rootTemplateSet {
+      startPlaybackAndShowNowPlaying(animated: false)
+    } else {
+      pendingAutoPlay = true
+    }
   }
 
   private func makeRootTemplate() -> CPListTemplate {

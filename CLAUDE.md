@@ -169,3 +169,4 @@ Both are custom Expo config plugins (no third-party CarPlay/Android Auto npm pac
 - Development builds required for native dependencies (can't use Expo Go)
 - Environment variables configured through EAS secrets for production builds
 - Apple Developer license required for iOS distribution
+- Never commit superpower plan docs
