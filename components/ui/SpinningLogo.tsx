@@ -4,19 +4,13 @@ import { WebView } from 'react-native-webview';
 import { eistLogoHtml } from '../../assets/eistLogoHtml';
 
 export function SpinningLogo({ size = 100 }: { size?: number }) {
-  if (Platform.OS === 'web') return null; // web build: omit (or use an <iframe> later)
-
-  // Transparent WKWebViews on iOS often load their content but never composite the
-  // first frame until a layout pass forces it — so the logo shows blank on the root
-  // pager until you navigate away and back (which re-lays-out the overlay). Keep it
-  // opacity:0 until the content has loaded, then flip to 1; that state-driven style
-  // change is itself the composite nudge, so the logo paints on first mount without
-  // a remount flash. A timeout backstops the rare case where onLoadEnd doesn't fire.
   const [painted, setPainted] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setPainted(true), 400);
     return () => clearTimeout(t);
   }, []);
+
+  if (Platform.OS === 'web') return null;
 
   // Interactive: touches reach the canvas so the logo can be grabbed, flung and
   // eased back to auto-spin — matching the reference spinning-eist-logo physics.
