@@ -330,8 +330,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       retryTimeout.current = null
     }
 
-    // Don't change userPlay here - just update UI state
-    setIsPlaying(false)
+    // Deliberately do NOT setIsPlaying(false) here: this path only runs while
+    // userPlay is true, and the button must reflect the listening session, not
+    // recovery churn. Flipping it here made the button glitch Stop → Listen →
+    // Stop on every network change / rebuffer / retry. A genuine failure keeps
+    // retrying until the user presses Stop, which clears userPlay and the state.
 
     if (isWeb) {
       try {
