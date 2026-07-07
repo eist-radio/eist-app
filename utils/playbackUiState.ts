@@ -14,7 +14,12 @@
 
 // The transient states RNTP passes through while (re)starting a live stream.
 // State.Connecting is an alias of State.Loading, so it's covered by 'loading'.
-const TRANSIENT_STARTUP_STATES = new Set(['loading', 'buffering', 'ready']);
+// 'stopped' and 'none' are included because play() calls cleanResetPlayer()
+// which fires stop()/reset() before TrackPlayer.play() — those events arrive
+// asynchronously and would flicker the button if not held steady.  This is safe:
+// user-initiated stop() clears userPlay BEFORE calling TrackPlayer.stop(), so
+// genuine stops still resolve to false.
+const TRANSIENT_STARTUP_STATES = new Set(['loading', 'buffering', 'ready', 'stopped', 'none']);
 
 /**
  * @param state         the raw PlaybackState string from RNTP (State enum value)
@@ -26,6 +31,6 @@ export function resolveIsPlaying(state: string, userWantsPlay: boolean): boolean
   if (state === 'playing') return true;
   // Hold steady through startup/rebuffer churn while the user wants playback.
   if (userWantsPlay && TRANSIENT_STARTUP_STATES.has(state)) return true;
-  // Stopped / paused / none / ended / error → genuinely not playing.
+  // Paused / ended / error (or stopped/none with userPlay false) → not playing.
   return false;
 }
