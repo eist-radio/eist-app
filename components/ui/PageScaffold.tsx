@@ -15,7 +15,7 @@ export function PageScaffold({
         <View>{left}</View>
         <View>{right}</View>
       </View>
-      <View style={[styles.content, { paddingTop: insets.top + 86 }]}>
+      <View style={[styles.content, { paddingTop: insets.top + 86, paddingBottom: insets.bottom + 40 }]}>
         {/* zIndex keeps the indicator above detail pages' absolute-fill
             ShowArtworkBackground, which is a later sibling and would otherwise
             paint over it. */}
@@ -46,6 +46,6 @@ export function PageScaffold({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   top: { position: 'absolute', left: space.screenX, right: space.screenX, zIndex: 5, height: 100, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  content: { flex: 1, paddingHorizontal: space.screenX, paddingBottom: 40 },
+  content: { flex: 1, paddingHorizontal: space.screenX },
   liveNow: { zIndex: 2 },
 });
