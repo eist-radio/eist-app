@@ -16,7 +16,6 @@ import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage }
 import { setupTrackPlayer } from '../utils/trackPlayerSetup';
 import { getLiveShowInfo } from '../utils/liveShowInfo';
 import { resolveIsPlaying } from '../utils/playbackUiState';
-
 // Only import TrackPlayer on mobile platforms
 let TrackPlayer: any, Event: any, State: any;
 if (Platform.OS !== 'web') {
@@ -91,6 +90,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   const hasInitialized = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const lastMetadataRef = useRef<string>('')
+  // Separate success key for the cast target so a failed/deferred local (RNTP)
+  // update never marks cast as done and vice versa. See updateMetadata.
+  const lastCastMetadataRef = useRef<string>('')
   const isPlayingRef = useRef(isPlaying)
   // Mirror of isPlayerReady so mount-registered listeners / stale closures
   // (attemptStreamRestart -> play -> setupPlayer) read the LIVE readiness
@@ -101,6 +104,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   // Separate user intent tracking from actual playback state
   const userPlay = useRef(false)
+
+  // Stable ref for play() so the CarPlay bridge listener never re-subscribes
+  const playRef = useRef<(options?: { castOnly?: boolean }) => Promise<void>>(async () => {})
 
   // Unified recovery state - keeps trying as long as user hasn't stopped
   const isRecovering = useRef(false);
@@ -314,12 +320,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // Unified restart mechanism that uses user intent instead of current playing state
   const attemptStreamRestart = async (reason: string = 'unknown') => {
     if (isRecovering.current) return
-    
+
     // Use userPlay instead of isPlayingRef.current
     if (!userPlay.current) {
       return
     }
-
     isRecovering.current = true
 
     // Clear any existing retry timeout
@@ -328,8 +333,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       retryTimeout.current = null
     }
 
-    // Don't change userPlay here - just update UI state
-    setIsPlaying(false)
+    // Deliberately do NOT setIsPlaying(false) here: this path only runs while
+    // userPlay is true, and the button must reflect the listening session, not
+    // recovery churn. Flipping it here made the button glitch Stop → Listen →
+    // Stop on every network change / rebuffer / retry. A genuine failure keeps
+    // retrying until the user presses Stop, which clears userPlay and the state.
 
     if (isWeb) {
       try {
@@ -581,22 +589,24 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       }
 
-      // Fetch fresh metadata FIRST and pass directly to cleanResetPlayer
-      // (React setState is async so state won't be updated yet)
-      const metadata = await fetchAndUpdateShowMetadata()
+      // Start audio immediately with existing metadata so CarPlay's Now
+      // Playing controls go live without waiting for a network fetch.
+      // Metadata is refreshed after playback starts.
+      await cleanResetPlayer()
 
-      // Now perform clean reset with fresh metadata passed directly
-      await cleanResetPlayer(metadata || undefined)
-
-      // Start playback with muted volume to allow buffering without glitch
       await TrackPlayer.setVolume(0)
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
-      
+
+      // Now fetch fresh metadata and update (non-blocking for playback)
+      fetchAndUpdateShowMetadata().catch((err) =>
+        console.warn('Post-play metadata fetch failed:', err)
+      )
+
       // Wait 2 seconds for proper buffering to avoid startup glitch
       await new Promise(resolve => setTimeout(resolve, 2000))
-      
+
       // Gradually restore volume to avoid jarring audio start
       await TrackPlayer.setVolume(1)
 
@@ -616,6 +626,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       await attemptStreamRestart('play-error')
     }
   }, [isPlayerReady, isWeb, setupPlayer, attemptStreamRestart, cleanResetPlayer, fetchAndUpdateShowMetadata, isCastConnected, castPlay, showTitle, showArtist, showArtworkUrl])
+
+  useEffect(() => { playRef.current = play }, [play])
 
   const stop = useCallback(async () => {
     // Clear user intent when manually stopping
@@ -694,16 +706,28 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
     const resolvedShowTime = showTime ?? showTimeRef.current
 
-    // Also update cast metadata if casting
+    const key = `${title}\0${artist}\0${artworkUrl ?? ''}\0${resolvedShowTime}`
+
+    // Also update cast metadata if casting. Dedup on its own success key so it
+    // records only after a successful cast update, independent of the local one.
     if (isCastConnected || isCastPlaying) {
-      try {
-        await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
-      } catch (err) {
-        console.error('Failed to update cast metadata:', err)
+      if (key !== lastCastMetadataRef.current) {
+        try {
+          await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
+          lastCastMetadataRef.current = key
+        } catch (err) {
+          console.error('Failed to update cast metadata:', err)
+        }
       }
     }
 
-    if (!isPlayerReady || isWeb) return
+    // Read the live readiness ref, not the render-captured isPlayerReady state,
+    // so a cold-start seed doesn't see a stale `false`. The local dedup key is
+    // recorded only AFTER a successful updateMetadataForTrack (below) — recording
+    // it here would let any early return (not ready, empty queue, out-of-bounds)
+    // or throw permanently suppress every later attempt for this show.
+    if (!isPlayerReadyRef.current || isWeb) return
+    if (key === lastMetadataRef.current) return
 
     try {
       const queue = await TrackPlayer.getQueue()
@@ -745,6 +769,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         _metadata_refresh: Date.now(),
       }
       await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
+      lastMetadataRef.current = key
     } catch (err) {
       console.error('Metadata update failed:', err)
     }
@@ -794,14 +819,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     const emitter = new NativeEventEmitter(bridge)
     const sub = emitter.addListener('EistCarPlayPlay', () => {
-      // Fired on every CarPlay scene activation, not just once per connection.
-      // If the stream is already playing (user glanced at Maps and came back),
-      // restarting it would glitch the audio — only start when not playing.
       if (isPlayingRef.current) return
-      play().catch((error) => console.error('CarPlay play request failed:', error))
+      playRef.current().catch((error: unknown) => console.error('CarPlay play request failed:', error))
     })
     return () => sub.remove()
-  }, [isWeb, play])
+  }, [isWeb])
 
   useEffect(() => {
     setupPlayer()
