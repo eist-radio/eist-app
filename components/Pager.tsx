@@ -1,6 +1,6 @@
 // components/Pager.tsx
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Dimensions, NativeScrollEvent, NativeSyntheticEvent, StatusBar, Text, View } from 'react-native';
+import { Animated, NativeScrollEvent, NativeSyntheticEvent, StatusBar, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PAGE_COUNT, colors, space } from '../theme/tokens';
 import { registerListenScroll } from '../utils/listenNav';
@@ -15,15 +15,27 @@ import ArchiveScreen from './screens/ArchiveScreen';
 import ConnectScreen from './screens/ConnectScreen';
 import NotificationsScreen from './screens/NotificationsScreen';
 
-const { width } = Dimensions.get('window');
-
 export function Pager() {
   const [active, setActive] = useState(0);
   const insets = useSafeAreaInsets();
+  // Track the live window width instead of a value captured once at module load.
+  // Android 16 (targetSdk 36) ignores the portrait lock on >=600dp displays, so
+  // on tablets / foldables / desktop windowing the width can change at runtime.
+  const { width } = useWindowDimensions();
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<any>(null);
+  const prevWidthRef = useRef(width);
   const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
     setActive(Math.round(e.nativeEvent.contentOffset.x / width));
+
+  // Re-align the active page after a width change (rotation / resize / large-
+  // screen windowing). Paging offsets are width-multiples, so a stale width
+  // would leave pages partly off-screen. No-op on plain active changes.
+  useEffect(() => {
+    if (prevWidthRef.current === width) return;
+    prevWidthRef.current = width;
+    scrollRef.current?.scrollTo?.({ x: active * width, animated: false });
+  }, [width, active]);
 
   // Let the frozen LiveNowIndicator (on any page) swipe us back to Listen.
   useEffect(() => {
