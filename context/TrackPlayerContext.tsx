@@ -91,6 +91,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const hasInitialized = useRef(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const lastMetadataRef = useRef<string>('')
+  // Separate success key for the cast target so a failed/deferred local (RNTP)
+  // update never marks cast as done and vice versa. See updateMetadata.
+  const lastCastMetadataRef = useRef<string>('')
   const isPlayingRef = useRef(isPlaying)
   // Mirror of isPlayerReady so mount-registered listeners / stale closures
   // (attemptStreamRestart -> play -> setupPlayer) read the LIVE readiness
@@ -704,19 +707,27 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const resolvedShowTime = showTime ?? showTimeRef.current
 
     const key = `${title}\0${artist}\0${artworkUrl ?? ''}\0${resolvedShowTime}`
-    if (key === lastMetadataRef.current) return
-    lastMetadataRef.current = key
 
-    // Also update cast metadata if casting
+    // Also update cast metadata if casting. Dedup on its own success key so it
+    // records only after a successful cast update, independent of the local one.
     if (isCastConnected || isCastPlaying) {
-      try {
-        await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
-      } catch (err) {
-        console.error('Failed to update cast metadata:', err)
+      if (key !== lastCastMetadataRef.current) {
+        try {
+          await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
+          lastCastMetadataRef.current = key
+        } catch (err) {
+          console.error('Failed to update cast metadata:', err)
+        }
       }
     }
 
-    if (!isPlayerReady || isWeb) return
+    // Read the live readiness ref, not the render-captured isPlayerReady state,
+    // so a cold-start seed doesn't see a stale `false`. The local dedup key is
+    // recorded only AFTER a successful updateMetadataForTrack (below) — recording
+    // it here would let any early return (not ready, empty queue, out-of-bounds)
+    // or throw permanently suppress every later attempt for this show.
+    if (!isPlayerReadyRef.current || isWeb) return
+    if (key === lastMetadataRef.current) return
 
     try {
       const queue = await TrackPlayer.getQueue()
@@ -758,6 +769,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         _metadata_refresh: Date.now(),
       }
       await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
+      lastMetadataRef.current = key
     } catch (err) {
       console.error('Metadata update failed:', err)
     }
