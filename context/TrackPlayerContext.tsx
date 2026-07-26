@@ -713,8 +713,14 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (isCastConnected || isCastPlaying) {
       if (key !== lastCastMetadataRef.current) {
         try {
-          await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
-          lastCastMetadataRef.current = key
+          // Record the cast success key ONLY if the update actually went
+          // through. updateCastMediaMetadata swallows failures and returns
+          // false; recording on a mere promise-resolve would let one transient
+          // failure permanently suppress every retry for this show.
+          const castOk = await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
+          if (castOk) {
+            lastCastMetadataRef.current = key
+          }
         } catch (err) {
           console.error('Failed to update cast metadata:', err)
         }
@@ -727,7 +733,18 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // it here would let any early return (not ready, empty queue, out-of-bounds)
     // or throw permanently suppress every later attempt for this show.
     if (!isPlayerReadyRef.current || isWeb) return
-    if (key === lastMetadataRef.current) return
+
+    // Resolve the artwork the lock screen will actually use, then dedup on THAT.
+    // Android's two-pass flow calls updateMetadata twice with the same artworkUrl
+    // (once before preload -> fallback logo, once after -> real image); keying on
+    // the input URL alone would suppress the second pass and leave Android Auto /
+    // lock screen stuck on the fallback logo. Keying on the resolved value lets
+    // the fallback->real transition through while still deduping true repeats.
+    const isDeadAir = title.trim().length === 0
+    let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
+    artworkToUse = getLockScreenImage(artworkToUse)
+    const localKey = `${title}\0${artist}\0${String(artworkToUse)}\0${resolvedShowTime}`
+    if (localKey === lastMetadataRef.current) return
 
     try {
       const queue = await TrackPlayer.getQueue()
@@ -745,14 +762,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      const isDeadAir = title.trim().length === 0
-
-      // Use appropriate artwork for Android lock screen and Android Auto compatibility
-      let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
-
-      // Use the lock screen image utility for proper Android handling
-      artworkToUse = getLockScreenImage(artworkToUse)
-
       const metadata = {
         title,
         artist: isDeadAir ? '' : (artist || ''),
@@ -769,7 +778,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         _metadata_refresh: Date.now(),
       }
       await TrackPlayer.updateMetadataForTrack(trackIndex, metadata)
-      lastMetadataRef.current = key
+      lastMetadataRef.current = localKey
     } catch (err) {
       console.error('Metadata update failed:', err)
     }

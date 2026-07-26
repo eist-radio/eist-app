@@ -59,7 +59,7 @@ export type CastContextType = {
     artist: string,
     artworkUrl?: string,
     showTime?: string
-  ) => Promise<void>
+  ) => Promise<boolean>
 }
 
 const CastContextValue = createContext<CastContextType | undefined>(undefined)
@@ -73,7 +73,7 @@ const disabledCastContext: CastContextType = {
   isCastPlaying: false,
   castPlay: async () => false,
   castStop: async () => {},
-  updateCastMetadata: async () => {},
+  updateCastMetadata: async () => false,
 }
 
 export const CastProvider = ({ children }: { children: ReactNode }) => {
@@ -308,13 +308,14 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
   const updateCastMetadataFn = useCallback(
     async (title: string, artist: string, artworkUrl?: string, showTime?: string) => {
       if (!isCastConnected || !isCastPlaying) {
-        // Just store metadata for when cast starts
+        // Just store metadata for when cast starts — nothing was actually sent,
+        // so report failure to the caller (don't let it record a success key).
         currentMetadata.current = { title, artist, artworkUrl, showTime }
-        return
+        return false
       }
 
       currentMetadata.current = { title, artist, artworkUrl, showTime }
-      await updateCastMediaMetadata(title, artist, artworkUrl, showTime)
+      return await updateCastMediaMetadata(title, artist, artworkUrl, showTime)
     },
     [isCastConnected, isCastPlaying]
   )
