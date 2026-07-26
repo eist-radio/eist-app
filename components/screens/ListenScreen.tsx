@@ -1,6 +1,6 @@
 // components/screens/ListenScreen.tsx
 import { useRouter } from 'expo-router'
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   AppState,
@@ -60,6 +60,16 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   // (shows disconnected while a cast is still active) while JS is suspended in
   // the background.
   const [castButtonNonce, setCastButtonNonce] = useState(0)
+
+  // Live mirrors for async fetch callbacks: they compare against what is
+  // currently on screen without needing the state values in their deps
+  // (which would churn their identities and re-trigger effects).
+  const broadcastStatusRef = useRef(broadcastStatus)
+  const remoteImageUrlRef = useRef(remoteImageUrl)
+  useEffect(() => {
+    broadcastStatusRef.current = broadcastStatus
+    remoteImageUrlRef.current = remoteImageUrl
+  })
 
 
   const parseDescription = (blocks: any[]): string =>
@@ -242,8 +252,13 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
               setImageFailed(false)
               await updateMetadata(newShowTitle || 'éist', name, image.uri, showTimeRange)
             } else {
-              setRemoteImageUrl(null)
-              setImageFailed(true)
+              // Preload failed. If this exact image is already displayed (it
+              // loaded fine earlier), keep it rather than flashing the
+              // placeholder until the next successful poll.
+              if (remoteImageUrlRef.current !== image.uri) {
+                setRemoteImageUrl(null)
+                setImageFailed(true)
+              }
               await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
             }
           } else {
@@ -269,8 +284,14 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         }
       }
     } catch {
-      setBroadcastStatus('error')
-      await clearNowPlayingState()
+      // A fetch error is a network blip, not an off-air signal (that arrives
+      // as a successful response with status !== 'schedule'). If a live show
+      // is on screen, hold it instead of flashing the offline background and
+      // swapping back on the next successful poll.
+      if (broadcastStatusRef.current !== 'schedule') {
+        setBroadcastStatus('error')
+        await clearNowPlayingState()
+      }
     }
   }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
 
@@ -352,8 +373,12 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
           setImageFailed(false)
           await updateMetadata(newShowTitle || 'éist', name, image.uri, showTimeRange)
         } else {
-          setRemoteImageUrl(null)
-          setImageFailed(true)
+          // Same rule as fetchLiveScheduleOnly: don't drop an image that is
+          // already on screen just because a re-preload of it failed.
+          if (remoteImageUrlRef.current !== image.uri) {
+            setRemoteImageUrl(null)
+            setImageFailed(true)
+          }
           await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
         }
       } else {
@@ -365,8 +390,13 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
       // Mark loading as finished
       setIsContentLoading(false)
     } catch {
-      setBroadcastStatus('error')
-      await clearNowPlayingState()
+      setIsContentLoading(false)
+      // Same hold-last-known-good rule as fetchLiveScheduleOnly: only a
+      // successful off-air response may replace a live show on screen.
+      if (broadcastStatusRef.current !== 'schedule') {
+        setBroadcastStatus('error')
+        await clearNowPlayingState()
+      }
     }
   }, [getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
 
@@ -401,16 +431,33 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   // (CarPlay / Android Auto) is handled centrally in TrackPlayerContext, which
   // is always mounted. This screen no longer schedules its own car refresh.
 
+  // The fetch effects below must run on page activation / a timer ONLY — not
+  // whenever isPlaying flips or a fetch callback picks up a new identity
+  // (artistCache/artistName/remoteImageUrl churn on every fetch). Re-running
+  // the full fetch on those re-renders set isContentLoading(true) each time,
+  // which blanked and re-showed the background artwork. Latest callbacks are
+  // read through refs so the effects can depend on isActive alone.
+  const isPlayingLatest = useRef(isPlaying)
+  const fetchNowPlayingWithArtistRef = useRef(fetchNowPlayingWithArtist)
+  const fetchLiveScheduleOnlyRef = useRef(fetchLiveScheduleOnly)
+  const fetchNextShowRef = useRef(fetchNextShow)
+  useEffect(() => {
+    isPlayingLatest.current = isPlaying
+    fetchNowPlayingWithArtistRef.current = fetchNowPlayingWithArtist
+    fetchLiveScheduleOnlyRef.current = fetchLiveScheduleOnly
+    fetchNextShowRef.current = fetchNextShow
+  })
+
   useEffect(() => {
     if (!isActive) return;
-    fetchNowPlayingWithArtist();
-    fetchNextShow();
+    fetchNowPlayingWithArtistRef.current();
+    fetchNextShowRef.current();
     const interval = setInterval(() => {
-      if (isPlaying) fetchLiveScheduleOnly();
-      fetchNextShow();
+      if (isPlayingLatest.current) fetchLiveScheduleOnlyRef.current();
+      fetchNextShowRef.current();
     }, 60000);
     return () => clearInterval(interval);
-  }, [isActive, fetchNowPlayingWithArtist, fetchLiveScheduleOnly, fetchNextShow, isPlaying]);
+  }, [isActive]);
 
   // Refresh now playing info whenever the app returns to the foreground
   useEffect(() => {
@@ -420,8 +467,8 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         // session state (which can go stale while backgrounded).
         setCastButtonNonce((n) => n + 1)
         // Only refresh if we're playing - use lightweight function
-        if (isPlaying) {
-          fetchLiveScheduleOnly()
+        if (isPlayingLatest.current) {
+          fetchLiveScheduleOnlyRef.current()
         }
       }
     })
@@ -429,7 +476,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     return () => {
       subscription.remove()
     }
-  }, [fetchLiveScheduleOnly, isPlaying])
+  }, [])
 
   // The Pager keeps every page mounted, so swiping away from Listen leaves this
   // screen's native Cast button alive but offscreen — where GCKUICastButton can
