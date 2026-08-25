@@ -31,6 +31,30 @@ if (Platform.OS !== 'web') {
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
 
+// How long to let the player recover on its own after the network changes before
+// intervening. Measured on a real device: ExoPlayer enters `buffering` within
+// ~1s of a wifi<->cellular handover and comes back by itself. The old code
+// restarted unconditionally 2s after the change and destroyed a stream that was
+// already healing — 22 teardowns and 75.9s of dead audio across 16 transitions.
+const NETWORK_RECOVERY_GRACE_MS = 8000
+
+// TEMPORARY DIAGNOSTICS — remove, or set DIAG false, before any release build.
+// Attributing which handler tears the player down during a network transition:
+// at least three paths each do a full teardown and the release build emits no
+// ReactNativeJS logcat, so the reason strings the code already builds are
+// invisible. Every line is greppable as EISTDIAG and parsed by
+// eist/test/stream-dropout/android-network-flip.mjs.
+const DIAG = false
+const DIAG_T0 = Date.now()
+const diag = (event: string, data?: Record<string, unknown>) => {
+  if (!DIAG) return
+  try {
+    console.log(`EISTDIAG@${Date.now()} ${Date.now() - DIAG_T0} ${event} ${JSON.stringify(data ?? {})}`)
+  } catch {
+    console.log(`EISTDIAG@${Date.now()} ${Date.now() - DIAG_T0} ${event} {"unserialisable":true}`)
+  }
+}
+
 type TrackPlayerContextType = {
   isPlaying: boolean
   isPlayerReady: boolean
@@ -111,6 +135,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // Unified recovery state - keeps trying as long as user hasn't stopped
   const isRecovering = useRef(false);
   const retryTimeout = useRef<NodeJS.Timeout | null>(null);
+  // Deferred post-network-change check. Held in a ref so NetInfo churn during a
+  // handover replaces the pending check instead of queueing several racing ones.
+  const networkCheckTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Deadline-driven metadata refresh timer (fires just after the current show ends)
   const metadataRefreshTimer = useRef<NodeJS.Timeout | null>(null);
@@ -158,6 +185,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // Optional metadata parameter allows passing freshly fetched metadata directly
   // (since React setState is async and state may not be updated yet)
   const cleanResetPlayer = async (metadata?: { title: string; artist: string; artworkUrl?: string }) => {
+    diag('cleanReset.enter')
     if (isWeb) {
       // Clean reset for web audio
       if (audioRef.current) {
@@ -204,14 +232,17 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         await TrackPlayer.add(trackToAdd)
+        diag('cleanReset.exit')
       } catch (addError) {
         console.error('TrackPlayer.add failed:', addError)
+        diag('cleanReset.addFailed', { error: String(addError) })
         // Don't throw the error, just log it to prevent crashes
         return
       }
 
     } catch (err) {
       console.error('Clean reset failed:', err)
+      diag('cleanReset.threw', { error: String(err) })
       throw err
     }
   }
@@ -319,10 +350,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   // Unified restart mechanism that uses user intent instead of current playing state
   const attemptStreamRestart = async (reason: string = 'unknown') => {
-    if (isRecovering.current) return
+    diag('restart.enter', { reason, isRecovering: isRecovering.current, userPlay: userPlay.current })
+    if (isRecovering.current) {
+      diag('restart.skip.alreadyRecovering', { reason })
+      return
+    }
 
     // Use userPlay instead of isPlayingRef.current
     if (!userPlay.current) {
+      diag('restart.skip.noUserIntent', { reason })
       return
     }
     isRecovering.current = true
@@ -370,33 +406,41 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       setIsPlayerReady(false)
       hasInitialized.current = false
 
-      // Clean reset
-      await cleanResetPlayer()
-
-      // Wait for cleanup
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // No cleanResetPlayer() here: play() already does one, with fresher
+      // metadata. Doing it twice destroyed the audio, rebuilt it, then destroyed
+      // it again — measured as 30 resets across 15 restarts, and the source of
+      // the destroy/create/destroy/create signature in every dropout.
 
       // Check userPlay instead of isPlayingRef.current
       if (userPlay.current) {
+        diag('restart.replay.begin', { reason })
         await setupPlayer()
         await play()
+        diag('restart.replay.returned', { reason })
       }
     } catch (err) {
       console.error(`Restart failed after ${reason}:`, err)
+      diag('restart.threw', { reason, error: String(err) })
       scheduleRetry(reason)
     }
     
+    diag('restart.exit', { reason })
     isRecovering.current = false
   }
 
   // Schedule a retry that respects user intent
   const scheduleRetry = (reason: string) => {
     // Check userPlay instead of isPlayingRef.current
-    if (!userPlay.current) return // Don't retry if user stopped
+    if (!userPlay.current) {
+      diag('retry.skip.noUserIntent', { reason })
+      return // Don't retry if user stopped
+    }
 
     const retryDelay = Math.min(5000 + Math.random() * 5000, 60000) // 5-10s with max 60s
-    
+
+    diag('retry.scheduled', { reason, delay_ms: Math.round(retryDelay) })
     retryTimeout.current = setTimeout(() => {
+      diag('retry.fired', { reason })
       attemptStreamRestart(`retry-${reason}`)
     }, retryDelay)
   }
@@ -480,6 +524,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   const play = useCallback(async (options?: { castOnly?: boolean }) => {
+    diag('play.enter', { castOnly: options?.castOnly === true, isRecovering: isRecovering.current })
     // Set user intent first
     userPlay.current = true
     const castOnly = options?.castOnly === true
@@ -609,9 +654,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       // Gradually restore volume to avoid jarring audio start
       await TrackPlayer.setVolume(1)
+      diag('play.success')
 
     } catch (err) {
       console.error('Play failed:', err)
+      diag('play.threw', { error: String(err), isRecovering: isRecovering.current })
       
       // Ensure volume is restored even if play fails
       try {
@@ -622,6 +669,16 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
+      // If we got here from inside attemptStreamRestart, calling it again would
+      // early-return on its isRecovering guard and swallow this failure — the
+      // outer `await play()` would look like it succeeded and no retry would ever
+      // be scheduled, leaving the player stopped with userPlay still true.
+      // Rethrow instead so the outer restart's catch runs scheduleRetry.
+      if (isRecovering.current) {
+        diag('play.rethrowToRestart', { error: String(err) })
+        throw err
+      }
+
       // Use unified restart for all play errors
       await attemptStreamRestart('play-error')
     }
@@ -630,6 +687,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => { playRef.current = play }, [play])
 
   const stop = useCallback(async () => {
+    diag('stop.enter', { isRecovering: isRecovering.current })
     // Clear user intent when manually stopping
     userPlay.current = false
 
@@ -637,6 +695,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (retryTimeout.current) {
       clearTimeout(retryTimeout.current)
       retryTimeout.current = null
+    }
+
+    // ...and any pending post-network-change check, so it cannot resurrect
+    // playback the user has deliberately stopped.
+    if (networkCheckTimer.current) {
+      clearTimeout(networkCheckTimer.current)
+      networkCheckTimer.current = null
     }
 
     // If casting, stop cast playback
@@ -794,6 +859,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const previous = previousNetworkState.current
     const current = networkState
 
+    diag('net.delivered', {
+      prev_type: previous.type, prev_connected: previous.isConnected,
+      cur_type: current.type, cur_connected: current.isConnected,
+      cur_reachable: current.isInternetReachable,
+      userPlay: userPlay.current, isRecovering: isRecovering.current,
+    })
+
     // Auto-restart when network comes back online OR when switching network types
     const shouldRestart = (
       // Network reconnection (disconnected -> connected)
@@ -804,12 +876,44 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       (previous.isConnected && !current.isConnected && userPlay.current)
     )
 
+    diag('net.decision', { shouldRestart, userPlay: userPlay.current })
+
     // Check userPlay instead of isPlaying to handle network disconnection cases
     if (shouldRestart && userPlay.current) {
-      
-      setTimeout(async () => {
+      // A network change is a reason to CHECK, not a reason to restart. Most
+      // handovers are survived by the player on its own; tearing it down is what
+      // produced the reported dropouts. Replace any pending check so churn
+      // during a handover collapses to a single one.
+      if (networkCheckTimer.current) {
+        clearTimeout(networkCheckTimer.current)
+      }
+
+      diag('net.checkScheduled', { from: previous.type, to: current.type, delay_ms: NETWORK_RECOVERY_GRACE_MS })
+      networkCheckTimer.current = setTimeout(async () => {
+        networkCheckTimer.current = null
+
+        if (!userPlay.current) {
+          diag('net.check.skip.noUserIntent')
+          return
+        }
+
+        // Did it recover by itself?
+        let state: unknown = null
+        try {
+          const playback = await TrackPlayer.getPlaybackState()
+          state = playback?.state
+        } catch (err) {
+          diag('net.check.stateFailed', { error: String(err) })
+        }
+
+        if (state === State.Playing) {
+          diag('net.check.recovered', { state: String(state) })
+          return
+        }
+
+        diag('net.check.restarting', { state: String(state), from: previous.type, to: current.type })
         await attemptStreamRestart(`network-change-${previous.type}-to-${current.type}`)
-      }, 2000) // 2 second delay for network stability
+      }, NETWORK_RECOVERY_GRACE_MS)
     }
 
     previousNetworkState.current = current
@@ -857,6 +961,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const onState = TrackPlayer.addEventListener(
         Event.PlaybackState,
         async ({ state }: any) => {
+          diag('event.playbackState', { state: String(state), userPlay: userPlay.current, isRecovering: isRecovering.current })
           const wasPlaying = isPlayingRef.current
           // Reflect the listening session, not the instantaneous decoder state.
           // RNTP passes through Loading/Buffering/Ready on startup and every
@@ -894,12 +999,14 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
       const onError = TrackPlayer.addEventListener(Event.PlaybackError, async (error: any) => {
         console.error('Playback error:', error)
+        diag('event.playbackError', { message: String(error?.message ?? error), code: error?.code ?? null })
 
         if (error.message?.includes('interrupted') ||
           error.message?.includes('session') ||
           error.message?.includes('carplay') ||
           error.message?.includes('android auto') ||
           error.message?.includes('bluetooth')) {
+          diag('event.playbackError.branch', { branch: 'interruption->stop' })
           wasPlayingBeforeBackground.current = isPlayingRef.current
           try {
             await stop()
@@ -907,6 +1014,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             console.error('Error stopping playback after interruption:', stopError)
           }
         } else {
+          diag('event.playbackError.branch', { branch: 'restart' })
           // Use unified restart for all other playback errors
           await attemptStreamRestart('playback-error')
         }
@@ -915,6 +1023,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       const onQueueEnded = TrackPlayer.addEventListener(
         Event.PlaybackQueueEnded,
         async () => {
+          diag('event.queueEnded', { userPlay: userPlay.current })
           // Use userPlay instead of isPlayingRef.current
           if (userPlay.current) {
             await attemptStreamRestart('queue-ended')
@@ -925,6 +1034,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       )
 
       const onAppState = AppState.addEventListener('change', async (next) => {
+        diag('event.appState', { next: String(next), userPlay: userPlay.current, isPlaying: isPlayingRef.current })
         if (next === 'active') {
           // Check if we should resume playback after returning from background
           setTimeout(async () => {
@@ -955,6 +1065,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         if (retryTimeout.current) {
           clearTimeout(retryTimeout.current)
           retryTimeout.current = null
+        }
+
+        // Clear pending post-network-change check
+        if (networkCheckTimer.current) {
+          clearTimeout(networkCheckTimer.current)
+          networkCheckTimer.current = null
         }
       }
     }
