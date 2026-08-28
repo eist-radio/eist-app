@@ -9,7 +9,7 @@ const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 // does a full stop/reset/add/play, and RemotePause routes into it whenever the
 // observed state is in NON_PLAYING_STATES — which includes State.Ready, a state
 // the player passes through on every rebuffer.
-const DIAG = false;
+const DIAG = true;
 const DIAG_T0 = Date.now();
 const diag = (event, data) => {
   if (!DIAG) return;

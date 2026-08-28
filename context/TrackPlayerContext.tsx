@@ -44,7 +44,7 @@ const NETWORK_RECOVERY_GRACE_MS = 8000
 // ReactNativeJS logcat, so the reason strings the code already builds are
 // invisible. Every line is greppable as EISTDIAG and parsed by
 // eist/test/stream-dropout/android-network-flip.mjs.
-const DIAG = false
+const DIAG = true
 const DIAG_T0 = Date.now()
 const diag = (event: string, data?: Record<string, unknown>) => {
   if (!DIAG) return
