@@ -13,7 +13,7 @@ import { AppState, NativeEventEmitter, NativeModules, Platform } from 'react-nat
 import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
-import { setupTrackPlayer } from '../utils/trackPlayerSetup';
+import { ensurePlayerSetup } from '../utils/ensurePlayerSetup';
 import { getLiveShowInfo } from '../utils/liveShowInfo';
 import { resolveIsPlaying } from '../utils/playbackUiState';
 // Only import TrackPlayer on mobile platforms
@@ -312,7 +312,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Check if TrackPlayer is already initialized before calling setupTrackPlayer
+      // Check if TrackPlayer is already initialized before calling ensurePlayerSetup
       try {
         const state = await TrackPlayer.getPlaybackState()
         hasInitialized.current = true
@@ -324,8 +324,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (!hasInitialized.current) {
-        // Use the best practice setup function
-        await setupTrackPlayer()
+        // Route through the shared, memoised setup so the UI and the background
+        // playback service (trackPlayerService.js) can't double-initialise and
+        // either one can be the first to set the player up. See ensurePlayerSetup.
+        await ensurePlayerSetup()
         hasInitialized.current = true
       }
 

@@ -1,5 +1,6 @@
 // trackPlayerService.js
 import TrackPlayer, { Event, State } from 'react-native-track-player';
+import { ensurePlayerSetup } from './utils/ensurePlayerSetup';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
@@ -23,6 +24,13 @@ const diag = (event, data) => {
 const startFreshStream = async () => {
   diag('startFreshStream.enter');
   try {
+    // A CarPlay-initiated session can reach this handler without the phone UI
+    // ever mounting, so the player may not have been set up by
+    // TrackPlayerContext yet. Ensure setup here (idempotent) or every TrackPlayer
+    // call below no-ops/throws and the car's play button appears to do nothing.
+    await ensurePlayerSetup();
+    diag('startFreshStream.setupEnsured');
+
     // Stop current playback
     await TrackPlayer.stop().catch(() => {});
     
@@ -66,6 +74,11 @@ const startFreshStream = async () => {
 };
 
 module.exports = async function() {
+  // Kick off player setup as soon as the playback service registers, so remote
+  // commands from CarPlay / the lock screen reach a live, initialized player even
+  // when the app was launched into the background without the React UI mounting.
+  ensurePlayerSetup().catch((e) => console.error('Playback service setup failed:', e));
+
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
     diag('remotePlay');
     try {
@@ -121,6 +134,7 @@ module.exports = async function() {
   ];
   TrackPlayer.addEventListener(Event.RemotePause, async () => {
     try {
+      await ensurePlayerSetup();
       const { state } = await TrackPlayer.getPlaybackState();
       const willRestart = NON_PLAYING_STATES.includes(state);
       // `Ready` is in NON_PLAYING_STATES, so a pause arriving mid-rebuffer
@@ -150,8 +164,9 @@ module.exports = async function() {
   // stop() tears down the service, which kills the MusicService and breaks the
   // MediaBrowserService binding — making it impossible to play again from
   // Android Auto without restarting the app.
-  TrackPlayer.addEventListener(Event.RemoteStop, () => {
+  TrackPlayer.addEventListener(Event.RemoteStop, async () => {
     diag('remoteStop');
+    await ensurePlayerSetup();
     return TrackPlayer.pause();
   });
 };
