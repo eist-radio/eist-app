@@ -414,7 +414,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
               >
                 <View style={s.timeCol}>
                   {r.isLive ? (
-                    <View style={s.nowChip}><Text style={s.nowChipText}>NOW</Text></View>
+                    <Text style={s.nowText}>NOW</Text>
                   ) : (
                     <Text style={[s.time, { color: colors.text }]} numberOfLines={1}>{r.time}</Text>
                   )}
@@ -436,6 +436,5 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 30 },
   timeCol: { width: 84 },
   time: { fontFamily: font.body, fontWeight: '600', fontSize: 16 },
-  nowChip: { alignSelf: 'flex-start', backgroundColor: colors.green, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 3, marginTop: 1 },
-  nowChipText: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 13, letterSpacing: 0.4, color: colors.purple },
+  nowText: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 17, letterSpacing: 0.4, color: colors.green, marginTop: 1 },
 })
