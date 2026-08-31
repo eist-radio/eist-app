@@ -1,11 +1,36 @@
 // trackPlayerService.js
 import TrackPlayer, { Event, State } from 'react-native-track-player';
+import { ensurePlayerSetup } from './utils/ensurePlayerSetup';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
+// TEMPORARY DIAGNOSTICS — must match the format used in TrackPlayerContext.tsx.
+// This file is a third teardown source nobody had instrumented: startFreshStream
+// does a full stop/reset/add/play, and RemotePause routes into it whenever the
+// observed state is in NON_PLAYING_STATES — which includes State.Ready, a state
+// the player passes through on every rebuffer.
+const DIAG = true;
+const DIAG_T0 = Date.now();
+const diag = (event, data) => {
+  if (!DIAG) return;
+  try {
+    console.log(`EISTDIAG@${Date.now()} ${Date.now() - DIAG_T0} svc.${event} ${JSON.stringify(data || {})}`);
+  } catch (_e) {
+    console.log(`EISTDIAG@${Date.now()} ${Date.now() - DIAG_T0} svc.${event} {"unserialisable":true}`);
+  }
+};
+
 // Start fresh stream
 const startFreshStream = async () => {
+  diag('startFreshStream.enter');
   try {
+    // A CarPlay-initiated session can reach this handler without the phone UI
+    // ever mounting, so the player may not have been set up by
+    // TrackPlayerContext yet. Ensure setup here (idempotent) or every TrackPlayer
+    // call below no-ops/throws and the car's play button appears to do nothing.
+    await ensurePlayerSetup();
+    diag('startFreshStream.setupEnsured');
+
     // Stop current playback
     await TrackPlayer.stop().catch(() => {});
     
@@ -35,6 +60,7 @@ const startFreshStream = async () => {
     // Start playback with fresh stream
     await TrackPlayer.play();
     
+    diag('startFreshStream.exit');
     console.log('Fresh stream started from CarPlay/remote control');
   } catch (error) {
     console.error('Error starting fresh stream:', error);
@@ -48,7 +74,13 @@ const startFreshStream = async () => {
 };
 
 module.exports = async function() {
+  // Kick off player setup as soon as the playback service registers, so remote
+  // commands from CarPlay / the lock screen reach a live, initialized player even
+  // when the app was launched into the background without the React UI mounting.
+  ensurePlayerSetup().catch((e) => console.error('Playback service setup failed:', e));
+
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
+    diag('remotePlay');
     try {
       await startFreshStream();
       // Force metadata refresh for Android Auto after play
@@ -68,6 +100,7 @@ module.exports = async function() {
   // Android Auto: fired when the user taps a browse-list item (e.g. "éist radio").
   // Without this handler Android Auto spins on "Getting your selection..." forever.
   TrackPlayer.addEventListener(Event.RemotePlayId, async () => {
+    diag('remotePlayId');
     try {
       await startFreshStream();
     } catch (error) {
@@ -76,6 +109,7 @@ module.exports = async function() {
   });
 
   TrackPlayer.addEventListener(Event.RemotePlaySearch, async () => {
+    diag('remotePlaySearch');
     try {
       await startFreshStream();
     } catch (error) {
@@ -100,8 +134,14 @@ module.exports = async function() {
   ];
   TrackPlayer.addEventListener(Event.RemotePause, async () => {
     try {
+      await ensurePlayerSetup();
       const { state } = await TrackPlayer.getPlaybackState();
-      if (NON_PLAYING_STATES.includes(state)) {
+      const willRestart = NON_PLAYING_STATES.includes(state);
+      // `Ready` is in NON_PLAYING_STATES, so a pause arriving mid-rebuffer
+      // starts a whole fresh stream instead of pausing. Suspected second
+      // teardown in the destroy/create/destroy/create pattern.
+      diag('remotePause', { state: String(state), branch: willRestart ? 'startFreshStream' : 'pause' });
+      if (willRestart) {
         await startFreshStream();
       } else {
         await TrackPlayer.pause();
@@ -124,5 +164,9 @@ module.exports = async function() {
   // stop() tears down the service, which kills the MusicService and breaks the
   // MediaBrowserService binding — making it impossible to play again from
   // Android Auto without restarting the app.
-  TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.pause());
+  TrackPlayer.addEventListener(Event.RemoteStop, async () => {
+    diag('remoteStop');
+    await ensurePlayerSetup();
+    return TrackPlayer.pause();
+  });
 };
