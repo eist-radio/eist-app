@@ -108,22 +108,24 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
             startPlayback()
         }
 
+        // Android Auto may still send STOP even though we no longer advertise
+        // ACTION_STOP (a head unit can send any command it likes). For live radio
+        // a stop is a pause: forwarding stop() to RNTP is a dead end, because
+        // Capability.STOP is deliberately absent from the capability list in
+        // utils/trackPlayerSetup.ts, so RNTP never wired a stop action on its
+        // session and silently drops the command. Nothing then comes back through
+        // the mirror, the proxy stays in an active state advertising no PLAY
+        // action, and Android Auto is left with no way to restart playback —
+        // the Google Play rejection ("pressing stop completely stop app, unable
+        // to play anything afterward").
         override fun onStop() {
-            Log.d(TAG, "proxy onStop -> forwarding to RNTP")
-            try {
-                rntpController?.transportControls?.stop()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error forwarding stop to RNTP", e)
-            }
+            Log.d(TAG, "proxy onStop -> treating as pause")
+            pauseAndPublishIdle()
         }
 
         override fun onPause() {
             Log.d(TAG, "proxy onPause -> forwarding to RNTP")
-            try {
-                rntpController?.transportControls?.pause()
-            } catch (e: Exception) {
-                Log.e(TAG, "Error forwarding pause to RNTP", e)
-            }
+            pauseAndPublishIdle()
         }
 
         override fun onSkipToNext() { /* no-op: live radio */ }
@@ -384,27 +386,32 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    // Action mask depending on state: active states offer STOP|PAUSE; idle
-    // states offer PLAY + PLAY/PREPARE_FROM_*. Never advertise SKIP.
-    private fun actionsFor(state: Int): Long {
-        val active = state == PlaybackStateCompat.STATE_PLAYING ||
-            state == PlaybackStateCompat.STATE_BUFFERING ||
-            state == PlaybackStateCompat.STATE_CONNECTING
-        return if (active) {
-            PlaybackStateCompat.ACTION_STOP or PlaybackStateCompat.ACTION_PAUSE
-        } else {
-            PlaybackStateCompat.ACTION_PLAY or
-                PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
-                PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
-                PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID or
-                PlaybackStateCompat.ACTION_PREPARE_FROM_SEARCH
-        }
+    // Action mask. ACTION_STOP is never advertised: Android Auto renders its
+    // transport controls from the actions on THIS session (the proxy is the only
+    // session AA ever sees — RNTP's own session is not exposed), so this mask is
+    // the one and only reason a stop button appears in the car. Dropping
+    // Capability.Stop in utils/trackPlayerSetup.ts does not reach this surface.
+    //
+    // ACTION_PLAY and ACTION_PAUSE are both advertised in every state. AA picks
+    // the right one from the state, and advertising both means there is never a
+    // state in which the head unit has no way to resume. The old mask advertised
+    // STOP|PAUSE with no PLAY while active, so a stop that produced no mirrored
+    // state change stranded the card with no play affordance at all.
+    // Never advertise SKIP (live radio).
+    private fun transportActions(): Long {
+        return PlaybackStateCompat.ACTION_PLAY or
+            PlaybackStateCompat.ACTION_PAUSE or
+            PlaybackStateCompat.ACTION_PLAY_PAUSE or
+            PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
+            PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH or
+            PlaybackStateCompat.ACTION_PREPARE_FROM_MEDIA_ID or
+            PlaybackStateCompat.ACTION_PREPARE_FROM_SEARCH
     }
 
     private fun publishState(state: Int) {
         val playbackState = PlaybackStateCompat.Builder()
             .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1f)
-            .setActions(actionsFor(state))
+            .setActions(transportActions())
             .build()
         try {
             proxySession?.setPlaybackState(playbackState)
@@ -425,6 +432,26 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
             proxySession?.setMetadata(metadata)
         } catch (e: Exception) {
             Log.e(TAG, "Error seeding metadata", e)
+        }
+    }
+
+    // Every AA stop/pause entry point funnels here. Publishing PAUSED on the
+    // proxy SYNCHRONOUSLY is the part that matters for policy compliance: it
+    // moves the card out of an active state right away, so the head unit shows
+    // play rather than pause, even if RNTP drops the forwarded command or the
+    // mirror never fires.
+    private fun pauseAndPublishIdle() {
+        // Drop the start grace window, otherwise mirrorState() would discard
+        // RNTP's genuine PAUSED and leave the card showing a stale active state.
+        suppressIdleUntil = 0L
+        // Let the next play through: without this a stop immediately after a
+        // start is swallowed by the DEBOUNCE_MS coalescing window.
+        lastForwardMs = 0L
+        publishState(PlaybackStateCompat.STATE_PAUSED)
+        try {
+            rntpController?.transportControls?.pause()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error forwarding pause to RNTP", e)
         }
     }
 

@@ -70,10 +70,16 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     interfaceController.setRootTemplate(makeRootTemplate(), animated: false) { [weak self] _, _ in
       guard let self = self else { return }
       self.rootTemplateSet = true
-      if self.pendingAutoPlay {
-        self.pendingAutoPlay = false
-        self.startPlaybackAndShowNowPlaying(animated: false)
-      }
+      // Push Now Playing unconditionally as soon as the root exists, rather than
+      // only when an early activation was parked. Waiting for
+      // sceneDidBecomeActive left the one-item list on screen whenever that
+      // callback did not arrive (or arrived before the root was ready and the
+      // flush was missed), which is the reported symptom: the list is visible
+      // and its play button does nothing. The root list stays in the stack
+      // underneath purely because Apple rejects CPNowPlayingTemplate as a root
+      // template; the user is never meant to see it.
+      self.pendingAutoPlay = false
+      self.startPlaybackAndShowNowPlaying(animated: false)
     }
   }
 
