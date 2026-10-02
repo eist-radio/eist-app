@@ -33,14 +33,24 @@ export const setupTrackPlayer = async () => {
       },
       
       // Capabilities for live radio. Play+Pause is the standard pattern for
-      // car/lock-screen: a single toggle button. Stop is intentionally omitted —
+      // car/lock-screen: a single toggle button. Stop is omitted because
       // TrackPlayer.stop() tears down the Android foreground service, which kills
-      // the MusicService and breaks the MediaBrowserService binding. Android Auto
-      // then can't send play commands and the app appears dead (Google Play
-      // rejection: "pressing stop completely stop app"). Pause keeps the service
-      // alive; the RemotePause handler in trackPlayerService.js treats
-      // pause-while-playing as a live-radio stop, and pause-while-stopped as a
-      // fresh-stream start.
+      // the MusicService and breaks the MediaBrowserService binding. Pause keeps
+      // the service alive; the RemotePause handler in trackPlayerService.js
+      // treats pause-while-playing as a live-radio stop, and pause-while-stopped
+      // as a fresh-stream start.
+      //
+      // This list governs RNTP's OWN session: the lock screen and notification.
+      // It does NOT govern Android Auto, which only ever talks to the proxy
+      // MediaSession in plugins/withAndroidAuto.js. The stop button behind the
+      // Google Play rejection ("pressing stop completely stop app, unable to
+      // play anything afterward") came from that proxy advertising ACTION_STOP,
+      // so removing Capability.Stop here never affected it. The car-facing
+      // action mask lives in transportActions() in that plugin.
+      //
+      // Side effect worth knowing: omitting Capability.Stop means RNTP never
+      // wires a stop action on its session, so a stop() forwarded to RNTP is
+      // silently dropped. The proxy therefore converts stop to pause itself.
       capabilities: [
         Capability.Play,
         Capability.Pause,

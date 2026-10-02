@@ -13,9 +13,10 @@ import { AppState, NativeEventEmitter, NativeModules, Platform } from 'react-nat
 import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
-import { setupTrackPlayer } from '../utils/trackPlayerSetup';
+import { ensurePlayerSetup, resetPlayerSetup } from '../utils/ensurePlayerSetup';
 import { getLiveShowInfo } from '../utils/liveShowInfo';
 import { resolveIsPlaying } from '../utils/playbackUiState';
+import { withTimeout } from '../utils/withTimeout';
 // Only import TrackPlayer on mobile platforms
 let TrackPlayer: any, Event: any, State: any;
 if (Platform.OS !== 'web') {
@@ -30,6 +31,24 @@ if (Platform.OS !== 'web') {
 }
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
+
+// How long to let the player recover on its own after the network changes before
+// intervening. Measured on a real device: ExoPlayer enters `buffering` within
+// ~1s of a wifi<->cellular handover and comes back by itself. The old code
+// restarted unconditionally 2s after the change and destroyed a stream that was
+// already healing — 22 teardowns and 75.9s of dead audio across 16 transitions.
+const NETWORK_RECOVERY_GRACE_MS = 8000
+
+// Ceiling on one recovery attempt (setupPlayer + play). Nothing below this line
+// may await a native promise without a bound: RNTP's setupPlayer() resolves from
+// MusicModule.onServiceConnected, and a promise that never settles used to latch
+// isRecovering true for the life of the JS runtime, after which every recovery
+// path returned early and only an app restart brought audio back. See
+// attemptStreamRestart.
+const RECOVERY_TIMEOUT_MS = 30000
+
+// Ceiling on the "is the native player answering?" probe in setupPlayer.
+const PLAYER_PROBE_TIMEOUT_MS = 2000
 
 type TrackPlayerContextType = {
   isPlaying: boolean
@@ -111,6 +130,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // Unified recovery state - keeps trying as long as user hasn't stopped
   const isRecovering = useRef(false);
   const retryTimeout = useRef<NodeJS.Timeout | null>(null);
+  // Deferred post-network-change check. Held in a ref so NetInfo churn during a
+  // handover replaces the pending check instead of queueing several racing ones.
+  const networkCheckTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Deadline-driven metadata refresh timer (fires just after the current show ends)
   const metadataRefreshTimer = useRef<NodeJS.Timeout | null>(null);
@@ -281,34 +303,46 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Check if TrackPlayer is already initialized before calling setupTrackPlayer
+      // Is the player already up and answering? A playback-state read that
+      // resolves is the proof; bound so a native promise that goes missing
+      // degrades into a re-setup instead of stalling here.
       try {
-        const state = await TrackPlayer.getPlaybackState()
+        await withTimeout(
+          TrackPlayer.getPlaybackState(),
+          PLAYER_PROBE_TIMEOUT_MS,
+          'getPlaybackState'
+        )
         hasInitialized.current = true
         isPlayerReadyRef.current = true
         setIsPlayerReady(true)
         return
       } catch (checkError) {
-        // TrackPlayer not initialized yet, proceed with setup
+        // The player did not answer, so anything ensurePlayerSetup has memoised
+        // is stale. The MusicService can be destroyed under a live JS runtime
+        // (OS reclaim, foreground-service limits) and its ExoPlayer goes with
+        // it, while the memo keeps reporting "set up" forever. Dropping it is
+        // what makes the call below actually reach TrackPlayer.setupPlayer();
+        // without this the retry loop re-ran a no-op setup every few seconds,
+        // marked the player ready, failed every call against it, and never
+        // recovered until the app was restarted.
+        resetPlayerSetup()
       }
 
-      if (!hasInitialized.current) {
-        // Use the best practice setup function
-        await setupTrackPlayer()
-        hasInitialized.current = true
-      }
+      // Route through the shared, memoised setup so the UI and the background
+      // playback service (trackPlayerService.js) can't double-initialise and
+      // either one can be the first to set the player up. See ensurePlayerSetup.
+      // Reached only when the probe above failed, so setup is always wanted
+      // here regardless of what hasInitialized claims.
+      await ensurePlayerSetup()
+      hasInitialized.current = true
 
       isPlayerReadyRef.current = true
       setIsPlayerReady(true)
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message.toLowerCase() : ''
-      if (errorMsg.includes('already been initialized')) {
-        hasInitialized.current = true
-        isPlayerReadyRef.current = true
-        setIsPlayerReady(true)
-        return
-      }
-
+      // No "already been initialized" shortcut here any more. ensurePlayerSetup
+      // swallows that error itself once it has verified the player responds, so
+      // seeing it at this level means the probe failed and the player is not
+      // usable. Reporting ready on it is what let play() drive a dead player.
       console.error('Player setup failed:', err)
       hasInitialized.current = false
       isPlayerReadyRef.current = false
@@ -319,7 +353,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   // Unified restart mechanism that uses user intent instead of current playing state
   const attemptStreamRestart = async (reason: string = 'unknown') => {
-    if (isRecovering.current) return
+    if (isRecovering.current) {
+      return
+    }
 
     // Use userPlay instead of isPlayingRef.current
     if (!userPlay.current) {
@@ -339,63 +375,82 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // Stop on every network change / rebuffer / retry. A genuine failure keeps
     // retrying until the user presses Stop, which clears userPlay and the state.
 
-    if (isWeb) {
-      try {
-        // Clean reset for web
-        if (audioRef.current) {
-          audioRef.current.pause()
-          audioRef.current.src = ''
-          audioRef.current.load()
-          audioRef.current = null
-        }
+    // isRecovering is cleared in the finally below, and the recovery work is
+    // bounded by RECOVERY_TIMEOUT_MS. Both matter: this flag gates EVERY
+    // recovery path (playback error, queue ended, the post-network-change
+    // check, the retry timer, app-foregrounded), so a single await that never
+    // settles used to latch it true for the life of the JS runtime and leave
+    // the stream dead until the app was restarted. A finally alone would not
+    // have run on a hung await, which is why the timeout is the real guard and
+    // the finally is there to cover every ordinary exit.
+    try {
+      if (isWeb) {
+        try {
+          // Clean reset for web
+          if (audioRef.current) {
+            audioRef.current.pause()
+            audioRef.current.src = ''
+            audioRef.current.load()
+            audioRef.current = null
+          }
 
-        // Wait a moment then restart
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
+          // Wait a moment then restart
+          await new Promise(resolve => setTimeout(resolve, 2000))
+
+          // Check userPlay instead of isPlayingRef.current
+          if (userPlay.current) {
+            await play()
+          }
+        } catch (err) {
+          console.error('Web restart failed:', err)
+          scheduleRetry(reason)
+        }
+        return
+      }
+
+      try {
+        // Reset player state
+        isPlayerReadyRef.current = false
+        setIsPlayerReady(false)
+        hasInitialized.current = false
+
+        // No cleanResetPlayer() here: play() already does one, with fresher
+        // metadata. Doing it twice destroyed the audio, rebuilt it, then destroyed
+        // it again — measured as 30 resets across 15 restarts, and the source of
+        // the destroy/create/destroy/create signature in every dropout.
+
         // Check userPlay instead of isPlayingRef.current
         if (userPlay.current) {
-          await play()
+          await withTimeout(
+            (async () => {
+              await setupPlayer()
+              await play()
+            })(),
+            RECOVERY_TIMEOUT_MS,
+            `restart(${reason})`
+          )
         }
       } catch (err) {
-        console.error('Web restart failed:', err)
+        // Covers a timeout as well as a thrown failure. The abandoned attempt
+        // may still land later; that is harmless, and scheduleRetry's 5-10s
+        // delay means the latch is clear by the time the retry runs.
+        console.error(`Restart failed after ${reason}:`, err)
         scheduleRetry(reason)
       }
+    } finally {
       isRecovering.current = false
-      return
     }
-
-    try {
-      // Reset player state
-      isPlayerReadyRef.current = false
-      setIsPlayerReady(false)
-      hasInitialized.current = false
-
-      // Clean reset
-      await cleanResetPlayer()
-
-      // Wait for cleanup
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      // Check userPlay instead of isPlayingRef.current
-      if (userPlay.current) {
-        await setupPlayer()
-        await play()
-      }
-    } catch (err) {
-      console.error(`Restart failed after ${reason}:`, err)
-      scheduleRetry(reason)
-    }
-    
-    isRecovering.current = false
   }
 
   // Schedule a retry that respects user intent
   const scheduleRetry = (reason: string) => {
     // Check userPlay instead of isPlayingRef.current
-    if (!userPlay.current) return // Don't retry if user stopped
+    if (!userPlay.current) {
+      return // Don't retry if user stopped
+    }
 
     const retryDelay = Math.min(5000 + Math.random() * 5000, 60000) // 5-10s with max 60s
-    
+
     retryTimeout.current = setTimeout(() => {
       attemptStreamRestart(`retry-${reason}`)
     }, retryDelay)
@@ -622,6 +677,15 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
+      // If we got here from inside attemptStreamRestart, calling it again would
+      // early-return on its isRecovering guard and swallow this failure — the
+      // outer `await play()` would look like it succeeded and no retry would ever
+      // be scheduled, leaving the player stopped with userPlay still true.
+      // Rethrow instead so the outer restart's catch runs scheduleRetry.
+      if (isRecovering.current) {
+        throw err
+      }
+
       // Use unified restart for all play errors
       await attemptStreamRestart('play-error')
     }
@@ -637,6 +701,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (retryTimeout.current) {
       clearTimeout(retryTimeout.current)
       retryTimeout.current = null
+    }
+
+    // ...and any pending post-network-change check, so it cannot resurrect
+    // playback the user has deliberately stopped.
+    if (networkCheckTimer.current) {
+      clearTimeout(networkCheckTimer.current)
+      networkCheckTimer.current = null
     }
 
     // If casting, stop cast playback
@@ -806,10 +877,41 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     // Check userPlay instead of isPlaying to handle network disconnection cases
     if (shouldRestart && userPlay.current) {
-      
-      setTimeout(async () => {
+      // A network change is a reason to CHECK, not a reason to restart. Most
+      // handovers are survived by the player on its own; tearing it down is what
+      // produced the reported dropouts. Replace any pending check so churn
+      // during a handover collapses to a single one.
+      if (networkCheckTimer.current) {
+        clearTimeout(networkCheckTimer.current)
+      }
+
+      networkCheckTimer.current = setTimeout(async () => {
+        networkCheckTimer.current = null
+
+        if (!userPlay.current) {
+          return
+        }
+
+        // Did it recover by itself?
+        let state: unknown = null
+        try {
+          const playback = await withTimeout<any>(
+            TrackPlayer.getPlaybackState(),
+            PLAYER_PROBE_TIMEOUT_MS,
+            'getPlaybackState'
+          )
+          state = playback?.state
+        } catch {
+          // Leave state null and fall through to a restart: a player that will
+          // not report its state is not a player that recovered on its own.
+        }
+
+        if (state === State.Playing) {
+          return
+        }
+
         await attemptStreamRestart(`network-change-${previous.type}-to-${current.type}`)
-      }, 2000) // 2 second delay for network stability
+      }, NETWORK_RECOVERY_GRACE_MS)
     }
 
     previousNetworkState.current = current
@@ -955,6 +1057,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         if (retryTimeout.current) {
           clearTimeout(retryTimeout.current)
           retryTimeout.current = null
+        }
+
+        // Clear pending post-network-change check
+        if (networkCheckTimer.current) {
+          clearTimeout(networkCheckTimer.current)
+          networkCheckTimer.current = null
         }
       }
     }
