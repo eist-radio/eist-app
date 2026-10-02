@@ -1,8 +1,42 @@
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
-index b2409a0..42efd37 100644
+index b2409a0..e7c0600 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
-@@ -545,7 +545,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -50,14 +50,29 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+ 
+     override fun onServiceConnected(name: ComponentName, service: IBinder) {
+         scope.launch {
+-            // If a binder already exists, don't get a new one
+-            if (!::musicService.isInitialized) {
+-                val binder: MusicService.MusicBinder = service as MusicService.MusicBinder
++            val binder: MusicService.MusicBinder = service as MusicService.MusicBinder
++
++            // Adopt the binder the system just handed us whenever it is a different
++            // service instance. The original guard was `if (!::musicService.isInitialized)`,
++            // and because that lateinit is never cleared, the first bind made it true
++            // forever: after the MusicService was destroyed (OS reclaim,
++            // foreground-service limits) and Android rebound, this module kept calling
++            // a dead service whose ExoPlayer had been torn down in its onDestroy, and
++            // nothing short of restarting the app recovered.
++            if (!::musicService.isInitialized || musicService !== binder.service) {
+                 musicService = binder.service
+                 musicService.setupPlayer(playerOptions)
+-                playerSetUpPromise?.resolve(null)
+             }
+ 
++            // Resolve on EVERY connect, not just the first. The resolve used to sit
++            // inside the guard above, so a rebind left the promise returned by
++            // TrackPlayer.setupPlayer() pending forever. Every JS caller awaiting it
++            // then hung for the life of the runtime, including the memoised setup
++            // shared with the background playback service. Cleared afterwards so a
++            // later connect cannot resolve an already-settled promise.
++            playerSetUpPromise?.resolve(null)
++            playerSetUpPromise = null
++
+             isServiceBound = true
+         }
+     }
+@@ -545,7 +560,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          if (index >= 0 && index < musicService.tracks.size) {
@@ -11,7 +45,7 @@ index b2409a0..42efd37 100644
          } else {
              callback.resolve(null)
          }
-@@ -584,9 +584,9 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -584,9 +599,9 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          if (verifyServiceBoundOrReject(callback)) return@launch
          callback.resolve(
              if (musicService.tracks.isEmpty()) null
