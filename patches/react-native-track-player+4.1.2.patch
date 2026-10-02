@@ -24,3 +24,56 @@ index b2409a0..42efd37 100644
          )
      }
  
+diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
+index afa6b0f..9434f2e 100644
+--- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
++++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
+@@ -94,6 +94,19 @@ class MusicService : HeadlessJsTaskService() {
+     private var compactCapabilities: List<Capability> = emptyList()
+ 
+     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
++        // A null intent means the system is recreating the service after the process
++        // died (START_STICKY redelivery). There is no React context and no player at
++        // that point, so nothing can resume until JS calls setupPlayer again, and on
++        // API 31+ a backgrounded app has no foreground-service start exemption. Going
++        // through startAndStopEmptyNotificationToAvoidANR() anyway throws
++        // ForegroundServiceStartNotAllowedException, which ActivityThread rethrows as a
++        // fatal RuntimeException, and START_STICKY schedules another restart into the
++        // same crash. Bail out of the restart instead.
++        if (intent == null) {
++            stopSelf()
++            return START_NOT_STICKY
++        }
++
+         startTask(getTaskConfig(intent))
+         startAndStopEmptyNotificationToAvoidANR()
+         return START_STICKY
+@@ -120,9 +133,25 @@ class MusicService : HeadlessJsTaskService() {
+             notificationBuilder.foregroundServiceBehavior = NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
+         }
+         val notification = notificationBuilder.build()
+-        startForeground(EMPTY_NOTIFICATION_ID, notification)
+-        @Suppress("DEPRECATION")
+-        stopForeground(true)
++        try {
++            startForeground(EMPTY_NOTIFICATION_ID, notification)
++            @Suppress("DEPRECATION")
++            stopForeground(true)
++        } catch (error: Exception) {
++            // Same guard startForegroundIfNecessary() already applies to its own
++            // startForeground call: a start the system refuses because the app is in
++            // the background degrades the ANR workaround, it does not kill the process.
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
++                error is ForegroundServiceStartNotAllowedException
++            ) {
++                Timber.e(
++                    "ForegroundServiceStartNotAllowedException: App tried to start a foreground Service when it was not allowed to do so.",
++                    error
++                )
++            } else {
++                Timber.e("Failed to start the empty ANR-avoidance notification.", error)
++            }
++        }
+     }
+ 
+     @MainThread
