@@ -13,6 +13,7 @@ import { AppState, NativeEventEmitter, NativeModules, Platform } from 'react-nat
 import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
+import { shouldStartPlaybackForCarPlay } from '../utils/carPlayPlayRequest';
 import { ensurePlayerSetup, resetPlayerSetup } from '../utils/ensurePlayerSetup';
 import { getLiveShowInfo } from '../utils/liveShowInfo';
 import { resolveIsPlaying } from '../utils/playbackUiState';
@@ -126,6 +127,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
   // Stable ref for play() so the CarPlay bridge listener never re-subscribes
   const playRef = useRef<(options?: { castOnly?: boolean }) => Promise<void>>(async () => {})
+
+  // Whether a CarPlay-initiated play attempt is still running. The native scene
+  // posts a play request on every activation, and several can land inside the
+  // state probe's window, so the first attempt needs to be visible to the rest.
+  // Scoped to this one path and always released in a finally, unlike the sticky
+  // isPlaying flag it replaced. See utils/carPlayPlayRequest.ts.
+  const carPlayPlayInFlight = useRef(false)
 
   // Unified recovery state - keeps trying as long as user hasn't stopped
   const isRecovering = useRef(false);
@@ -928,10 +936,51 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const bridge = NativeModules.EistCarPlayBridge
     if (!bridge) return
 
+    // Ask the player what it is actually doing. This used to read isPlayingRef,
+    // which is a UI affordance (resolveIsPlaying holds it true through
+    // loading/buffering/ready/stopped/none while userPlay intent is set) and
+    // userPlay is only cleared by an explicit user stop. A CarPlay disconnect
+    // therefore left it latched true with nothing playing, and from then on
+    // every car play request was discarded: the car showed Now Playing and sat
+    // silent until the user tapped the button on the phone. The decision now
+    // runs off the real playback state, in utils/carPlayPlayRequest.ts.
+    const handleCarPlayPlayRequest = async () => {
+      // Read and claim the latch synchronously, before any await, so a second
+      // activation arriving during the probe below sees the first attempt.
+      // Only the invocation that claimed it releases it.
+      const requestInFlight = carPlayPlayInFlight.current
+      carPlayPlayInFlight.current = true
+
+      try {
+        let state: string | null = null
+        try {
+          const playback = await withTimeout<any>(
+            TrackPlayer.getPlaybackState(),
+            PLAYER_PROBE_TIMEOUT_MS,
+            'getPlaybackState'
+          )
+          state = playback?.state ?? null
+        } catch {
+          // Leave state null. A player that will not answer is treated as not
+          // playing, and play() runs setupPlayer() first, which is what revives
+          // a player whose service died under a live JS runtime.
+        }
+
+        if (!shouldStartPlaybackForCarPlay({ state, requestInFlight })) {
+          return
+        }
+
+        await playRef.current()
+      } catch (error: unknown) {
+        console.error('CarPlay play request failed:', error)
+      } finally {
+        carPlayPlayInFlight.current = requestInFlight
+      }
+    }
+
     const emitter = new NativeEventEmitter(bridge)
     const sub = emitter.addListener('EistCarPlayPlay', () => {
-      if (isPlayingRef.current) return
-      playRef.current().catch((error: unknown) => console.error('CarPlay play request failed:', error))
+      void handleCarPlayPlayRequest()
     })
     return () => sub.remove()
   }, [isWeb])
