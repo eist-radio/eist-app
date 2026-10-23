@@ -25,6 +25,20 @@ export const setupTrackPlayer = async () => {
       autoUpdateMetadata: true,
     });
 
+    await applyPlayerOptions();
+  } catch (error) {
+    console.error('TrackPlayer setup error:', error);
+    throw error;
+  }
+};
+
+// Capabilities and Android behaviour. Separate from setupTrackPlayer because it
+// must also run when setupPlayer() reports "already initialized": a first setup
+// that timed out in JS can still complete natively, and its options were never
+// applied, which leaves CarPlay's Now Playing button and the notification
+// controls dead.
+export const applyPlayerOptions = async () => {
+  try {
     // Options setup - Enhanced for Android Auto
     await TrackPlayer.updateOptions({
       android: {
@@ -68,7 +82,7 @@ export const setupTrackPlayer = async () => {
       progressUpdateEventInterval: 1,
     });
   } catch (error) {
-    console.error('TrackPlayer setup error:', error);
+    console.error('TrackPlayer options error:', error);
     throw error;
   }
 };

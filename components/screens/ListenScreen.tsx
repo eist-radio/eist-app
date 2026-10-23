@@ -65,6 +65,12 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   // currently on screen without needing the state values in their deps
   // (which would churn their identities and re-trigger effects).
   const broadcastStatusRef = useRef(broadcastStatus)
+  // End time (ms) of the live show on screen. Bounds the hold-last-known-good
+  // rule in the fetch catch blocks: during an outage or with a bad API key, a
+  // show is held only until it ends, not indefinitely.
+  const liveShowEndRef = useRef<number | null>(null)
+  const heldShowIsOver = () =>
+    liveShowEndRef.current !== null && Date.now() > liveShowEndRef.current
   const remoteImageUrlRef = useRef(remoteImageUrl)
   useEffect(() => {
     broadcastStatusRef.current = broadcastStatus
@@ -166,6 +172,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     setShowDescription('')
     setArtistId(null)
     setCurrentShowId(null)
+    liveShowEndRef.current = null
     // Don't clear next show info - it should be preserved when station is off air
     setIsContentLoading(false)
     try {
@@ -223,6 +230,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
           content.endDateUtc,
           currentTimezone
         )
+        liveShowEndRef.current = Date.parse(content.endDateUtc) || null
 
         // Prepare description
         let desc = parseDescription(content.description?.content || [])
@@ -291,7 +299,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
       // as a successful response with status !== 'schedule'). If a live show
       // is on screen, hold it instead of flashing the offline background and
       // swapping back on the next successful poll.
-      if (broadcastStatusRef.current !== 'schedule') {
+      if (broadcastStatusRef.current !== 'schedule' || heldShowIsOver()) {
         setBroadcastStatus('error')
         await clearNowPlayingState()
       }
@@ -351,6 +359,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         content.endDateUtc,
         currentTimezone
       )
+      liveShowEndRef.current = Date.parse(content.endDateUtc) || null
 
       const { name, image } = await getArtistDetails(newArtistId)
 
@@ -397,7 +406,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
       setIsContentLoading(false)
       // Same hold-last-known-good rule as fetchLiveScheduleOnly: only a
       // successful off-air response may replace a live show on screen.
-      if (broadcastStatusRef.current !== 'schedule') {
+      if (broadcastStatusRef.current !== 'schedule' || heldShowIsOver()) {
         setBroadcastStatus('error')
         await clearNowPlayingState()
       }
@@ -456,12 +465,24 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     if (!isActive) return;
     fetchNowPlayingWithArtistRef.current();
     fetchNextShowRef.current();
+    // Refresh while idle too, or the show on screen goes stale at the top of
+    // the hour when nothing is playing.
     const interval = setInterval(() => {
-      if (isPlayingLatest.current) fetchLiveScheduleOnlyRef.current();
+      fetchLiveScheduleOnlyRef.current();
       fetchNextShowRef.current();
     }, 60000);
     return () => clearInterval(interval);
   }, [isActive]);
+
+  // The show times on screen are formatted for the device timezone, so a
+  // timezone change needs a refetch. Skips the first run, which the effect
+  // above already covers.
+  const lastTimezone = useRef(currentTimezone)
+  useEffect(() => {
+    if (lastTimezone.current === currentTimezone) return
+    lastTimezone.current = currentTimezone
+    if (isActive) fetchLiveScheduleOnlyRef.current()
+  }, [currentTimezone, isActive]);
 
   // Refresh now playing info whenever the app returns to the foreground
   useEffect(() => {

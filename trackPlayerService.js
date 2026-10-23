@@ -1,11 +1,15 @@
 // trackPlayerService.js
 import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { ensurePlayerSetup } from './utils/ensurePlayerSetup';
+import { playIntent } from './utils/playIntent';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
 // Start fresh stream
 const startFreshStream = async () => {
+  // Every remote start goes through here, so this is where the listener's
+  // intent to play is recorded for the recovery paths in TrackPlayerContext.
+  playIntent.current = true;
   try {
     // A CarPlay-initiated session can reach this handler without the phone UI
     // ever mounting, so the player may not have been set up by
@@ -124,6 +128,7 @@ module.exports = async function() {
       if (willRestart) {
         await startFreshStream();
       } else {
+        playIntent.current = false;
         await TrackPlayer.pause();
       }
     } catch (error) {
@@ -145,6 +150,7 @@ module.exports = async function() {
   // MediaBrowserService binding — making it impossible to play again from
   // Android Auto without restarting the app.
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
+    playIntent.current = false;
     // A failed setup must not swallow the stop. Pause regardless: on a live
     // player it stops the audio, and on a dead one it is a harmless no-op.
     try {

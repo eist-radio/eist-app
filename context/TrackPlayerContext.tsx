@@ -21,6 +21,7 @@ import {
   resetPlayerSetup,
 } from '../utils/ensurePlayerSetup';
 import { getLiveShowInfo } from '../utils/liveShowInfo';
+import { playIntent } from '../utils/playIntent';
 import { resolveIsPlaying } from '../utils/playbackUiState';
 import { withTimeout } from '../utils/withTimeout';
 // Only import TrackPlayer on mobile platforms
@@ -129,8 +130,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   const isPlayerReadyRef = useRef(isPlayerReady)
   const wasPlayingBeforeBackground = useRef(false)
 
-  // Separate user intent tracking from actual playback state
-  const userPlay = useRef(false)
+  // Separate user intent tracking from actual playback state. Shared with the
+  // playback service so remote play/pause/stop keep it accurate. See
+  // utils/playIntent.ts.
+  const userPlay = playIntent
 
   // Stable ref for play() so the CarPlay bridge listener never re-subscribes
   const playRef = useRef<(options?: { castOnly?: boolean }) => Promise<void>>(async () => {})
@@ -141,6 +144,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // Scoped to this one path and always released in a finally, unlike the sticky
   // isPlaying flag it replaced. See utils/carPlayPlayRequest.ts.
   const carPlayPlayInFlight = useRef(false)
+
+  // Live cast state for the mount-registered CarPlay listener. A scene
+  // activation while casting would otherwise run play(), which reloads the
+  // media on the cast device.
+  const isCastPlayingRef = useRef(isCastPlaying)
+  useEffect(() => { isCastPlayingRef.current = isCastPlaying }, [isCastPlaying])
 
   // Unified recovery state - keeps trying as long as user hasn't stopped
   const isRecovering = useRef(false);
@@ -259,6 +268,14 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  // Stop local audio for good (not a transient stop inside cleanResetPlayer).
+  // Android pauses instead: TrackPlayer.stop() drops the foreground service,
+  // the process becomes reclaimable, and Android Auto loses the MusicService
+  // until the app is relaunched. That is the same dead end the remote stop
+  // handlers avoid by pausing. play() rebuilds the stream either way.
+  const stopLocalPlayer = () =>
+    Platform.OS === 'android' ? TrackPlayer.pause() : TrackPlayer.stop()
+
   const stopLocalPlaybackForCast = async () => {
     if (isWeb) {
       if (audioRef.current) {
@@ -269,7 +286,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      await TrackPlayer.stop()
+      await stopLocalPlayer()
     } catch (err) {
       console.error('Failed to stop local playback for cast:', err)
     } finally {
@@ -752,7 +769,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     try {
 
       // Stop playback but preserve metadata for lock screen/CarPlay
-      await TrackPlayer.stop()
+      await stopLocalPlayer()
 
       // Ensure we have a track in queue for metadata display (stopped state)
       await ensureTrackForDisplay()
@@ -832,9 +849,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     const isDeadAir = title.trim().length === 0
     let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
     artworkToUse = getLockScreenImage(artworkToUse)
-    const localKey = `${title}\0${artist}\0${String(artworkToUse)}\0${resolvedShowTime}`
-    if (localKey === lastMetadataRef.current) return
-
     try {
       const queue = await TrackPlayer.getQueue()
       if (!queue || queue.length === 0) {
@@ -850,6 +864,13 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       if (trackIndex < 0 || trackIndex >= queue.length) {
         return
       }
+
+      // Key on the track as well as the metadata. Every stream rebuild
+      // (cleanResetPlayer, ensureTrackForDisplay, startFreshStream) adds a new
+      // track, often carrying placeholder metadata, and must accept the real
+      // metadata again even when the show has not changed.
+      const localKey = `${queue[trackIndex]?.id}\0${title}\0${artist}\0${String(artworkToUse)}\0${resolvedShowTime}`
+      if (localKey === lastMetadataRef.current) return
 
       const metadata = {
         title,
@@ -952,6 +973,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // silent until the user tapped the button on the phone. The decision now
     // runs off the real playback state, in utils/carPlayPlayRequest.ts.
     const handleCarPlayPlayRequest = async () => {
+      // Returning to éist from another app resumes playback, but not while a
+      // cast device is playing it.
+      if (isCastPlayingRef.current) {
+        return
+      }
+
       // Read and claim the latch synchronously, before any await, so a second
       // activation arriving during the probe below sees the first attempt.
       // Only the invocation that claimed it releases it.

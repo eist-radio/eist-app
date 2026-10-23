@@ -1,7 +1,7 @@
 // utils/ensurePlayerSetup.ts
 
 import TrackPlayer from 'react-native-track-player';
-import { setupTrackPlayer } from './trackPlayerSetup';
+import { applyPlayerOptions, setupTrackPlayer } from './trackPlayerSetup';
 import { withTimeout } from './withTimeout';
 
 // Runtime-wide, idempotent player setup shared by the React UI
@@ -39,6 +39,23 @@ const PROBE_TIMEOUT_MS = 2000;
 
 let setupPromise: Promise<void> | null = null;
 let setupInFlight = false;
+
+// The native setup call itself, kept until it settles even when the JS side has
+// given up on it. A timeout clears the memo so the caller can retry, but the
+// native call is still running. Calling TrackPlayer.setupPlayer() again then
+// makes Android's MusicModule register a second event receiver, and every
+// remote command reaches JS twice. A retry waits on the original call instead.
+let nativeSetup: Promise<void> | null = null;
+
+const runNativeSetup = (): Promise<void> => {
+  if (!nativeSetup) {
+    const call: Promise<void> = setupTrackPlayer().finally(() => {
+      if (nativeSetup === call) nativeSetup = null;
+    });
+    nativeSetup = call;
+  }
+  return nativeSetup;
+};
 
 // The player's real state, or null when it does not answer within
 // PROBE_TIMEOUT_MS. Bounded so a native promise that goes missing degrades into
@@ -83,7 +100,7 @@ export const ensurePlayerSetup = (): Promise<void> => {
     setupInFlight = true;
     setupPromise = (async () => {
       try {
-        await withTimeout(setupTrackPlayer(), SETUP_TIMEOUT_MS, 'setupPlayer');
+        await withTimeout(runNativeSetup(), SETUP_TIMEOUT_MS, 'setupPlayer');
       } catch (err) {
         const msg = err instanceof Error ? err.message.toLowerCase() : '';
         if (msg.includes('already been initialized') || msg.includes('already initialized')) {
@@ -91,7 +108,14 @@ export const ensurePlayerSetup = (): Promise<void> => {
           // through and report failure so the caller retries rather than
           // driving a player that isn't there.
           if (await isPlayerResponsive()) {
-            return;
+            try {
+              await withTimeout(applyPlayerOptions(), PROBE_TIMEOUT_MS, 'updateOptions');
+              return;
+            } catch (optionsErr) {
+              // Leave the memo clear so the next caller tries the options again.
+              setupPromise = null;
+              throw optionsErr;
+            }
           }
         }
         // Genuine failure: clear the memo so the next caller can retry setup
