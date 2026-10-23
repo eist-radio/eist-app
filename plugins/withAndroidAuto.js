@@ -50,6 +50,10 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         private const val GRACE_MS = 4000L
         // Coalesce prepare + play (AA often sends both) into a single restart.
         private const val DEBOUNCE_MS = 1500L
+        // How long a cold-start play may wait for RNTP's controller. Without
+        // the app process running nothing sets the player up, and the car spun
+        // on BUFFERING indefinitely.
+        private const val PENDING_PLAY_TIMEOUT_MS = 15000L
     }
 
     private var musicService: Any? = null
@@ -412,6 +416,28 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
             PlaybackStateCompat.ACTION_PREPARE_FROM_SEARCH
     }
 
+    // Gives up on a cold-start play that never got a controller. The error state
+    // tells the driver what to do, and still advertises play so they can retry.
+    private val pendingPlayTimeout = Runnable {
+        if (!pendingPlay) return@Runnable
+        pendingPlay = false
+        suppressIdleUntil = 0L
+        Log.w(TAG, "Cold-start play timed out waiting for RNTP")
+        val errorState = PlaybackStateCompat.Builder()
+            .setState(PlaybackStateCompat.STATE_ERROR, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 0f)
+            .setActions(transportActions())
+            .setErrorMessage(
+                PlaybackStateCompat.ERROR_CODE_APP_ERROR,
+                "Open éist on your phone to start playback"
+            )
+            .build()
+        try {
+            proxySession?.setPlaybackState(errorState)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error publishing playback error state", e)
+        }
+    }
+
     private fun publishState(state: Int) {
         val playbackState = PlaybackStateCompat.Builder()
             .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1f)
@@ -488,6 +514,8 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
             Log.d(TAG, "RNTP controller not ready; deferring play")
             pendingPlay = true
             if (!isBound) bindToMusicService()
+            handler.removeCallbacks(pendingPlayTimeout)
+            handler.postDelayed(pendingPlayTimeout, PENDING_PLAY_TIMEOUT_MS)
         }
     }
 

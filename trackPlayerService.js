@@ -1,7 +1,7 @@
 // trackPlayerService.js
 import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { ensurePlayerSetup } from './utils/ensurePlayerSetup';
-import { playIntent } from './utils/playIntent';
+import { isRebuildingStream, markStreamRebuild, playIntent } from './utils/playIntent';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
@@ -17,6 +17,7 @@ const startFreshStream = async () => {
     // call below no-ops/throws and the car's play button appears to do nothing.
     await ensurePlayerSetup();
 
+    markStreamRebuild();
     // Stop current playback
     await TrackPlayer.stop().catch(() => {});
     
@@ -121,10 +122,15 @@ module.exports = async function() {
     try {
       await ensurePlayerSetup();
       const { state } = await TrackPlayer.getPlaybackState();
-      const willRestart = NON_PLAYING_STATES.includes(state);
-      // Caveat: `Ready` is in NON_PLAYING_STATES, so a pause arriving
-      // mid-rebuffer tears the stream down and builds a fresh one rather than
-      // pausing.
+      // The listener started the stream and it is still coming up: `ready`
+      // mid-rebuffer, or `stopped`/`none` during a rebuild. A pause here means
+      // stop. Treating these as "not playing" started a fresh stream instead,
+      // so a car stop pressed during startup did not stop anything.
+      const isStartingUp =
+        playIntent.current &&
+        (state === State.Ready ||
+          ((state === State.Stopped || state === State.None) && isRebuildingStream()));
+      const willRestart = !isStartingUp && NON_PLAYING_STATES.includes(state);
       if (willRestart) {
         await startFreshStream();
       } else {

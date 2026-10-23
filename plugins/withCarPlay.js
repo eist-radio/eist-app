@@ -202,7 +202,13 @@ class EistCarPlayBridge: RCTEventEmitter {
   static func syncTimersToPhoneScreen() {
     // Async so this runs after RCTTiming's own handler for the same notification.
     DispatchQueue.main.async {
-      guard let timing = EistCarPlayBridge.timing else { return }
+      guard let timing = EistCarPlayBridge.timing else {
+        // Without the Timing module, JS timers stall whenever the phone screen
+        // is off in the car. Logged rather than silent so a React Native
+        // upgrade that renames or removes it shows up in device logs.
+        NSLog("[EistCarPlay] RCTTiming module not found, JS timers will stall with the phone screen off")
+        return
+      }
       let phoneOnScreen = UIApplication.shared.connectedScenes.contains { scene in
         scene is UIWindowScene &&
           (scene.activationState == .foregroundActive || scene.activationState == .foregroundInactive)
@@ -210,6 +216,8 @@ class EistCarPlayBridge: RCTEventEmitter {
       let selector = NSSelectorFromString(phoneOnScreen ? "appDidMoveToForeground" : "appDidMoveToBackground")
       if timing.responds(to: selector) {
         _ = timing.perform(selector)
+      } else {
+        NSLog("[EistCarPlay] RCTTiming no longer responds to %@, JS timers will stall with the phone screen off", NSStringFromSelector(selector))
       }
     }
   }

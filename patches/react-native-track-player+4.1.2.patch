@@ -1,8 +1,20 @@
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
-index b2409a0..e7c0600 100644
+index b2409a0..cd18364 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
-@@ -50,14 +50,29 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -32,6 +32,11 @@ import javax.annotation.Nonnull
+ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext),
+     ServiceConnection {
+     private var playerOptions: Bundle? = null
++    // Last options passed to updateOptions(), re-applied when a new MusicService
++    // is adopted. A recreated service starts with no capabilities and the
++    // default appKilledPlaybackBehavior, and JS cannot see the rebind to call
++    // updateOptions() again.
++    private var lastOptions: Bundle? = null
+     private var isServiceBound = false
+     private var playerSetUpPromise: Promise? = null
+     private val scope = MainScope()
+@@ -50,14 +55,30 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
  
      override fun onServiceConnected(name: ComponentName, service: IBinder) {
          scope.launch {
@@ -22,6 +34,7 @@ index b2409a0..e7c0600 100644
                  musicService = binder.service
                  musicService.setupPlayer(playerOptions)
 -                playerSetUpPromise?.resolve(null)
++                lastOptions?.let { musicService.updateOptions(it) }
              }
  
 +            // Resolve on EVERY connect, not just the first. The resolve used to sit
@@ -36,7 +49,15 @@ index b2409a0..e7c0600 100644
              isServiceBound = true
          }
      }
-@@ -545,7 +560,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -257,6 +278,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+         val options = Arguments.toBundle(data)
+ 
+         options?.let {
++            lastOptions = it
+             musicService.updateOptions(it)
+         }
+ 
+@@ -545,7 +567,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          if (index >= 0 && index < musicService.tracks.size) {
@@ -45,7 +66,7 @@ index b2409a0..e7c0600 100644
          } else {
              callback.resolve(null)
          }
-@@ -584,9 +599,9 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -584,9 +606,9 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          if (verifyServiceBoundOrReject(callback)) return@launch
          callback.resolve(
              if (musicService.tracks.isEmpty()) null

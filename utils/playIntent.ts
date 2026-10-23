@@ -14,3 +14,26 @@
 //
 // Shaped like a ref so the context can keep using `userPlay.current`.
 export const playIntent = { current: false };
+
+// A stream rebuild (stop, reset, add, play) is in progress. Both rebuild paths,
+// cleanResetPlayer in TrackPlayerContext and startFreshStream in the playback
+// service, emit `stopped` and `none` events that arrive asynchronously, often
+// after play() has returned. Those must not read as a genuine stop.
+//
+// Time-bounded rather than cleared by the caller: an add() that fails and is
+// swallowed leaves the player stopped with no further events, and a flag only
+// an active state could clear would then hold "playing" over silence for good.
+export const STREAM_REBUILD_HOLD_MS = 5000;
+
+let rebuildUntil = 0;
+
+export const markStreamRebuild = (): void => {
+  rebuildUntil = Date.now() + STREAM_REBUILD_HOLD_MS;
+};
+
+// Called once the rebuilt stream reaches an active state.
+export const endStreamRebuild = (): void => {
+  rebuildUntil = 0;
+};
+
+export const isRebuildingStream = (): boolean => Date.now() < rebuildUntil;

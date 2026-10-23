@@ -21,7 +21,13 @@ import {
   resetPlayerSetup,
 } from '../utils/ensurePlayerSetup';
 import { getLiveShowInfo } from '../utils/liveShowInfo';
-import { playIntent } from '../utils/playIntent';
+import {
+  endStreamRebuild,
+  isRebuildingStream,
+  markStreamRebuild,
+  playIntent,
+  STREAM_REBUILD_HOLD_MS,
+} from '../utils/playIntent';
 import { resolveIsPlaying } from '../utils/playbackUiState';
 import { withTimeout } from '../utils/withTimeout';
 // Only import TrackPlayer on mobile platforms
@@ -164,6 +170,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // handover replaces the pending check instead of queueing several racing ones.
   const networkCheckTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Re-reads the player once a stream rebuild's hold expires. A rebuild that
+  // never reached an active state emits no further events, so without this the
+  // button kept the Stop label it was holding.
+  const rebuildCheckTimer = useRef<NodeJS.Timeout | null>(null);
+
   // Deadline-driven metadata refresh timer (fires just after the current show ends)
   const metadataRefreshTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -221,6 +232,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       return
     }
 
+    markStreamRebuild()
     try {
       // Stop current playback but don't reset queue yet
       await TrackPlayer.stop().catch(() => { })
@@ -1047,13 +1059,21 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           // mid-stream rebuffer; mapping those to "stopped" flickers the button
           // Stop→Listen→Stop right after play(). Hold steady through them while
           // the user intends to play. See utils/playbackUiState.
-          const playing = resolveIsPlaying(state, userPlay.current)
+          const rebuilding = isRebuildingStream()
+          const playing = resolveIsPlaying(state, userPlay.current, rebuilding)
           setIsPlaying(playing)
 
-          // Only clear user intent if the stop was intentional (not due to network/error)
-          if (state === State.Stopped && !isRecovering.current) {
-            // This was likely an intentional stop, not a network error
-            // But don't clear userPlay here as it might be a temporary stop
+          if (state === State.Playing || state === State.Buffering || state === State.Loading) {
+            endStreamRebuild()
+          } else if (rebuilding && (state === State.Stopped || state === State.None)) {
+            if (rebuildCheckTimer.current) clearTimeout(rebuildCheckTimer.current)
+            rebuildCheckTimer.current = setTimeout(async () => {
+              rebuildCheckTimer.current = null
+              const current = await probePlaybackState()
+              if (current !== null) {
+                setIsPlaying(resolveIsPlaying(current, userPlay.current, isRebuildingStream()))
+              }
+            }, STREAM_REBUILD_HOLD_MS + 100)
           }
 
           // Refresh metadata when starting playback (especially from lock screen)
@@ -1065,8 +1085,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
             }
           }
 
-          // Ensure metadata display is maintained when stopped
-          if (state === State.Stopped) {
+          // Ensure metadata display is maintained when stopped. Not mid-rebuild:
+          // the rebuild is about to add its own track.
+          if (state === State.Stopped && !rebuilding) {
             try {
               await ensureTrackForDisplay()
             } catch (error) {
@@ -1145,6 +1166,11 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         if (networkCheckTimer.current) {
           clearTimeout(networkCheckTimer.current)
           networkCheckTimer.current = null
+        }
+
+        if (rebuildCheckTimer.current) {
+          clearTimeout(rebuildCheckTimer.current)
+          rebuildCheckTimer.current = null
         }
       }
     }
