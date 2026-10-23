@@ -1,4 +1,4 @@
-.PHONY: help install clean colors reset start lint lint-fix typecheck doctor check verify preview eas-dev-ios eas-dev-android eas-build-ios eas-build-android credentials-ios eas-submit-ios eas-submit-android env-check logs version update-deps security
+.PHONY: help install clean start lint lint-fix typecheck doctor check verify preview eas-dev-ios eas-dev-android eas-build-ios eas-build-android credentials-ios eas-submit-ios eas-submit-android env-check logs version update-deps security
 
 help:
 	@echo ""
@@ -14,15 +14,6 @@ clean:
 	npm cache clean --force
 	npm install
 	npx expo install
-
-colors:
-	@echo ""
-	@echo "  $$eist-primary:   #4733FF"
-	@echo "  $$eist-secondary: #AFFC41"
-	@echo "  $$eist-highlight: #96BFE6"
-
-reset:
-	node ./scripts/reset-project.js
 
 start:
 	npx expo start --tunnel --clear
