@@ -40,18 +40,29 @@ const PROBE_TIMEOUT_MS = 2000;
 let setupPromise: Promise<void> | null = null;
 let setupInFlight = false;
 
+// The player's real state, or null when it does not answer within
+// PROBE_TIMEOUT_MS. Bounded so a native promise that goes missing degrades into
+// "not answering" instead of stalling the caller.
+export const probePlaybackState = async (): Promise<string | null> => {
+  try {
+    const playback = await withTimeout(
+      TrackPlayer.getPlaybackState(),
+      PROBE_TIMEOUT_MS,
+      'getPlaybackState'
+    );
+    // A read that resolves proves the player answers, even without a state.
+    return playback?.state ?? 'none';
+  } catch {
+    return null;
+  }
+};
+
 // Does the native player actually answer? RNTP's "already initialized" only
 // means its module still believes a service is bound, which stays true after the
 // service is destroyed. A playback-state read that resolves is the cheapest
 // proof the player is really there.
-const isPlayerResponsive = async (): Promise<boolean> => {
-  try {
-    await withTimeout(TrackPlayer.getPlaybackState(), PROBE_TIMEOUT_MS, 'getPlaybackState');
-    return true;
-  } catch {
-    return false;
-  }
-};
+export const isPlayerResponsive = async (): Promise<boolean> =>
+  (await probePlaybackState()) !== null;
 
 // Drop the memo so the next ensurePlayerSetup() genuinely calls setupPlayer()
 // again instead of resolving an already-fulfilled promise.

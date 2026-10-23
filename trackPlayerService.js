@@ -109,6 +109,9 @@ module.exports = async function() {
     State.Ready,
     State.None,
     State.Ended,
+    // An errored player has to be rebuilt. pause() leaves it in error, so a
+    // headset, knob, or toggle press would never get the stream back.
+    State.Error,
   ];
   TrackPlayer.addEventListener(Event.RemotePause, async () => {
     try {
@@ -142,7 +145,13 @@ module.exports = async function() {
   // MediaBrowserService binding — making it impossible to play again from
   // Android Auto without restarting the app.
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
-    await ensurePlayerSetup();
-    return TrackPlayer.pause();
+    // A failed setup must not swallow the stop. Pause regardless: on a live
+    // player it stops the audio, and on a dead one it is a harmless no-op.
+    try {
+      await ensurePlayerSetup();
+    } catch (error) {
+      console.error('Remote stop setup error:', error);
+    }
+    await TrackPlayer.pause().catch((error) => console.error('Remote stop error:', error));
   });
 };

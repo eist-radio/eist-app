@@ -157,6 +157,10 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
             }
             mirrorCallback = null
             rntpController = null
+            // Nothing is playing any more, whatever the proxy last mirrored.
+            // Without this the car kept showing pause over silence, and the user
+            // had to press pause then play to get a play forwarded.
+            publishState(PlaybackStateCompat.STATE_PAUSED)
             // RNTP's MusicService went away (e.g. process/service restart). Rebind
             // so the proxy re-wires to the new session and keeps forwarding play.
             retryCount = 0
@@ -447,6 +451,9 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         // Let the next play through: without this a stop immediately after a
         // start is swallowed by the DEBOUNCE_MS coalescing window.
         lastForwardMs = 0L
+        // Cancel a cold-start play still waiting for RNTP's controller, or it
+        // starts the stream when wiring finishes, after the user stopped it.
+        pendingPlay = false
         publishState(PlaybackStateCompat.STATE_PAUSED)
         try {
             rntpController?.transportControls?.pause()

@@ -57,10 +57,9 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   var interfaceController: CPInterfaceController?
   // Cold-start ordering: sceneDidBecomeActive can fire before setRootTemplate's
   // completion runs, and pushing Now Playing without a root in place fails. So
-  // activation only auto-plays once the root is set, and an early activation is
-  // parked in pendingAutoPlay for the completion handler to flush.
+  // activation only auto-plays once the root is set. An earlier activation is
+  // covered by the completion handler, which always starts playback.
   private var rootTemplateSet = false
-  private var pendingAutoPlay = false
 
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
@@ -78,7 +77,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
       // and its play button does nothing. The root list stays in the stack
       // underneath purely because Apple rejects CPNowPlayingTemplate as a root
       // template; the user is never meant to see it.
-      self.pendingAutoPlay = false
       self.startPlaybackAndShowNowPlaying(animated: false)
     }
   }
@@ -89,7 +87,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   ) {
     self.interfaceController = nil
     rootTemplateSet = false
-    pendingAutoPlay = false
   }
 
   // Fires on EVERY foreground activation of éist on the car screen — cold start,
@@ -103,8 +100,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   func sceneDidBecomeActive(_ scene: UIScene) {
     if rootTemplateSet {
       startPlaybackAndShowNowPlaying(animated: false)
-    } else {
-      pendingAutoPlay = true
     }
   }
 

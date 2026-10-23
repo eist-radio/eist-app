@@ -255,11 +255,14 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
               // Preload failed. If this exact image is already displayed (it
               // loaded fine earlier), keep it rather than flashing the
               // placeholder until the next successful poll.
-              if (remoteImageUrlRef.current !== image.uri) {
+              const keepImage = remoteImageUrlRef.current === image.uri
+              if (!keepImage) {
                 setRemoteImageUrl(null)
                 setImageFailed(true)
               }
-              await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
+              // Same image to the lock screen and car, or they flicker to the
+              // logo and back.
+              await updateMetadata(newShowTitle || 'éist', name, keepImage ? image.uri : undefined, showTimeRange)
             }
           } else {
             setRemoteImageUrl(null)
@@ -375,11 +378,12 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         } else {
           // Same rule as fetchLiveScheduleOnly: don't drop an image that is
           // already on screen just because a re-preload of it failed.
-          if (remoteImageUrlRef.current !== image.uri) {
+          const keepImage = remoteImageUrlRef.current === image.uri
+          if (!keepImage) {
             setRemoteImageUrl(null)
             setImageFailed(true)
           }
-          await updateMetadata(newShowTitle || 'éist', name, undefined, showTimeRange)
+          await updateMetadata(newShowTitle || 'éist', name, keepImage ? image.uri : undefined, showTimeRange)
         }
       } else {
         setRemoteImageUrl(null)
