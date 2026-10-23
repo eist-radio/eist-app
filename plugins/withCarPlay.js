@@ -130,6 +130,9 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     // this flag as soon as JS subscribes — so the play request is never lost.
     EistCarPlayBridge.pendingPlay = true
     NotificationCenter.default.post(name: EistCarPlayBridge.playRequested, object: nil)
+    // The play path depends on JS timers, which stall on the display link while
+    // the phone screen is off. See syncTimersToPhoneScreen.
+    EistCarPlayBridge.syncTimersToPhoneScreen()
     showNowPlaying(animated: animated)
   }
 
@@ -157,6 +160,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 // CarPlay builds; JS guards on NativeModules.EistCarPlayBridge being present.
 const EIST_CARPLAY_BRIDGE_SWIFT = `import Foundation
 import React
+import UIKit
 
 @objc(EistCarPlayBridge)
 class EistCarPlayBridge: RCTEventEmitter {
@@ -182,9 +186,65 @@ class EistCarPlayBridge: RCTEventEmitter {
 
   override func supportedEvents() -> [String]! { [EistCarPlayBridge.playEvent] }
 
+  // ── JS timers while the phone screen is off ──────────────────────────────
+  // RCTTiming decides how to drive setTimeout from UIApplication notifications.
+  // When the CarPlay scene activates, UIApplication becomes "active" even though
+  // the phone is locked in a pocket, so RCTTiming switches to its foreground
+  // mode and waits on a CADisplayLink. The phone display is off, so the display
+  // link never ticks and every JS timer stalls. play() awaits a 100 ms delay in
+  // cleanResetPlayer() and holds the volume at 0 for 2 s, so the car showed Now
+  // Playing in silence until the phone screen woke (raising it to your face) and
+  // the frozen timers finally fired. Re-entering éist after another CarPlay app
+  // replays the same activation, which is why switching back never played.
+  //
+  // So, after every activation change, put RCTTiming in the mode that matches
+  // the phone screen: foreground only while a phone UIWindowScene is on screen,
+  // otherwise its background mode, which runs timers off NSTimer instead of the
+  // display link. The selectors are RCTTiming's own notification handlers.
+  private static weak var timing: NSObject?
+  private static var timerSyncInstalled = false
+
+  static func syncTimersToPhoneScreen() {
+    // Async so this runs after RCTTiming's own handler for the same notification.
+    DispatchQueue.main.async {
+      guard let timing = EistCarPlayBridge.timing else { return }
+      let phoneOnScreen = UIApplication.shared.connectedScenes.contains { scene in
+        scene is UIWindowScene &&
+          (scene.activationState == .foregroundActive || scene.activationState == .foregroundInactive)
+      }
+      let selector = NSSelectorFromString(phoneOnScreen ? "appDidMoveToForeground" : "appDidMoveToBackground")
+      if timing.responds(to: selector) {
+        _ = timing.perform(selector)
+      }
+    }
+  }
+
+  private func installTimerSync() {
+    if let timing = bridge?.module(forName: "Timing", lazilyLoadIfNecessary: true) as? NSObject {
+      EistCarPlayBridge.timing = timing
+    }
+    if !EistCarPlayBridge.timerSyncInstalled {
+      EistCarPlayBridge.timerSyncInstalled = true
+      let names: [Notification.Name] = [
+        UIApplication.didBecomeActiveNotification,
+        UIApplication.willEnterForegroundNotification,
+        UIScene.didActivateNotification,
+        UIScene.willDeactivateNotification,
+        UIScene.didEnterBackgroundNotification,
+      ]
+      for name in names {
+        NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+          EistCarPlayBridge.syncTimersToPhoneScreen()
+        }
+      }
+    }
+    EistCarPlayBridge.syncTimersToPhoneScreen()
+  }
+
   // RCTEventEmitter calls these when JS adds/removes its first/last listener.
   override func startObserving() {
     hasListeners = true
+    installTimerSync()
     NotificationCenter.default.addObserver(
       self,
       selector: #selector(handlePlayRequested),
