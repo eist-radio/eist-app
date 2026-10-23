@@ -6,6 +6,7 @@ import TrackPlayer, {
     Capability,
     IOSCategory
 } from 'react-native-track-player';
+import { Platform } from 'react-native';
 import { setupAndroidNotificationChannel } from './androidNotificationSetup';
 
 export const setupTrackPlayer = async () => {
@@ -16,7 +17,13 @@ export const setupTrackPlayer = async () => {
     // Player setup - Optimized for live radio streaming
     await TrackPlayer.setupPlayer({
       maxBuffer: 8,
-      minBuffer: 3,
+      // Android only. On iOS, RNTP passes minBuffer to SwiftAudioEx as
+      // bufferDuration, and any non-zero value also turns off AVPlayer's
+      // automaticallyWaitsToMinimizeStalling. AVPlayer then kept a 3 s forward
+      // buffer and played straight through every underrun instead of waiting,
+      // which came out as random tiny skips on any network jitter. Leaving it
+      // unset keeps AVPlayer's own buffer sizing and stall handling.
+      minBuffer: Platform.OS === 'ios' ? undefined : 3,
       playBuffer: 1.5,
       backBuffer: 0,
       iosCategory: IOSCategory.Playback,
