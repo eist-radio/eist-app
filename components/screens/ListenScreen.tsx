@@ -45,9 +45,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   const [artistName, setArtistName] = useState('éist · off air')
   const [remoteImageUrl, setRemoteImageUrl] = useState<string | null>(null)
   const [imageFailed, setImageFailed] = useState(false)
-  // 'loading' is the initial, undetermined state (before the first schedule
-  // fetch resolves) — distinct from a real 'off air'/'error' status so we can
-  // avoid flashing the offline placeholder before we know anything.
+  // 'loading' = before the first fetch resolves, so the offline placeholder doesn't flash.
   const [broadcastStatus, setBroadcastStatus] = useState('loading')
   const [nextShowId, setNextShowId] = useState<string | null>(null)
   const [nextShowTitle, setNextShowTitle] = useState('')
@@ -55,19 +53,12 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   const [currentShowId, setCurrentShowId] = useState<string | null>(null)
   const [isContentLoading, setIsContentLoading] = useState(false)
   const [artistCache, setArtistCache] = useState<Record<string, { name: string; image: any }>>({})
-  // Bumped on every foreground return to force the native Cast button to
-  // remount and re-read the live session state — its native view can go stale
-  // (shows disconnected while a cast is still active) while JS is suspended in
-  // the background.
+  // Bumped on foreground return to remount the native Cast button, which goes stale in the background.
   const [castButtonNonce, setCastButtonNonce] = useState(0)
 
-  // Live mirrors for async fetch callbacks: they compare against what is
-  // currently on screen without needing the state values in their deps
-  // (which would churn their identities and re-trigger effects).
+  // Live mirrors for async callbacks, kept out of deps to avoid re-triggering effects.
   const broadcastStatusRef = useRef(broadcastStatus)
-  // End time (ms) of the live show on screen. Bounds the hold-last-known-good
-  // rule in the fetch catch blocks: during an outage or with a bad API key, a
-  // show is held only until it ends, not indefinitely.
+  // End time (ms) of the live show on screen. A show is held through fetch errors only until it ends.
   const liveShowEndRef = useRef<number | null>(null)
   const heldShowIsOver = () =>
     liveShowEndRef.current !== null && Date.now() > liveShowEndRef.current
@@ -260,9 +251,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
               setImageFailed(false)
               await updateMetadata(newShowTitle || 'éist', name, image.uri, showTimeRange)
             } else {
-              // Preload failed. If this exact image is already displayed (it
-              // loaded fine earlier), keep it rather than flashing the
-              // placeholder until the next successful poll.
+              // Preload failed. Keep the image if it's already on screen.
               const keepImage = remoteImageUrlRef.current === image.uri
               if (!keepImage) {
                 setRemoteImageUrl(null)
@@ -295,10 +284,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         }
       }
     } catch {
-      // A fetch error is a network blip, not an off-air signal (that arrives
-      // as a successful response with status !== 'schedule'). If a live show
-      // is on screen, hold it instead of flashing the offline background and
-      // swapping back on the next successful poll.
+      // A fetch error isn't off air. Hold a live show on screen (until it ends) instead of flashing offline.
       if (broadcastStatusRef.current !== 'schedule' || heldShowIsOver()) {
         setBroadcastStatus('error')
         await clearNowPlayingState()
@@ -413,9 +399,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     }
   }, [getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
 
-  // Always resolve the next upcoming show (the most imminent show that starts in
-  // the future), independent of whether the station is currently live or off
-  // air, so the "Up next" row can show during live broadcasts too.
+  // Next upcoming show, live or off air, for the "Up next" row.
   const fetchNextShow = useCallback(async () => {
     try {
       const nowMs = Date.now()
@@ -440,16 +424,9 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     }
   }, [])
 
-  // Note: periodic Now Playing refresh for a connected car head unit
-  // (CarPlay / Android Auto) is handled centrally in TrackPlayerContext, which
-  // is always mounted. This screen no longer schedules its own car refresh.
+  // Car Now Playing refresh lives in TrackPlayerContext.
 
-  // The fetch effects below must run on page activation / a timer ONLY — not
-  // whenever isPlaying flips or a fetch callback picks up a new identity
-  // (artistCache/artistName/remoteImageUrl churn on every fetch). Re-running
-  // the full fetch on those re-renders set isContentLoading(true) each time,
-  // which blanked and re-showed the background artwork. Latest callbacks are
-  // read through refs so the effects can depend on isActive alone.
+  // Fetch effects run on activation and a timer only. Callbacks are read through refs so deps stay [isActive].
   const isPlayingLatest = useRef(isPlaying)
   const fetchNowPlayingWithArtistRef = useRef(fetchNowPlayingWithArtist)
   const fetchLiveScheduleOnlyRef = useRef(fetchLiveScheduleOnly)
@@ -474,9 +451,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     return () => clearInterval(interval);
   }, [isActive]);
 
-  // The show times on screen are formatted for the device timezone, so a
-  // timezone change needs a refetch. Skips the first run, which the effect
-  // above already covers.
+  // Refetch on timezone change. Skips the first run.
   const lastTimezone = useRef(currentTimezone)
   useEffect(() => {
     if (lastTimezone.current === currentTimezone) return
@@ -503,13 +478,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     }
   }, [])
 
-  // The Pager keeps every page mounted, so swiping away from Listen leaves this
-  // screen's native Cast button alive but offscreen — where GCKUICastButton can
-  // go stale and render grey/disconnected even though the session (and
-  // isCastConnected) is still live. Remount it each time Listen becomes the
-  // active page so it re-reads the session and re-applies the tint, mirroring
-  // the foreground remount above (in-app navigation never backgrounds the app,
-  // so that handler alone doesn't cover this path).
+  // Remount the Cast button when Listen becomes active. The Pager keeps it mounted offscreen, where it goes stale.
   useEffect(() => {
     if (isActive) setCastButtonNonce((n) => n + 1)
   }, [isActive])
@@ -527,12 +496,8 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     }
   }, [togglePlayStop])
 
-  // Image priority:
-  //  - live with a usable artist image → that image (persists across refreshes)
-  //  - live but still resolving the artist → nothing (avoid placeholder flash)
-  //  - live with no/failed artist image → eist_online.png default
-  //  - off air / error → eist_offline.png
-  //  - initial undetermined load → nothing
+  // Live: artist image, nothing while resolving, eist_online.png if none. Off air or error: eist_offline.png.
+  // Initial load: nothing.
   let artworkSource: React.ComponentProps<typeof ShowArtworkBackground>['source']
   if (broadcastStatus === 'schedule') {
     artworkSource =
@@ -548,12 +513,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
   }
 
   return (
-    // frozenLiveNow reserves the "live now" slot at the top; the visible line is
-    // the Pager's shared fixed overlay (drawn on every page, Listen included),
-    // so it stays put during swipes instead of scrolling with this page. Note:
-    // that overlay refreshes on its own ~60s clock (getLiveShowInfo), separate
-    // from this screen's schedule fetch that drives the artwork/title — so the
-    // two can briefly disagree at a show boundary before both settle.
+    // Reserves space for the "live now" line, drawn by the Pager's shared overlay (its own ~60s refresh).
     <PageScaffold transparentBg frozenLiveNow>
       <ShowArtworkBackground
         source={artworkSource}
@@ -607,14 +567,8 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
 }
 
 const s = StyleSheet.create({
-  // Spacing follows an ascending φ/Fibonacci rhythm (8 → 21 → 34) so the gaps
-  // themselves encode grouping: tight within the title block, wider between
-  // info blocks, widest before the play action. Type is a φ ladder anchored on
-  // the shared 16px eyebrow: 16 → 26 (×φ) → 42 (×φ²).
-  // marginLeft pulls the native cast glyph flush with the content edge (the
-  // "live now"/title above): GCKUICastButton centres its glyph inside its size
-  // box, so without this it reads as indented from everything else. No marginTop
-  // — the frozenLiveNow spacer above already provides the gap.
+  // Spacing 8/21/34 and type 16/26/42 follow a φ scale.
+  // marginLeft aligns the cast glyph with the content edge (GCKUICastButton centres its glyph).
   castRow: { marginBottom: 21, marginLeft: -6 },
   title: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 42, lineHeight: 43, letterSpacing: -0.8, color: colors.green },
   artist: { fontFamily: font.body, fontWeight: '500', fontSize: 26, color: colors.green, marginTop: 8 },

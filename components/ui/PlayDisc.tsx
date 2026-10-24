@@ -1,7 +1,5 @@
 // components/ui/PlayDisc.tsx
-//
-// Filled green coin with a knockout (transparent) glyph punched through it, so
-// the artwork / purple ground shows through the play triangle (or stop square).
+// Green coin with a knockout play/stop glyph.
 import React from 'react';
 import Svg, { Circle, Defs, Mask, Path, Rect } from 'react-native-svg';
 import { colors } from '../../theme/tokens';

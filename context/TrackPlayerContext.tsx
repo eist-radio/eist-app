@@ -45,24 +45,13 @@ if (Platform.OS !== 'web') {
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream'
 
-// How long to let the player recover on its own after the network changes before
-// intervening. Measured on a real device: ExoPlayer enters `buffering` within
-// ~1s of a wifi<->cellular handover and comes back by itself. The old code
-// restarted unconditionally 2s after the change and destroyed a stream that was
-// already healing — 22 teardowns and 75.9s of dead audio across 16 transitions.
+// Grace period after a network change before checking the stream. ExoPlayer usually recovers a handover by itself.
 const NETWORK_RECOVERY_GRACE_MS = 8000
 
-// Ceiling on one recovery attempt (setupPlayer + play). Nothing below this line
-// may await a native promise without a bound: RNTP's setupPlayer() resolves from
-// MusicModule.onServiceConnected, and a promise that never settles used to latch
-// isRecovering true for the life of the JS runtime, after which every recovery
-// path returned early and only an app restart brought audio back. See
-// attemptStreamRestart.
+// Ceiling on one recovery attempt (setupPlayer + play), so a hung native promise can't latch isRecovering.
 const RECOVERY_TIMEOUT_MS = 30000
 
-// Player states that mean the stream is up or still healing by itself. The
-// post-network-change check leaves these alone: restarting a stream that is
-// still buffering is the teardown that NETWORK_RECOVERY_GRACE_MS exists to avoid.
+// States the post-network-change check leaves alone (playing, or still healing).
 const HEALTHY_OR_HEALING_STATES = new Set(['playing', 'buffering', 'loading'])
 
 type TrackPlayerContextType = {
@@ -129,49 +118,32 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // update never marks cast as done and vice versa. See updateMetadata.
   const lastCastMetadataRef = useRef<string>('')
   const isPlayingRef = useRef(isPlaying)
-  // Mirror of isPlayerReady so mount-registered listeners / stale closures
-  // (attemptStreamRestart -> play -> setupPlayer) read the LIVE readiness
-  // instead of the value captured on first render. Kept in sync synchronously
-  // alongside every setIsPlayerReady call below.
+  // Live mirror of isPlayerReady for mount-registered listeners and stale closures.
   const isPlayerReadyRef = useRef(isPlayerReady)
 
-  // Separate user intent tracking from actual playback state. Shared with the
-  // playback service so remote play/pause/stop keep it accurate. See
-  // utils/playIntent.ts.
+  // User intent to play, shared with the playback service. See utils/playIntent.ts.
   const userPlay = playIntent
 
   // Stable ref for play() so the CarPlay bridge listener never re-subscribes
   const playRef = useRef<(options?: { castOnly?: boolean }) => Promise<void>>(async () => {})
 
-  // Whether a CarPlay-initiated play attempt is still running. The native scene
-  // posts a play request on every activation, and several can land inside the
-  // state probe's window, so the first attempt needs to be visible to the rest.
-  // Scoped to this one path and always released in a finally, unlike the sticky
-  // isPlaying flag it replaced. See utils/carPlayPlayRequest.ts.
+  // True while a CarPlay-initiated play is running, to drop duplicate requests. See utils/carPlayPlayRequest.ts.
   const carPlayPlayInFlight = useRef(false)
 
-  // Live cast state for the mount-registered CarPlay listener. A scene
-  // activation while casting would otherwise run play(), which reloads the
-  // media on the cast device.
+  // Live cast state for the CarPlay listener. play() while casting reloads the cast media.
   const isCastPlayingRef = useRef(isCastPlaying)
   useEffect(() => { isCastPlayingRef.current = isCastPlaying }, [isCastPlaying])
 
   // Unified recovery state - keeps trying as long as user hasn't stopped
   const isRecovering = useRef(false);
-  // Bumped by every restart attempt and every user stop. A recovery attempt
-  // abandoned by its timeout keeps running in the background, so before it calls
-  // play() it checks that it is still the current session. Without this, a Stop
-  // pressed mid-recovery was undone when the abandoned setup finished, and a
-  // late attempt interleaved its stream rebuild with the retry's.
+  // Bumped by every restart and user stop. A stale or timed-out recovery checks it before calling play().
   const restartSession = useRef(0);
   const retryTimeout = useRef<NodeJS.Timeout | null>(null);
   // Deferred post-network-change check. Held in a ref so NetInfo churn during a
   // handover replaces the pending check instead of queueing several racing ones.
   const networkCheckTimer = useRef<NodeJS.Timeout | null>(null);
 
-  // Re-reads the player once a stream rebuild's hold expires. A rebuild that
-  // never reached an active state emits no further events, so without this the
-  // button kept the Stop label it was holding.
+  // Re-reads the player when a rebuild's hold expires without reaching an active state.
   const rebuildCheckTimer = useRef<NodeJS.Timeout | null>(null);
 
   // Deadline-driven metadata refresh timer (fires just after the current show ends)
@@ -216,9 +188,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     return null
   }
 
-  // Clean reset of the stream while preserving metadata display
-  // Optional metadata parameter allows passing freshly fetched metadata directly
-  // (since React setState is async and state may not be updated yet)
+  // Rebuild the stream track, keeping the current metadata. Pass fresh metadata to skip stale state.
   const cleanResetPlayer = async (metadata?: { title: string; artist: string; artworkUrl?: string }) => {
     if (isWeb) {
       // Clean reset for web audio
@@ -279,11 +249,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  // Stop local audio for good (not a transient stop inside cleanResetPlayer).
-  // Android pauses instead: TrackPlayer.stop() drops the foreground service,
-  // the process becomes reclaimable, and Android Auto loses the MusicService
-  // until the app is relaunched. That is the same dead end the remote stop
-  // handlers avoid by pausing. play() rebuilds the stream either way.
+  // Stop for good. Android pauses instead, because stop() drops the foreground service and breaks Android Auto.
   const stopLocalPlayer = () =>
     Platform.OS === 'android' ? TrackPlayer.pause() : TrackPlayer.stop()
 
@@ -352,9 +318,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Is the player already up and answering? The probe is bounded, so a
-      // native promise that goes missing degrades into a re-setup instead of
-      // stalling here.
+      // Already set up and answering?
       if (await isPlayerResponsive()) {
         hasInitialized.current = true
         isPlayerReadyRef.current = true
@@ -362,31 +326,17 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      // The player did not answer, so anything ensurePlayerSetup has memoised
-      // is stale. The MusicService can be destroyed under a live JS runtime
-      // (OS reclaim, foreground-service limits) and its ExoPlayer goes with
-      // it, while the memo keeps reporting "set up" forever. Dropping it is
-      // what makes the call below actually reach TrackPlayer.setupPlayer();
-      // without this the retry loop re-ran a no-op setup every few seconds,
-      // marked the player ready, failed every call against it, and never
-      // recovered until the app was restarted.
+      // No answer: the MusicService may have died under a live runtime, so drop the stale setup memo.
       resetPlayerSetup()
 
-      // Route through the shared, memoised setup so the UI and the background
-      // playback service (trackPlayerService.js) can't double-initialise and
-      // either one can be the first to set the player up. See ensurePlayerSetup.
-      // Reached only when the probe above failed, so setup is always wanted
-      // here regardless of what hasInitialized claims.
+      // Shared, memoised setup so the UI and the playback service can't double-initialise.
       await ensurePlayerSetup()
       hasInitialized.current = true
 
       isPlayerReadyRef.current = true
       setIsPlayerReady(true)
     } catch (err) {
-      // No "already been initialized" shortcut here any more. ensurePlayerSetup
-      // swallows that error itself once it has verified the player responds, so
-      // seeing it at this level means the probe failed and the player is not
-      // usable. Reporting ready on it is what let play() drive a dead player.
+      // ensurePlayerSetup already handles "already initialized", so any error here means the player is unusable.
       console.error('Player setup failed:', err)
       hasInitialized.current = false
       isPlayerReadyRef.current = false
@@ -415,20 +365,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       retryTimeout.current = null
     }
 
-    // Deliberately do NOT setIsPlaying(false) here: this path only runs while
-    // userPlay is true, and the button must reflect the listening session, not
-    // recovery churn. Flipping it here made the button glitch Stop → Listen →
-    // Stop on every network change / rebuffer / retry. A genuine failure keeps
-    // retrying until the user presses Stop, which clears userPlay and the state.
+    // Keep isPlaying as is: the button reflects the session, not recovery churn.
 
-    // isRecovering is cleared in the finally below, and the recovery work is
-    // bounded by RECOVERY_TIMEOUT_MS. Both matter: this flag gates EVERY
-    // recovery path (playback error, queue ended, the post-network-change
-    // check, the retry timer), so a single await that never
-    // settles used to latch it true for the life of the JS runtime and leave
-    // the stream dead until the app was restarted. A finally alone would not
-    // have run on a hung await, which is why the timeout is the real guard and
-    // the finally is there to cover every ordinary exit.
+    // isRecovering gates every recovery path. The timeout guards hung awaits, the finally covers normal exits.
     try {
       if (isWeb) {
         try {
@@ -459,10 +398,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         setIsPlayerReady(false)
         hasInitialized.current = false
 
-        // No cleanResetPlayer() here: play() already does one, with fresher
-        // metadata. Doing it twice destroyed the audio, rebuilt it, then destroyed
-        // it again — measured as 30 resets across 15 restarts, and the source of
-        // the destroy/create/destroy/create signature in every dropout.
+        // No cleanResetPlayer() here: play() does one, and doing it twice doubled the teardowns.
 
         if (stillCurrent()) {
           await withTimeout(
@@ -478,9 +414,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           )
         }
       } catch (err) {
-        // Covers a timeout as well as a thrown failure. The abandoned attempt
-        // may still finish setup later, but its stillCurrent() check stops it
-        // from calling play() once the retry has bumped restartSession.
+        // Timeout or failure. stillCurrent() stops the abandoned attempt from calling play() later.
         console.error(`Restart failed after ${reason}:`, err)
         scheduleRetry(reason)
       }
@@ -680,17 +614,12 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Ensure player is ready. Read readiness from the ref (not the captured
-      // isPlayerReady state) so recovery paths driven by mount-registered
-      // listeners see the live value and actually reach TrackPlayer.play().
-      // setupPlayer() throws when it fails, which lands in the catch below.
+      // Read readiness from the ref so recovery paths see the live value. setupPlayer() throws on failure.
       if (!isPlayerReadyRef.current) {
         await setupPlayer()
       }
 
-      // Start audio immediately with existing metadata so CarPlay's Now
-      // Playing controls go live without waiting for a network fetch.
-      // Metadata is refreshed after playback starts.
+      // Start with existing metadata so car controls go live at once. Fresh metadata follows.
       await cleanResetPlayer()
 
       await TrackPlayer.setVolume(0)
@@ -721,11 +650,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
-      // If we got here from inside attemptStreamRestart, calling it again would
-      // early-return on its isRecovering guard and swallow this failure — the
-      // outer `await play()` would look like it succeeded and no retry would ever
-      // be scheduled, leaving the player stopped with userPlay still true.
-      // Rethrow instead so the outer restart's catch runs scheduleRetry.
+      // Inside attemptStreamRestart, rethrow so its catch schedules the retry.
       if (isRecovering.current) {
         throw err
       }
@@ -830,10 +755,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     if (isCastConnected || isCastPlaying) {
       if (key !== lastCastMetadataRef.current) {
         try {
-          // Record the cast success key ONLY if the update actually went
-          // through. updateCastMediaMetadata swallows failures and returns
-          // false; recording on a mere promise-resolve would let one transient
-          // failure permanently suppress every retry for this show.
+          // Record the key only on success, so one failure doesn't block retries.
           const castOk = await updateCastMetadata(title, artist, artworkUrl, resolvedShowTime)
           if (castOk) {
             lastCastMetadataRef.current = key
@@ -844,19 +766,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       }
     }
 
-    // Read the live readiness ref, not the render-captured isPlayerReady state,
-    // so a cold-start seed doesn't see a stale `false`. The local dedup key is
-    // recorded only AFTER a successful updateMetadataForTrack (below) — recording
-    // it here would let any early return (not ready, empty queue, out-of-bounds)
-    // or throw permanently suppress every later attempt for this show.
+    // Read readiness from the ref. The dedup key is only recorded after a successful update.
     if (!isPlayerReadyRef.current || isWeb) return
 
-    // Resolve the artwork the lock screen will actually use, then dedup on THAT.
-    // Android's two-pass flow calls updateMetadata twice with the same artworkUrl
-    // (once before preload -> fallback logo, once after -> real image); keying on
-    // the input URL alone would suppress the second pass and leave Android Auto /
-    // lock screen stuck on the fallback logo. Keying on the resolved value lets
-    // the fallback->real transition through while still deduping true repeats.
+    // Dedup on the resolved artwork, so Android's fallback-then-real artwork pass still goes through.
     const isDeadAir = title.trim().length === 0
     let artworkToUse = artworkUrl || require('../assets/images/eist-logo.png')
     artworkToUse = getLockScreenImage(artworkToUse)
@@ -866,20 +779,14 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         return
       }
 
-      // Resolve the live track index instead of assuming 0. The queue can be
-      // reset between getQueue() and updateMetadataForTrack() (stream restarts,
-      // cleanResetPlayer), so derive the active index and bounds-check it to
-      // avoid "The track index is out of bounds".
+      // Use the active index, bounds-checked. The queue can change between calls.
       const activeIndex = await TrackPlayer.getActiveTrackIndex().catch(() => undefined)
       const trackIndex = typeof activeIndex === 'number' ? activeIndex : 0
       if (trackIndex < 0 || trackIndex >= queue.length) {
         return
       }
 
-      // Key on the track as well as the metadata. Every stream rebuild
-      // (cleanResetPlayer, ensureTrackForDisplay, startFreshStream) adds a new
-      // track, often carrying placeholder metadata, and must accept the real
-      // metadata again even when the show has not changed.
+      // Include the track id, so a rebuilt track always gets real metadata.
       const localKey = `${queue[trackIndex]?.id}\0${title}\0${artist}\0${String(artworkToUse)}\0${resolvedShowTime}`
       if (localKey === lastMetadataRef.current) return
 
@@ -927,10 +834,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     // Check userPlay instead of isPlaying to handle network disconnection cases
     if (shouldRestart && userPlay.current) {
-      // A network change is a reason to CHECK, not a reason to restart. Most
-      // handovers are survived by the player on its own; tearing it down is what
-      // produced the reported dropouts. Replace any pending check so churn
-      // during a handover collapses to a single one.
+      // A network change triggers a check, not a restart. One pending check at a time.
       if (networkCheckTimer.current) {
         clearTimeout(networkCheckTimer.current)
       }
@@ -942,10 +846,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           return
         }
 
-        // Did it recover by itself, or is it still recovering? A null state
-        // (no answer) falls through to a restart: a player that will not
-        // report its state is not a player that recovered on its own. Web has
-        // no RNTP, so ask the audio element instead.
+        // Leave it if playing or healing. No answer means restart. Web checks the audio element.
         if (isWeb) {
           if (audioRef.current && !audioRef.current.paused) {
             return
@@ -964,49 +865,30 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     previousNetworkState.current = current
   }, [networkState, attemptStreamRestart, isPlaying]) // Keep isPlaying in deps for logging
 
-  // Start playback when éist connects on the car screen, or when the driver
-  // taps the éist list item. Not when the scene merely re-activates: coming
-  // back from another app is not a request to play. CarPlay's Now Playing
-  // template can only control the already-active now-playing app — it can't
-  // cold-start audio — so the native CarPlay scene posts a notification that the
-  // EistCarPlayBridge module (only present in CarPlay builds) forwards here, and we
-  // kick off the real play() path. Once playing, iOS populates the car Now Playing
-  // screen with the show metadata/art and its transport controls go live.
+  // CarPlay play requests (scene connect or list-item tap) from EistCarPlayBridge. Scene re-activation doesn't play.
+  // Now Playing can't cold-start audio, so the native side asks JS to run play().
   useEffect(() => {
     if (isWeb || Platform.OS !== 'ios') return
     const bridge = NativeModules.EistCarPlayBridge
     if (!bridge) return
 
-    // Ask the player what it is actually doing. This used to read isPlayingRef,
-    // which is a UI affordance (resolveIsPlaying holds it true through
-    // loading/buffering/ready/stopped/none while userPlay intent is set) and
-    // userPlay is only cleared by an explicit user stop. A CarPlay disconnect
-    // therefore left it latched true with nothing playing, and from then on
-    // every car play request was discarded: the car showed Now Playing and sat
-    // silent until the user tapped the button on the phone. The decision now
-    // runs off the real playback state, in utils/carPlayPlayRequest.ts.
+    // Decide from the player's real state, not the sticky UI flag. See utils/carPlayPlayRequest.ts.
     const handleCarPlayPlayRequest = async () => {
       // Not while a cast device is playing: play() would reload its media.
       if (isCastPlayingRef.current) {
         return
       }
 
-      // Read and claim the latch synchronously, before any await, so a second
-      // activation arriving during the probe below sees the first attempt.
-      // Only the invocation that claimed it releases it.
+      // Claim the latch before any await. Only the claimer releases it.
       const requestInFlight = carPlayPlayInFlight.current
       if (requestInFlight) {
-        // A duplicate. It must return without touching the latch: restoring a
-        // captured `true` after the claimer had released it latched it for good,
-        // and every later car request was then discarded.
+        // Duplicate request: return without touching the latch.
         return
       }
       carPlayPlayInFlight.current = true
 
       try {
-        // A null state (no answer) is treated as not playing, and play() runs
-        // setupPlayer() first, which is what revives a player whose service
-        // died under a live JS runtime.
+        // No answer counts as not playing. play() runs setupPlayer(), which revives a dead service.
         const state = await probePlaybackState()
 
         if (!shouldStartPlaybackForCarPlay({ state, requestInFlight })) {
@@ -1034,12 +916,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     setupPlayer()
 
     if (!isWeb) {
-      // Seed the Now Playing item at cold launch so CarPlay / the lock screen
-      // show the current show and expose a working play control before the
-      // phone UI is ever opened. Without this the CarPlay CPNowPlayingTemplate
-      // is empty (no metadata, no play target) until the user presses play in
-      // the app, which they can't do from the car. ensureTrackForDisplay adds a
-      // stopped-state track and fetchAndUpdateShowMetadata populates it.
+      // Seed Now Playing at launch so CarPlay and the lock screen have metadata and a play target.
       ;(async () => {
         try {
           await setupPlayer()
@@ -1054,11 +931,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         Event.PlaybackState,
         async ({ state }: any) => {
           const wasPlaying = isPlayingRef.current
-          // Reflect the listening session, not the instantaneous decoder state.
-          // RNTP passes through Loading/Buffering/Ready on startup and every
-          // mid-stream rebuffer; mapping those to "stopped" flickers the button
-          // Stop→Listen→Stop right after play(). Hold steady through them while
-          // the user intends to play. See utils/playbackUiState.
+          // Show the listening session, not decoder churn. See utils/playbackUiState.ts.
           const rebuilding = isRebuildingStream()
           const playing = resolveIsPlaying(state, userPlay.current, rebuilding)
           setIsPlaying(playing)
@@ -1128,14 +1001,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       )
 
-      // No resume-on-foreground. If playback stopped while the app was in the
-      // background (another app took the audio, an interruption, a car
-      // disconnect), the listener presses play to bring it back. Restarting on
-      // return stole the audio from whatever they were listening to instead.
+      // No resume on foreground: the listener presses play. Auto-resume stole audio from other apps.
 
-      // Now Playing refresh while playing is scheduled deadline-driven in a
-      // dedicated effect below (keyed on isPlaying), off the current show's
-      // actual end time rather than a wall-clock guess.
 
       return () => {
         onState.remove()
@@ -1162,16 +1029,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [])
 
-  // Deadline-driven Now Playing refresh. CarPlay's CPNowPlayingTemplate (and the
-  // lock screen / Android Auto) mirror MPNowPlayingInfoCenter, which only
-  // changes when we rewrite RNTP metadata. Rather than guessing when the show
-  // changes, we schedule the next refresh for the moment the CURRENT show ends —
-  // a timestamp the live API already gives us (endDateUtc) — then re-arm off the
-  // next show's end time. This stays correct for any show length or start
-  // minute. The loop lives exactly as long as playback: background audio keeps
-  // the JS run loop alive so it fires in the car with the phone backgrounded,
-  // and it's torn down on stop (a fresh fetch runs on the next play — see play()
-  // and the PlaybackState → Playing handler).
+  // Refresh Now Playing just after the current show ends (endDateUtc), then re-arm. Runs only while playing.
   useEffect(() => {
     if (isWeb || !isPlaying) return
 

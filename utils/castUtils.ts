@@ -29,11 +29,7 @@ export type CastMediaInfo = {
   customData?: Record<string, any>
 }
 
-/**
- * Format title for Cast display - replace "(éist arís)" with repeat symbol
- * Matches the behavior of FormattedShowTitle component in the app
- * Uses Unicode ↻ (U+21BB) which renders as a simple text glyph
- */
+/** Cast title, with "(éist arís)" replaced by ↻ to match FormattedShowTitle. */
 function formatCastTitle(title: string): string {
   if (!title) return 'éist'
   // Replace variations of "éist arís" with repeat symbol (↻)
@@ -47,9 +43,7 @@ function formatCastTitle(title: string): string {
     .trim()
 }
 
-/**
- * Build MediaInfo object for casting the live radio stream
- */
+/** MediaInfo for the live stream. */
 export function buildCastMediaInfo(
   title: string,
   artist: string,
@@ -79,9 +73,7 @@ export function buildCastMediaInfo(
   }
 }
 
-/**
- * Load the live radio stream onto the cast device
- */
+/** Load the live stream onto the cast device. */
 export async function loadMediaOnCast(
   title: string,
   artist: string,
@@ -145,9 +137,7 @@ export async function loadMediaOnCast(
   }
 }
 
-/**
- * Update metadata on the currently casting media
- */
+/** Update metadata on the casting media. */
 export async function updateCastMediaMetadata(
   title: string,
   artist: string,
@@ -214,9 +204,7 @@ async function sendCastMetadataMessage(payload: Record<string, any>) {
   }
 }
 
-/**
- * Control playback on the cast device
- */
+/** Control playback on the cast device. */
 export async function castPlay(): Promise<boolean> {
   if (Platform.OS === 'web' || !GoogleCast) {
     return false

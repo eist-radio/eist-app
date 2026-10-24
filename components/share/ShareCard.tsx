@@ -1,13 +1,5 @@
 // components/share/ShareCard.tsx
-//
-// Off-screen 1080×1920 (Instagram Story) composition captured for sharing a
-// show. Purely presentational and fully determined by props — the show page
-// mounts it off-screen and captures its ref with react-native-view-shot.
-//
-// Stacked layers, no band or hairline: full-bleed artwork, an éist-purple wash (a
-// single even all-over cast — no bottom deepen — so the whole image reads as one
-// uniform wash), and the show title / artist / date·time superimposed bottom-left.
-// A faint text shadow guarantees legibility over any artwork.
+// Off-screen 1080×1920 story card for sharing a show: artwork, purple wash, title/artist/time bottom-left.
 import React from 'react';
 import { Image, ImageSourcePropType, StyleSheet, Text, View } from 'react-native';
 import { colors, font } from '../../theme/tokens';

@@ -40,12 +40,7 @@ function normalizeSlug(name: string): string {
     .replace(/-+/g, '-'); // Collapse multiple hyphens
 }
 
-/**
- * Determine if an artist is "active" based on their stats.
- * An artist is active if:
- * - They have a show within the last 40 days, OR
- * - They have more than 3 archived shows
- */
+/** Active = a show in the last 40 days, or more than 3 archived shows. */
 function isArtistActive(stat: ArtistStat): boolean {
   const now = new Date();
   const fortyDaysAgo = new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000);

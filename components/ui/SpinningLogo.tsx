@@ -22,19 +22,14 @@ export function SpinningLogo({ size = 100 }: { size?: number }) {
         onLoadEnd={() => setPainted(true)}
         opaque={false}
         scrollEnabled={false}
-        // iOS WKWebView otherwise adds a safe-area content inset that shifts the
-        // canvas down inside its fixed box, clipping the logo's bottom edge on
-        // physical devices. Pin insets to zero so the canvas fills the box.
+        // Zero insets: WKWebView's safe-area inset clips the logo on device.
         automaticallyAdjustContentInsets={false}
         contentInset={{ top: 0, left: 0, bottom: 0, right: 0 }}
         androidLayerType="hardware"
         originWhitelist={['*']}
         javaScriptEnabled
         domStorageEnabled
-        // three.js is now inlined into the HTML (no network), so the only way the
-        // logo can go blank is a script/WebGL error. Surface those instead of
-        // failing silently — the previous CDN version had no diagnostics, which
-        // is why a blank logo on-device went unexplained.
+        // three.js is inlined, so a blank logo means a script or WebGL error. Log it.
         injectedJavaScriptBeforeContentLoaded={`window.onerror=function(m,s,l,c){window.ReactNativeWebView&&window.ReactNativeWebView.postMessage('logo-error: '+m);};true;`}
         onMessage={(e) => console.warn('[SpinningLogo]', e.nativeEvent.data)}
         onError={(e) => console.warn('[SpinningLogo] webview error', e.nativeEvent)}

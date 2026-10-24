@@ -345,9 +345,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
       const r = rowOffsets.current[id]
       if (r && dayOffsets.current[r.day] != null) {
         const absY = dayOffsets.current[r.day] + r.y
-        // Top-align the live row so it reads as the first item under the day
-        // heading. Centring it (the old behaviour) left Yesterday's rows — and
-        // the "Yesterday" heading — showing above it for early-morning shows.
+        // Top-align the live row so earlier rows don't show above it.
         const target = Math.max(0, absY)
         scrollRef.current?.scrollTo({ y: target, animated })
         pending.current = false

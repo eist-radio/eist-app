@@ -11,10 +11,7 @@ const startFreshStream = async () => {
   // intent to play is recorded for the recovery paths in TrackPlayerContext.
   playIntent.current = true;
   try {
-    // A CarPlay-initiated session can reach this handler without the phone UI
-    // ever mounting, so the player may not have been set up by
-    // TrackPlayerContext yet. Ensure setup here (idempotent) or every TrackPlayer
-    // call below no-ops/throws and the car's play button appears to do nothing.
+    // CarPlay can reach this without the UI mounting, so make sure the player is set up.
     await ensurePlayerSetup();
 
     markStreamRebuild();
@@ -60,9 +57,7 @@ const startFreshStream = async () => {
 };
 
 module.exports = async function() {
-  // Kick off player setup as soon as the playback service registers, so remote
-  // commands from CarPlay / the lock screen reach a live, initialized player even
-  // when the app was launched into the background without the React UI mounting.
+  // Set up the player at service start, so remote commands work without the UI.
   ensurePlayerSetup().catch((e) => console.error('Playback service setup failed:', e));
 
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
@@ -100,14 +95,8 @@ module.exports = async function() {
     }
   });
 
-  // For live radio, "pause" means stop while playing. But CarPlay's Now Playing
-  // button is a play/pause toggle, and iOS may route a tap-from-stopped through
-  // the pause/toggle command (RNTP's toggle handler emits RemotePause from any
-  // non-paused state, including .stopped). So make this state-aware: start the
-  // stream when nothing is playing, otherwise pause. This keeps the single car
-  // button working in both directions regardless of which command iOS sends.
-  // We use pause() instead of stop() to keep the Android foreground service alive
-  // so the media session survives and play can resume from Android Auto / car OS.
+  // CarPlay's toggle can send pause while stopped, so start the stream when nothing is playing, otherwise pause.
+  // pause(), not stop(), keeps the Android foreground service alive for Android Auto.
   const NON_PLAYING_STATES = [
     State.Stopped,
     State.Paused,
@@ -122,10 +111,7 @@ module.exports = async function() {
     try {
       await ensurePlayerSetup();
       const { state } = await TrackPlayer.getPlaybackState();
-      // The listener started the stream and it is still coming up: `ready`
-      // mid-rebuffer, or `stopped`/`none` during a rebuild. A pause here means
-      // stop. Treating these as "not playing" started a fresh stream instead,
-      // so a car stop pressed during startup did not stop anything.
+      // Still starting up (ready mid-rebuffer, or stopped/none during a rebuild): a pause here means stop.
       const isStartingUp =
         playIntent.current &&
         (state === State.Ready ||
@@ -151,10 +137,7 @@ module.exports = async function() {
     // nothing
   });
 
-  // Use pause() instead of stop() to keep the Android foreground service alive.
-  // stop() tears down the service, which kills the MusicService and breaks the
-  // MediaBrowserService binding — making it impossible to play again from
-  // Android Auto without restarting the app.
+  // pause(), not stop(): stop() kills the foreground service and breaks Android Auto.
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
     playIntent.current = false;
     // A failed setup must not swallow the stop. Pause regardless: on a live

@@ -5,10 +5,7 @@ type JSONNode = {
   content?: JSONNode[];
 };
 
-/**
- * Walk a ProseMirror‐style JSON tree and return only the text,
- * inserting newlines for paragraphs and hardBreaks.
- */
+/** Plain text from a ProseMirror JSON tree, with newlines for paragraphs and hard breaks. */
 export function stripFormatting(nodes?: JSONNode[]): string {
   // Add explicit checks for undefined and null
   if (!nodes || !Array.isArray(nodes) || nodes.length === 0) {

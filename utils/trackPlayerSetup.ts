@@ -17,12 +17,7 @@ export const setupTrackPlayer = async () => {
     // Player setup - Optimized for live radio streaming
     await TrackPlayer.setupPlayer({
       maxBuffer: 8,
-      // Android only. On iOS, RNTP passes minBuffer to SwiftAudioEx as
-      // bufferDuration, and any non-zero value also turns off AVPlayer's
-      // automaticallyWaitsToMinimizeStalling. AVPlayer then kept a 3 s forward
-      // buffer and played straight through every underrun instead of waiting,
-      // which came out as random tiny skips on any network jitter. Leaving it
-      // unset keeps AVPlayer's own buffer sizing and stall handling.
+      // Android only. On iOS a non-zero minBuffer turns off AVPlayer's stall waiting, causing tiny skips.
       minBuffer: Platform.OS === 'ios' ? undefined : 3,
       playBuffer: 1.5,
       backBuffer: 0,
@@ -39,11 +34,7 @@ export const setupTrackPlayer = async () => {
   }
 };
 
-// Capabilities and Android behaviour. Separate from setupTrackPlayer because it
-// must also run when setupPlayer() reports "already initialized": a first setup
-// that timed out in JS can still complete natively, and its options were never
-// applied, which leaves CarPlay's Now Playing button and the notification
-// controls dead.
+// Capabilities and Android behaviour. Also re-applied when setupPlayer() reports "already initialized".
 export const applyPlayerOptions = async () => {
   try {
     // Options setup - Enhanced for Android Auto
@@ -53,25 +44,8 @@ export const applyPlayerOptions = async () => {
         alwaysPauseOnInterruption: true,
       },
       
-      // Capabilities for live radio. Play+Pause is the standard pattern for
-      // car/lock-screen: a single toggle button. Stop is omitted because
-      // TrackPlayer.stop() tears down the Android foreground service, which kills
-      // the MusicService and breaks the MediaBrowserService binding. Pause keeps
-      // the service alive; the RemotePause handler in trackPlayerService.js
-      // treats pause-while-playing as a live-radio stop, and pause-while-stopped
-      // as a fresh-stream start.
-      //
-      // This list governs RNTP's OWN session: the lock screen and notification.
-      // It does NOT govern Android Auto, which only ever talks to the proxy
-      // MediaSession in plugins/withAndroidAuto.js. The stop button behind the
-      // Google Play rejection ("pressing stop completely stop app, unable to
-      // play anything afterward") came from that proxy advertising ACTION_STOP,
-      // so removing Capability.Stop here never affected it. The car-facing
-      // action mask lives in transportActions() in that plugin.
-      //
-      // Side effect worth knowing: omitting Capability.Stop means RNTP never
-      // wires a stop action on its session, so a stop() forwarded to RNTP is
-      // silently dropped. The proxy therefore converts stop to pause itself.
+      // Play+Pause only: stop() kills the Android foreground service. RemotePause handles stop/start for live radio.
+      // Governs the lock screen and notification only. Android Auto's buttons come from transportActions() in plugins/withAndroidAuto.js.
       capabilities: [
         Capability.Play,
         Capability.Pause,

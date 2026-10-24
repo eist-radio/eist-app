@@ -1,21 +1,6 @@
 /**
- * éist Cast Receiver
- *
- * IMPORTANT: This receiver uses the <cast-media-player> element from the CAF SDK.
- * This is REQUIRED for media playback to work. Without it, you'll get error 905
- * (LOAD_FAILED) because there's no actual media player to handle the audio stream.
- *
- * A custom receiver with just JavaScript and DIVs won't work - you MUST include
- * either <cast-media-player> (styled receiver) or implement a full custom player
- * using the PlayerManager's media element.
- *
- * The <cast-media-player> element provides:
- * - Built-in media playback support for all formats (audio/video)
- * - Standard player UI with progress bar, metadata display
- * - Proper handling of LOAD requests from sender apps
- *
- * Styling is done via CSS custom properties on the cast-media-player element.
- * See: https://developers.google.com/cast/docs/styled_receiver
+ * éist Cast receiver. Requires the cast-media-player element, otherwise LOAD fails with error 905.
+ * Styled via CSS custom properties: https://developers.google.com/cast/docs/styled_receiver
  */
 
 export default {

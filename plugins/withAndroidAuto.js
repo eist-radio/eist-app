@@ -24,16 +24,8 @@ import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
 
 /**
- * MediaBrowserService that bridges react-native-track-player (RNTP) to Android Auto.
- *
- * It binds to RNTP's MusicService and reflects out RNTP's MediaSessionCompat, but does
- * NOT expose RNTP's token to Android Auto (RNTP 4.1.2 never handles playFromMediaId, so
- * that produced "Could not load your selection"). Instead this service owns its OWN
- * "proxy" MediaSessionCompat and exposes the proxy's token. The proxy's callback forwards
- * every start entry point to RNTP's transport controls (which fire Event.RemotePlay and
- * start the stream), while a controller registered on RNTP's session mirrors RNTP's
- * playback state + metadata (with the DISPLAY_SUBTITLE fix) back onto the proxy so AA's
- * Now Playing stays correct. RNTP's own session/notification/lockscreen path is untouched.
+ * MediaBrowserService for Android Auto. Exposes its own proxy MediaSession (RNTP 4.1.2 can't handle playFromMediaId),
+ * forwards commands to RNTP's session, and mirrors RNTP's state and metadata back onto the proxy.
  */
 class MediaBrowserService : MediaBrowserServiceCompat() {
 
@@ -43,16 +35,11 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         private const val LIVE_RADIO_ID = "live_radio"
         private const val RETRY_DELAY_MS = 1000L
         private const val MAX_RETRIES = 30
-        // Window (ms) during which we ignore RNTP's transient STOPPED/NONE states
-        // emitted by startFreshStream()'s stop -> reset -> add -> play sequence,
-        // so they cannot overwrite our synchronous BUFFERING and re-trigger
-        // "Could not load your selection" in Android Auto.
+        // Ignore RNTP's transient STOPPED/NONE from startFreshStream for this long after a start.
         private const val GRACE_MS = 4000L
         // Coalesce prepare + play (AA often sends both) into a single restart.
         private const val DEBOUNCE_MS = 1500L
-        // How long a cold-start play may wait for RNTP's controller. Without
-        // the app process running nothing sets the player up, and the car spun
-        // on BUFFERING indefinitely.
+        // Give up on a cold-start play after this long (no app process means no player setup).
         private const val PENDING_PLAY_TIMEOUT_MS = 15000L
     }
 
@@ -61,15 +48,11 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
     private val handler = Handler(Looper.getMainLooper())
     private var retryCount = 0
 
-    // Controller on RNTP's OWN session. Used BOTH to forward commands to RNTP
-    // (play/stop/pause) and to mirror RNTP's playback state + metadata onto the
-    // proxy session below. RNTP's session and its callback are never modified.
+    // Controller on RNTP's own session: forwards commands and mirrors state. RNTP's session is never modified.
     private var rntpController: MediaControllerCompat? = null
     private var mirrorCallback: MediaControllerCompat.Callback? = null
 
-    // Our OWN MediaSession exposed to Android Auto (the "proxy"). AA sends
-    // transport controls here; we forward them to RNTP. This is purely additive
-    // and never touches RNTP's session, notification or lockscreen path.
+    // The proxy session Android Auto talks to.
     private var proxySession: MediaSessionCompat? = null
 
     // Cold-start: a play arrived before RNTP's controller was wired; flush later.
@@ -112,16 +95,8 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
             startPlayback()
         }
 
-        // Android Auto may still send STOP even though we no longer advertise
-        // ACTION_STOP (a head unit can send any command it likes). For live radio
-        // a stop is a pause: forwarding stop() to RNTP is a dead end, because
-        // Capability.STOP is deliberately absent from the capability list in
-        // utils/trackPlayerSetup.ts, so RNTP never wired a stop action on its
-        // session and silently drops the command. Nothing then comes back through
-        // the mirror, the proxy stays in an active state advertising no PLAY
-        // action, and Android Auto is left with no way to restart playback —
-        // the Google Play rejection ("pressing stop completely stop app, unable
-        // to play anything afterward").
+        // Treat a stop as a pause. RNTP has no stop action wired (no Capability.Stop), so a forwarded stop is dropped
+        // and the card is left with no way to play again (the Google Play rejection).
         override fun onStop() {
             Log.d(TAG, "proxy onStop -> treating as pause")
             pauseAndPublishIdle()
@@ -161,9 +136,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
             }
             mirrorCallback = null
             rntpController = null
-            // Nothing is playing any more, whatever the proxy last mirrored.
-            // Without this the car kept showing pause over silence, and the user
-            // had to press pause then play to get a play forwarded.
+            // Show paused, not a stale playing state.
             publishState(PlaybackStateCompat.STATE_PAUSED)
             // RNTP's MusicService went away (e.g. process/service restart). Rebind
             // so the proxy re-wires to the new session and keeps forwarding play.
@@ -176,12 +149,8 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         super.onCreate()
         Log.d(TAG, "MediaBrowserService created")
 
-        // Create our own proxy MediaSession synchronously so onGetRoot always
-        // returns a session with a valid token (fixes the old async-token race).
-        // Deliberately NOT FLAG_HANDLES_MEDIA_BUTTONS + setMediaButtonReceiver(null):
-        // the proxy never competes for hardware/Bluetooth media keys and cannot
-        // steal RNTP's lockscreen controls. AA commands arrive via the session
-        // binder, so the media-button flag is unnecessary.
+        // Create the proxy session synchronously so onGetRoot always has a token.
+        // No media-button handling, so it never steals hardware keys or RNTP's lock screen controls.
         val session = MediaSessionCompat(this, "EistProxySession")
         session.setFlags(MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
         session.setMediaButtonReceiver(null)
@@ -336,9 +305,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
 
             Log.d(TAG, "Got RNTP MediaSession, wiring controller + mirror")
 
-            // Build a controller on RNTP's OWN session. Used to (a) forward
-            // commands to RNTP and (b) mirror RNTP's state/metadata onto the
-            // proxy. RNTP's session and its callback are left untouched.
+            // Controller on RNTP's own session, for forwarding commands and mirroring state.
             try {
                 // Detach any previous mirror before re-wiring (defensive against
                 // a re-entry that skipped onServiceDisconnected).
@@ -366,9 +333,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
 
                 Log.i(TAG, "RNTP controller + mirror wired for Android Auto")
 
-                // Flush a cold-start play that arrived before the controller
-                // existed. Re-publish BUFFERING so the seeded STOPPED does not
-                // linger, then forward the play.
+                // Flush a cold-start play that arrived before the controller existed.
                 if (pendingPlay) {
                     pendingPlay = false
                     val n = System.currentTimeMillis()
@@ -394,18 +359,8 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    // Action mask. ACTION_STOP is never advertised: Android Auto renders its
-    // transport controls from the actions on THIS session (the proxy is the only
-    // session AA ever sees — RNTP's own session is not exposed), so this mask is
-    // the one and only reason a stop button appears in the car. Dropping
-    // Capability.Stop in utils/trackPlayerSetup.ts does not reach this surface.
-    //
-    // ACTION_PLAY and ACTION_PAUSE are both advertised in every state. AA picks
-    // the right one from the state, and advertising both means there is never a
-    // state in which the head unit has no way to resume. The old mask advertised
-    // STOP|PAUSE with no PLAY while active, so a stop that produced no mirrored
-    // state change stranded the card with no play affordance at all.
-    // Never advertise SKIP (live radio).
+    // Android Auto's buttons come from this mask. Never advertise STOP or SKIP.
+    // PLAY and PAUSE are advertised in every state, so the car can always resume.
     private fun transportActions(): Long {
         return PlaybackStateCompat.ACTION_PLAY or
             PlaybackStateCompat.ACTION_PAUSE or
@@ -465,11 +420,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         }
     }
 
-    // Every AA stop/pause entry point funnels here. Publishing PAUSED on the
-    // proxy SYNCHRONOUSLY is the part that matters for policy compliance: it
-    // moves the card out of an active state right away, so the head unit shows
-    // play rather than pause, even if RNTP drops the forwarded command or the
-    // mirror never fires.
+    // All stop/pause entry points. Publish PAUSED synchronously so the car shows play even if RNTP drops the command.
     private fun pauseAndPublishIdle() {
         // Drop the start grace window, otherwise mirrorState() would discard
         // RNTP's genuine PAUSED and leave the card showing a stale active state.
@@ -541,9 +492,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         val builder = MediaMetadataCompat.Builder(metadata)
         val displaySubtitle = metadata.getString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE)
         val artist = metadata.getString(MediaMetadataCompat.METADATA_KEY_ARTIST)
-        // Requirement #4: AA uses DISPLAY_SUBTITLE for the 2nd line but
-        // kotlin-audio only sets ARTIST. Copy artist -> display_subtitle on the
-        // PROXY only (never write back to RNTP's session).
+        // Android Auto reads DISPLAY_SUBTITLE but kotlin-audio only sets ARTIST. Copy it on the proxy only.
         if (displaySubtitle.isNullOrEmpty() && !artist.isNullOrEmpty()) {
             builder.putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
         }
@@ -604,9 +553,7 @@ const AUTOMOTIVE_APP_DESC_XML = `<?xml version="1.0" encoding="utf-8"?>
 </automotiveApp>
 `;
 
-/**
- * Expo config plugin to add Android Auto support
- */
+/** Expo config plugin to add Android Auto support. */
 function withAndroidAuto(config) {
   // Step 1: Modify AndroidManifest.xml
   config = withAndroidManifest(config, async (config) => {

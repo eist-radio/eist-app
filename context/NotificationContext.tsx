@@ -285,9 +285,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
         [artistId]: newSubscription,
       }));
 
-      // Schedule reminders for the artist's known upcoming shows so that
-      // subscribing actually delivers notifications (mirrors the per-show
-      // reminder path in toggleShowReminder).
+      // Schedule reminders for the artist's known upcoming shows (same path as toggleShowReminder).
       for (const show of upcomingShows) {
         if (!reminders[show.showId]) {
           const notificationId = await scheduleShowReminder(show);
@@ -347,13 +345,7 @@ export const NotificationProvider = ({ children }: { children: ReactNode }) => {
     [subscriptions, reminders]
   );
 
-  // Launch re-sync: once per app session (after subscriptions/reminders have
-  // hydrated from storage and permission is known), roll every active artist
-  // subscription forward by fetching that artist's next known show and
-  // scheduling a reminder for it if one isn't already set. This covers shows
-  // announced after the user subscribed, and re-arms the subscription once a
-  // previously reminded show has aired/passed. Relies on the existing
-  // `!reminders[showId]` dedupe in syncSubscribedArtistShows.
+  // Once per session, after hydration: schedule each subscribed artist's next show if not already reminded.
   const hasSyncedSubscriptions = useRef(false);
   useEffect(() => {
     if (hasSyncedSubscriptions.current) return;

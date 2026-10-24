@@ -18,9 +18,7 @@ import NotificationsScreen from './screens/NotificationsScreen';
 export function Pager() {
   const [active, setActive] = useState(0);
   const insets = useSafeAreaInsets();
-  // Track the live window width instead of a value captured once at module load.
-  // Android 16 (targetSdk 36) ignores the portrait lock on >=600dp displays, so
-  // on tablets / foldables / desktop windowing the width can change at runtime.
+  // Live window width: Android 16 ignores the portrait lock on large screens, so width can change.
   const { width } = useWindowDimensions();
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<any>(null);
@@ -28,9 +26,7 @@ export function Pager() {
   const onEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) =>
     setActive(Math.round(e.nativeEvent.contentOffset.x / width));
 
-  // Re-align the active page after a width change (rotation / resize / large-
-  // screen windowing). Paging offsets are width-multiples, so a stale width
-  // would leave pages partly off-screen. No-op on plain active changes.
+  // Re-align the active page after a width change.
   useEffect(() => {
     if (prevWidthRef.current === width) return;
     prevWidthRef.current = width;

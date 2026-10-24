@@ -73,9 +73,7 @@ async function fetchArtistById(id: string): Promise<RawArtist> {
   return json.artist;
 }
 
-// RadioCult socials are inconsistent: instagram/mixcloud are bare handles
-// (sometimes @-prefixed), soundcloud is a handle OR a full URL, site is a full
-// URL. Resolve each to an absolute URL, accepting either form.
+// RadioCult socials mix bare handles and full URLs. Resolve each to an absolute URL.
 function resolveSocialUrl(value: string, base: string): string {
   const v = value.trim();
   if (/^https?:\/\//i.test(v)) return v;
@@ -116,12 +114,7 @@ export default function ArtistScreen() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // The archive indexes shows by its own artistSlug. The authoritative match is
-  // the artist mapping (built from the archive shows themselves: id -> slug),
-  // then the normalized artist name (the archive uses the same scheme). The
-  // RadioCult artist.slug is a different field that often doesn't match, so it's
-  // only a last-resort fallback — preferring it left some artists with no
-  // past shows.
+  // Match archive shows by the artist mapping, then normalized name. RadioCult's slug is a last resort (it often differs).
   const routeSlug =
     queryId || (artist && slug && slug !== artist.id) ? slug : undefined;
   const mappedSlug = id ? artistMapping?.[id]?.slug : undefined;

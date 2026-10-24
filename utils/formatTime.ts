@@ -1,6 +1,4 @@
-/**
- * Formats a time in 24-hour format, e.g. "16:00".
- */
+/** 24-hour time, for example "16:00". */
 export function formatClockTime(input: string | Date, timeZone?: string): string {
   const date = typeof input === 'string' ? new Date(input) : input
   if (Number.isNaN(date.getTime())) return ''

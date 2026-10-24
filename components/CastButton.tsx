@@ -1,12 +1,5 @@
 // components/CastButton.tsx
-//
-// Uses the native react-native-google-cast button (GCKUICastButton on iOS),
-// which correctly drives device discovery and presents the system Cast picker.
-// Discovery is started at launch (iosStartDiscoveryAfterFirstTapOnCastButton:
-// false in app.config.ts), so the button becomes active as soon as a Cast
-// device is found on the network. tintColor follows the caller (lilac when
-// disconnected, green when casting). Wrapped in a fixed-size View so the native
-// view always gets a layout box.
+// Native Cast button (GCKUICastButton on iOS) in a fixed-size box. Discovery starts at launch, see app.config.ts.
 
 import React from 'react'
 import { Platform, StyleProp, View, ViewStyle } from 'react-native'

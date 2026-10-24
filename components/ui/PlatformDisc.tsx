@@ -1,13 +1,5 @@
 // components/ui/PlatformDisc.tsx
-//
-// Sibling of PlayDisc: a filled green coin with a brand glyph (SoundCloud /
-// Mixcloud) punched through it. Archive "listen back" opens the show on an
-// external platform rather than playing in-app, so it must NOT reuse PlayDisc's
-// play-triangle (the app's in-app playback affordance). Same knockout treatment
-// as PlayDisc so the two read as one visual language; only the glyph — and what
-// it promises — differ. The path data comes straight from the FontAwesome icon
-// objects and is drawn with react-native-svg, so no FontAwesome runtime config
-// is required.
+// Green coin with a SoundCloud/Mixcloud glyph knocked out. Like PlayDisc, but for opening a show externally.
 import { faMixcloud, faSoundcloud } from '@fortawesome/free-brands-svg-icons';
 import React from 'react';
 import Svg, { Circle, Defs, G, Mask, Path, Rect } from 'react-native-svg';

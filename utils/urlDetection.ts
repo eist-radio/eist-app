@@ -9,9 +9,7 @@ export interface LinkSegment {
   url?: string;
 }
 
-/**
- * Detects URLs in text and returns an array of segments (text and links)
- */
+/** Split text into text and link segments. */
 export function detectUrls(text: string): LinkSegment[] {
   if (!text) return [];
   
@@ -59,9 +57,7 @@ export function detectUrls(text: string): LinkSegment[] {
   return segments;
 }
 
-/**
- * Validates if a string is a valid URL
- */
+/** Whether a string is a valid URL. */
 export function isValidUrl(url: string): boolean {
   try {
     new URL(url);
