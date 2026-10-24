@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { Platform, Text } from 'react-native';
+import { Platform, StyleSheet, Text, TextStyle, View } from 'react-native';
+import { useFitWidestWord } from '../hooks/useFitWidestWord';
 
 interface FormattedShowTitleProps {
   title: string;
@@ -27,7 +28,21 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
   adjustsFontSizeToFit = false,
   minimumFontScale,
 }) => {
-  const iconSize = Platform.OS === 'ios' ? size * 0.9 : size;
+  // Shrink so the widest word fits the width. RN's adjustsFontSizeToFit only shrinks on line overflow,
+  // so a long single word still broke mid-word.
+  const shrink = adjustsFontSizeToFit && !asContent;
+  const baseStyle = StyleSheet.flatten([{ color, fontSize: size }, style]) as TextStyle;
+  const fit = useFitWidestWord(title, baseStyle, minimumFontScale ?? 0.5);
+  const scale = shrink ? fit.scale : 1;
+  const fittedStyle =
+    scale === 1
+      ? null
+      : {
+          fontSize: (baseStyle.fontSize ?? size) * scale,
+          ...(baseStyle.lineHeight != null && { lineHeight: baseStyle.lineHeight * scale }),
+        };
+
+  const iconSize = (Platform.OS === 'ios' ? size * 0.9 : size) * scale;
 
   // apply line constraints only when needed
   const lines = noWrap ? 1 : numberOfLines;
@@ -43,6 +58,26 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
     : lines != null
       ? { numberOfLines: lines as number, ellipsizeMode: 'tail' as const }
       : {};
+
+  const renderText = (children: React.ReactNode) => {
+    const text = (
+      <Text
+        style={[{ color, fontSize: size }, style, fittedStyle]}
+        {...lineProps}
+        {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
+        allowFontScaling={false}
+      >
+        {children}
+      </Text>
+    );
+    if (!shrink) return text;
+    return (
+      <View onLayout={fit.onLayout}>
+        {fit.measurer}
+        {text}
+      </View>
+    );
+  };
 
   // Case 1: exactly "éist arís"
   if (title === 'éist arís') {
@@ -63,13 +98,8 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
       );
     }
 
-    return (
-      <Text
-        style={[{ color, fontSize: size }, style]}
-        {...lineProps}
-        {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
-        allowFontScaling={false}
-      >
+    return renderText(
+      <>
         {title}{' '}
         <Ionicons
           name="repeat"
@@ -80,7 +110,7 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
             ...(Platform.OS === 'android' && { marginTop: 0 }),
           }}
         />
-      </Text>
+      </>
     );
   }
 
@@ -120,13 +150,8 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
         );
       }
 
-      return (
-        <Text
-          style={[{ color, fontSize: size }, style]}
-          {...lineProps}
-          {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
-          allowFontScaling={false}
-        >
+      return renderText(
+        <>
           {parts[0]}
           <Ionicons
             name="repeat"
@@ -139,7 +164,7 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
             }}
           />
           {parts[1]}
-        </Text>
+        </>
       );
     }
   }
@@ -148,16 +173,7 @@ const FormattedShowTitleComponent: React.FC<FormattedShowTitleProps> = ({
   if (asContent) {
     return <>{title}</>;
   }
-  return (
-    <Text
-      style={[{ color, fontSize: size }, style]}
-      {...lineProps}
-      {...(Platform.OS === 'android' && { breakStrategy: 'simple' })}
-      allowFontScaling={false}
-    >
-      {title}
-    </Text>
-  );
+  return renderText(title);
 };
 
 export const FormattedShowTitle = React.memo(FormattedShowTitleComponent);

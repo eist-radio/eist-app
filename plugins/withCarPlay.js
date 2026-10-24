@@ -10,47 +10,35 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Expo config plugin: minimal Apple CarPlay support for an audio app.
- *
- * NOT loaded by default. Only added when EXPO_ENABLE_CARPLAY=true (see
- * app.config.ts), since the `com.apple.developer.carplay-audio` entitlement
- * must be approved by Apple and present in the EAS provisioning profile.
- *
- * What this does: shows a single "éist" item in CarPlay; tapping it pushes
- * the system Now Playing screen (CPNowPlayingTemplate). That screen's
- * play/pause button drives MPRemoteCommandCenter directly, which
- * react-native-track-player already handles — so no JS bridge is needed.
- *
- * Why the phone scene delegate exists: enabling CarPlay makes the app a
- * multi-scene (UIScene) app, and once that's on, UIKit stops using the
- * AppDelegate's hand-made `self.window` — every window must come from a
- * UIWindowScene. So the phone UI needs its own scene delegate too, or you
- * get an orphaned window / black screen on launch. This is required
- * plumbing, not something we can simplify away.
- *
- * `ios/` is gitignored / prebuild-generated, so all of this lives in the
- * plugin — hand-editing ios/ would be wiped on the next prebuild/EAS build.
+ * Expo config plugin: minimal CarPlay audio support. Only loaded with EXPO_ENABLE_CARPLAY=true (needs the carplay-audio entitlement).
+ * Adds a one-item "éist" list, a JS play bridge (Now Playing can't cold-start audio), and the phone/CarPlay scene delegates.
  */
 
 const CARPLAY_AUDIO_ENTITLEMENT = 'com.apple.developer.carplay-audio';
 
-const CARPLAY_SCENE_DELEGATE_SWIFT = `import CarPlay
+const CARPLAY_SCENE_DELEGATE_SWIFT = `import AVFoundation
+import CarPlay
+import MediaPlayer
 
-// Apple does not allow CPNowPlayingTemplate as an audio app's ROOT template —
-// it can only be pushed on top of a browsable root. So we root on a single
-// "éist" list item and push Now Playing when it's tapped. Now Playing mirrors
-// MPNowPlayingInfoCenter (already set by react-native-track-player) and its
-// controls call straight into MPRemoteCommandCenter, so no JS bridge needed.
+// Apple forbids Now Playing as the root template, so root on a one-item list and push Now Playing over it.
+// Playback starts through EistCarPlayBridge, because Now Playing can't cold-start audio.
 @objc(CarPlaySceneDelegate)
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   var interfaceController: CPInterfaceController?
+  // sceneDidBecomeActive can fire before the root is set, so it checks this first.
+  private var rootTemplateSet = false
 
   func templateApplicationScene(
     _ templateApplicationScene: CPTemplateApplicationScene,
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
-    interfaceController.setRootTemplate(makeRootTemplate(), animated: false, completion: nil)
+    interfaceController.setRootTemplate(makeRootTemplate(), animated: false) { [weak self] _, _ in
+      guard let self = self else { return }
+      self.rootTemplateSet = true
+      // Start playback and push Now Playing as soon as the root exists. The list stays underneath.
+      self.startPlaybackAndShowNowPlaying(animated: false)
+    }
   }
 
   func templateApplicationScene(
@@ -58,22 +46,158 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didDisconnectInterfaceController interfaceController: CPInterfaceController
   ) {
     self.interfaceController = nil
+    rootTemplateSet = false
+  }
+
+  // Fires on every activation, including return from another app. Never starts playback.
+  // If another app is playing, pop to the éist list so play goes to éist, not the other app's Now Playing.
+  func sceneDidBecomeActive(_ scene: UIScene) {
+    guard rootTemplateSet, AVAudioSession.sharedInstance().isOtherAudioPlaying else { return }
+    interfaceController?.popToRootTemplate(animated: false, completion: nil)
   }
 
   private func makeRootTemplate() -> CPListTemplate {
     let item = CPListItem(text: "éist", detailText: "live")
     item.handler = { [weak self] _, completion in
-      self?.interfaceController?.pushTemplate(CPNowPlayingTemplate.shared, animated: true, completion: nil)
+      // Shown when backing out of Now Playing or returning while another app plays. Tap to start.
+      self?.startPlaybackAndShowNowPlaying(animated: true)
       completion()
     }
-    return CPListTemplate(title: "éist", sections: [CPListSection(items: [item])])
+    let section = CPListSection(items: [item])
+    return CPListTemplate(title: "éist", sections: [section])
+  }
+
+  // Ask JS to play, then push Now Playing.
+  private func startPlaybackAndShowNowPlaying(animated: Bool) {
+    // Set the flag before posting: the bridge replays it if JS isn't listening yet.
+    EistCarPlayBridge.pendingPlay = true
+    NotificationCenter.default.post(name: EistCarPlayBridge.playRequested, object: nil)
+    // The play path depends on JS timers, which stall on the display link while
+    // the phone screen is off. See syncTimersToPhoneScreen.
+    EistCarPlayBridge.syncTimersToPhoneScreen()
+    showNowPlaying(animated: animated)
+  }
+
+  // Push (never root) Now Playing. Its buttons go through MPRemoteCommandCenter to trackPlayerService.js.
+  private func showNowPlaying(animated: Bool) {
+    let nowPlaying = CPNowPlayingTemplate.shared
+    nowPlaying.isUpNextButtonEnabled = false
+    nowPlaying.isAlbumArtistButtonEnabled = false
+    if interfaceController?.topTemplate !== nowPlaying {
+      interfaceController?.pushTemplate(nowPlaying, animated: animated, completion: nil)
+    }
   }
 }
 `;
 
-// Hosts the normal phone UI. CarPlay forces the scene lifecycle, so the phone
-// window must be created here (from its UIWindowScene) rather than in the
-// AppDelegate. Reuses the RN root view the AppDelegate built at launch.
+// Native to JS bridge: forwards CarPlay play requests to TrackPlayerContext. Only exists in CarPlay builds.
+const EIST_CARPLAY_BRIDGE_SWIFT = `import Foundation
+import React
+import UIKit
+
+@objc(EistCarPlayBridge)
+class EistCarPlayBridge: RCTEventEmitter {
+  // Posted by CarPlaySceneDelegate when playback should start.
+  static let playRequested = Notification.Name("EistCarPlayPlayRequested")
+  // Emitted to JS (listened for in TrackPlayerContext).
+  static let playEvent = "EistCarPlayPlay"
+
+  // Play requested before JS subscribed (cold launch). Replayed in startObserving.
+  static var pendingPlay = false
+
+  private var hasListeners = false
+
+  override static func requiresMainQueueSetup() -> Bool { false }
+
+  override func supportedEvents() -> [String]! { [EistCarPlayBridge.playEvent] }
+
+  // With CarPlay active and the phone screen off, RCTTiming waits on a display link that never ticks, so JS timers stall.
+  // Switch RCTTiming to its NSTimer-based background mode whenever no phone scene is on screen.
+  private static weak var timing: NSObject?
+  private static var timerSyncInstalled = false
+
+  static func syncTimersToPhoneScreen() {
+    // Async so this runs after RCTTiming's own handler for the same notification.
+    DispatchQueue.main.async {
+      guard let timing = EistCarPlayBridge.timing else {
+        // Log loudly: a React Native upgrade may rename or remove the Timing module.
+        NSLog("[EistCarPlay] RCTTiming module not found, JS timers will stall with the phone screen off")
+        return
+      }
+      let phoneOnScreen = UIApplication.shared.connectedScenes.contains { scene in
+        scene is UIWindowScene &&
+          (scene.activationState == .foregroundActive || scene.activationState == .foregroundInactive)
+      }
+      let selector = NSSelectorFromString(phoneOnScreen ? "appDidMoveToForeground" : "appDidMoveToBackground")
+      if timing.responds(to: selector) {
+        _ = timing.perform(selector)
+      } else {
+        NSLog("[EistCarPlay] RCTTiming no longer responds to %@, JS timers will stall with the phone screen off", NSStringFromSelector(selector))
+      }
+    }
+  }
+
+  private func installTimerSync() {
+    if let timing = bridge?.module(forName: "Timing", lazilyLoadIfNecessary: true) as? NSObject {
+      EistCarPlayBridge.timing = timing
+    }
+    if !EistCarPlayBridge.timerSyncInstalled {
+      EistCarPlayBridge.timerSyncInstalled = true
+      let names: [Notification.Name] = [
+        UIApplication.didBecomeActiveNotification,
+        UIApplication.willEnterForegroundNotification,
+        UIScene.didActivateNotification,
+        UIScene.willDeactivateNotification,
+        UIScene.didEnterBackgroundNotification,
+      ]
+      for name in names {
+        NotificationCenter.default.addObserver(forName: name, object: nil, queue: nil) { _ in
+          EistCarPlayBridge.syncTimersToPhoneScreen()
+        }
+      }
+    }
+    EistCarPlayBridge.syncTimersToPhoneScreen()
+  }
+
+  // RCTEventEmitter calls these when JS adds/removes its first/last listener.
+  override func startObserving() {
+    hasListeners = true
+    installTimerSync()
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handlePlayRequested),
+      name: EistCarPlayBridge.playRequested,
+      object: nil)
+    // Deliver a tap that landed before JS was ready to hear it.
+    if EistCarPlayBridge.pendingPlay {
+      EistCarPlayBridge.pendingPlay = false
+      sendEvent(withName: EistCarPlayBridge.playEvent, body: nil)
+    }
+  }
+
+  override func stopObserving() {
+    hasListeners = false
+    NotificationCenter.default.removeObserver(self)
+  }
+
+  @objc private func handlePlayRequested() {
+    // JS is subscribed, so consume the buffered intent and forward immediately.
+    EistCarPlayBridge.pendingPlay = false
+    sendEvent(withName: EistCarPlayBridge.playEvent, body: nil)
+  }
+}
+`;
+
+// ObjC registration is required for a Swift RCTEventEmitter to be exported to the
+// JS module registry under the old architecture.
+const EIST_CARPLAY_BRIDGE_OBJC = `#import <React/RCTBridgeModule.h>
+#import <React/RCTEventEmitter.h>
+
+@interface RCT_EXTERN_MODULE(EistCarPlayBridge, RCTEventEmitter)
+@end
+`;
+
+// Phone UI scene. With scenes on, the window must come from the UIWindowScene, reusing the AppDelegate's RN root view.
 const PHONE_SCENE_DELEGATE_SWIFT = `import UIKit
 
 @objc(PhoneSceneDelegate)
@@ -129,9 +253,7 @@ function withCarPlaySceneManifest(config) {
     const infoPlist = config.modResults;
     const existing = infoPlist.UIApplicationSceneManifest || {};
 
-    // Declare both scene roles: the phone window role keeps the normal app UI
-    // alive once multiple scenes are enabled, and the CarPlay role adds the
-    // car screen. $(PRODUCT_MODULE_NAME) is expanded by Xcode at build time.
+    // Declare both scene roles: phone window and CarPlay.
     infoPlist.UIApplicationSceneManifest = {
       ...existing,
       UIApplicationSupportsMultipleScenes: true,
@@ -158,11 +280,7 @@ function withCarPlaySceneManifest(config) {
   });
 }
 
-/**
- * Patch the (generated) AppDelegate so it no longer creates its own UIWindow
- * and instead exposes the RN root view for PhoneSceneDelegate to display.
- * Fails loudly if the expected code shape isn't found.
- */
+/** Patch the generated AppDelegate to expose the RN root view instead of creating a window. Fails loudly on a code shape mismatch. */
 function withCarPlayAppDelegate(config) {
   return withAppDelegate(config, (config) => {
     if (config.modResults.language !== 'swift') {
@@ -220,6 +338,8 @@ function withCarPlaySceneDelegateFiles(config) {
   const files = [
     { name: 'CarPlaySceneDelegate.swift', source: CARPLAY_SCENE_DELEGATE_SWIFT },
     { name: 'PhoneSceneDelegate.swift', source: PHONE_SCENE_DELEGATE_SWIFT },
+    { name: 'EistCarPlayBridge.swift', source: EIST_CARPLAY_BRIDGE_SWIFT },
+    { name: 'EistCarPlayBridge.m', source: EIST_CARPLAY_BRIDGE_OBJC },
   ];
 
   config = withDangerousMod(config, [

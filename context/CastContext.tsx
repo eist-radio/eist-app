@@ -108,19 +108,14 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     let sessionEndedSubscription: any
     let appStateSubscription: any
 
-    // Re-read the authoritative cast state from the SDK and reconcile our
-    // React state with it. Cheap native call; setState bails out when the
-    // value is unchanged, so polling this does not cause needless re-renders.
+    // Reconcile React state with the SDK's cast state. Cheap and safe to poll.
     const syncCastState = async () => {
       try {
         const currentState = await GoogleCast.getCastState()
         setCastState(currentState)
 
         if (currentState === CAST_STATE.CONNECTED) {
-          // Make sure the device name AND play state reflect the live session.
-          // Both can be lost if the onSessionStarted / onSessionResumed and
-          // onMediaStatusUpdated events were missed while JS was suspended in
-          // the background.
+          // Refresh device name and play state, which can be missed while JS is suspended.
           try {
             const sessionManager = GoogleCast.getSessionManager()
             const session = await sessionManager.getCurrentCastSession()
@@ -155,12 +150,7 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
           setCastState(state)
         })
 
-        // Listen for session events via session manager. A session becomes
-        // active either freshly (onSessionStarted) or by being resumed after
-        // the app was backgrounded/suspended or relaunched (onSessionResumed).
-        // iOS delivers the return-from-background case as a *resume*, not a
-        // fresh start, so both must be handled or the device name / play state
-        // never comes back when the app returns.
+        // Handle both started and resumed sessions. iOS reports return from background as a resume.
         const sessionManager = GoogleCast.getSessionManager()
 
         const handleSessionActive = async (session: any) => {
@@ -183,10 +173,7 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
           setIsCastPlaying(false)
         })
 
-        // Resync whenever the app returns to the foreground. onCastStateChanged
-        // events that fire while JS is suspended are dropped, and getCastState()
-        // can be briefly stale right as iOS wakes the app, so resync immediately
-        // and retry a couple of times to settle on the true session state.
+        // Resync on foreground, with retries: events are dropped while suspended and state can be briefly stale.
         appStateSubscription = AppState.addEventListener('change', (next) => {
           if (next === 'active') {
             syncCastState()
@@ -233,12 +220,7 @@ export const CastProvider = ({ children }: { children: ReactNode }) => {
     return 'not_connected'
   }
 
-  // Monitor media status for play state while connected. Idiomatic RNGC:
-  // subscribe to the client's onMediaStatusUpdated event (this is what the
-  // library's own useMediaStatus hook does) rather than polling — the receiver
-  // pushes status changes, so this stays accurate without a timer. The
-  // foreground resync (syncCastState) re-seeds this after a background gap,
-  // where in-background events would have been dropped.
+  // Track play state from onMediaStatusUpdated (like RNGC's useMediaStatus). Foreground resync covers missed events.
   useEffect(() => {
     if (!isCastConnected || isWeb || !GoogleCast) {
       setIsCastPlaying(false)

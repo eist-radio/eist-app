@@ -24,12 +24,7 @@ import { NotificationProvider } from '../context/NotificationContext';
 import { TrackPlayerProvider } from '../context/TrackPlayerContext';
 import { EistDarkTheme, EistLightTheme } from '../themes';
 
-// React Query doesn't know about connectivity in React Native unless wired up.
-// Without this it assumes "always online", so queries that fail in airplane
-// mode exhaust their retries and never refetch when the network returns —
-// leaving the Artists and Listen-back pages stuck empty. Wiring onlineManager
-// to NetInfo makes offline queries pause and automatically resume/refetch on
-// reconnect.
+// Wire React Query's onlineManager to NetInfo so offline queries pause and refetch on reconnect.
 if (Platform.OS !== 'web') {
   onlineManager.setEventListener((setOnline) => {
     return NetInfo.addEventListener((state) => {

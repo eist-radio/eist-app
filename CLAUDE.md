@@ -1,172 +1,77 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Build and deploy notes for the éist radio app (React Native, Expo SDK 53, EAS Build).
 
-## Project Overview
+## Rules
 
-This is a React Native/Expo app for streaming éist radio. The app provides live radio streaming with metadata display, schedule viewing, and social media integration. It supports iOS, Android, and web platforms.
+- Never commit superpower plan docs (`docs/superpowers/`, `.superpowers/`).
+- The app uses native modules, so you can't use Expo Go. Use a development build.
+- You only need a new development build when native code changes (new native packages, config plugins, `app.config.ts`, patches). JS changes hot reload.
 
-## Common Commands
+## Local development
 
-### Development
 ```bash
-npm install             # Install dependencies
-npm start               # Start Expo development server
-npm run android         # Run on Android device/emulator
-npm run ios             # Run on iOS device/simulator
-npm run web             # Start web development server
-npm run lint            # Run ESLint
+npm install                     # also runs patch-package (patches/)
+npx expo start --tunnel --clear # serve JS to the dev build
+npm run lint
+npx tsc --noEmit                # typecheck
 ```
 
-### EAS Build & Deploy
+`make check` runs lint, typecheck, and `expo-doctor`.
+
+## EAS build profiles (`eas.json`)
+
+- `development`: dev client, internal distribution, CarPlay enabled.
+- `preview`: store distribution, iOS simulator build.
+- `production`: store distribution, `autoIncrement` build numbers, `API_KEY` from EAS secrets, CarPlay enabled.
+- `production-local`: same as `production` but for `--local` builds, so `API_KEY` must be in your local environment.
+
+The RadioCult API key reaches the app through `process.env.API_KEY` in `app.config.ts` (`extra.apiKey`).
+Builds without it can't fetch live metadata or schedules.
+
+`.easignore` excludes `ios/` and `android/` so EAS always runs a fresh prebuild.
+Don't remove that, a stale local prebuild once dropped the Cast SDK `Info.plist` keys from iOS builds.
+
+## Build and submit
+
+Bump `version` in `app.json` first.
+Build numbers are remote (`appVersionSource: remote`) and auto increment.
+
 ```bash
-npx expo start --tunnel                    # Development with tunnel
-npx expo start --tunnel --clear           # Development with cache clear
-eas build --platform ios --profile development    # iOS development build
-eas build --platform ios                          # iOS production build
-eas build --platform android                      # Android production build
-eas submit --platform ios                         # Submit to App Store
-eas submit --platform android                     # Submit to Google Play
-eas credentials --platform ios                    # Manage iOS credentials
+eas build --platform all --profile production --auto-submit   # both stores in one go
+eas build --platform ios                                      # or one platform at a time
+eas submit --platform ios
+eas build --platform android
+eas submit --platform android
 ```
 
-## Tech Stack & Architecture
+Development builds:
 
-### Core Technologies
-- **React Native 0.79.5** with **Expo 53.0.22**
-- **React 19.0.0** with **React DOM 19.0.0**
-- **Expo Router** for file-based navigation
-- **TypeScript** with strict mode enabled
-- **React Query (@tanstack/react-query)** for data fetching
-- **React Native Track Player 4.1.2** (@doublesymmetry/react-native-track-player) for audio streaming
-
-### Key Dependencies
-- **Audio**: @doublesymmetry/react-native-track-player, expo-audio
-- **Navigation**: @react-navigation/native, @react-navigation/bottom-tabs, expo-router
-- **Network**: @react-native-community/netinfo
-- **Storage**: @react-native-async-storage/async-storage
-- **UI**: @expo/vector-icons, @fortawesome/react-native-fontawesome
-- **Media**: expo-image, expo-video, react-native-svg, shaka-player
-- **Sharing**: react-native-share, expo-sharing, react-native-view-shot
-- **Other**: react-native-webview, expo-web-browser, expo-haptics, react-native-dotenv
-
-### Application Architecture
-
-#### Core Context System
-- **TrackPlayerContext** (`context/TrackPlayerContext.tsx`): Central audio management with comprehensive error handling, network recovery, background playback support, and CarPlay/Android Auto integration
-- **NotificationContext** (`context/NotificationContext.tsx`): Manages show reminders and artist subscriptions (local scheduled notifications), permission state, and AsyncStorage persistence. Consumed via the `useNotifications()` hook.
-- **CastContext** (`context/CastContext.tsx`): Google Cast / AirPlay state.
-
-#### Navigation & Routing
-
-The primary UI is **not** bottom tabs — it's a horizontal **swipe Pager** (`components/Pager.tsx`) rendered by `app/index.tsx`. Each swipe page is a component in `components/screens/`. Detail pages are separate Expo Router routes navigated to via `router.push`.
-
-```
-app/
-├── _layout.tsx              # Root Stack layout: providers (Query, Cast, TrackPlayer,
-│                            #   Notification) + animated splash screen. Header hidden;
-│                            #   horizontal slide transitions.
-├── index.tsx                # Renders <Pager /> (the swipe deck)
-├── show/[slug].tsx          # Show detail page (radiocult schedule)
-├── artist/[slug].tsx        # Artist detail page
-├── archive/[slug].tsx       # Archived show detail page (worker API)
-└── +not-found.tsx           # 404 error page
-
-components/
-├── Pager.tsx                # Horizontal paging ScrollView; PAGE_COUNT (theme/tokens.ts)
-│                            #   pages, shared spinning-logo overlay, Pills indicator.
-└── screens/                 # One component per swipe page (props: { pageIndex, isActive })
-    ├── ListenScreen.tsx     #   0 · live player
-    ├── ScheduleScreen.tsx   #   1 · schedule (live/upcoming)
-    ├── ArtistsScreen.tsx    #   2 · artists
-    ├── ArchiveScreen.tsx    #   3 · archive / listen back
-    ├── NotificationsScreen.tsx  # 4 · active reminders (clear show reminders/artist subs)
-    └── ConnectScreen.tsx    #   5 · external links, last page (incl. "Support us" → eist.radio/support)
+```bash
+eas build --platform ios --profile development
+eas build --platform android --profile development --local
 ```
 
-To add/remove a swipe page: update `PAGE_COUNT` in `theme/tokens.ts` and the index→component mapping in `components/Pager.tsx`. The `Pills` indicator reads `PAGE_COUNT` automatically.
+## Credentials
 
-#### Audio Streaming Architecture
-- **TrackPlayerService** (`trackPlayerService.js`): Background service handling remote controls, CarPlay events, and audio session management
-- **Live Metadata API**: Real-time show information from `https://api.radiocult.fm/api/station/eist/schedule/live`
-- **Stream URL**: `https://eist-radio.radiocult.fm/stream`
-- **Cross-platform Support**: Web uses HTML5 Audio, mobile uses react-native-track-player
+- iOS: App Store Connect API key managed by EAS (`eas credentials --platform ios`, then "App Store Connect: Manage your API Key"). `submit.production.ios.ascAppId` is `6746519137`. Bundle ID is `com.oootini.eistapp`.
+- Android: `./google-service-account.json` (gitignored and easignored), submits to the `production` track.
 
-#### Data APIs (`config.ts`)
-Two distinct backends — keep them straight:
-- **RadioCult** (`https://api.radiocult.fm`): live metadata, schedule, show & artist detail pages. Authenticated with `apiKey` (from EAS/Expo `extra`). Used by ListenScreen, ScheduleScreen, `app/show/[slug].tsx`, `app/artist/[slug].tsx`.
-- **éist worker API** (`EIST_API_BASE_URL` = `https://eist-api.johnocallaghan.workers.dev`, endpoints in `EIST_API_ENDPOINTS`): archive shows and artist stats/mapping. Used by `hooks/useArchiveShows.ts` and `hooks/useArtists.ts`. **This is production code.** The worker source is **not** in this repo — it's a separate Cloudflare Worker project maintained in its own repository, and the app only talks to the deployed URL above over HTTP.
+## CarPlay
 
-#### Theming (`theme/tokens.ts`)
-- `colors` — `purple` (bg), `green` (`#AFFC41`), `text` (`#E7E5E5` "Alabaster gray", secondary text), `textDim` (translucent gray for placeholders), `pillDim`. There is **no** `bone`/`boneDim` token (renamed to `text`/`textDim`).
-- **Eyebrows** (`components/ui/Eyebrow.tsx`) default to `text` (Alabaster gray); the only green eyebrow is the Listen screen "on air" live indicator (explicit `color={colors.green}`).
-- **Colour convention:** `green` is used for headings/titles, links, and the "now playing" context — the Listen screen's current-show artist and the schedule live ("NOW") row (whole row green). `text`/`textDim` (gray) is for all other secondary text — body/descriptions, dates/times, captions, and **artist-name subtitles in lists** (archive, non-live schedule rows).
-- `font`, `type` (shared text-style fragments; colour applied at call site), `space`, `PAGE_COUNT`.
+CarPlay is behind `EXPO_ENABLE_CARPLAY=true` (`app.config.ts` adds `plugins/withCarPlay.js`).
+The `development`, `production`, and `production-local` profiles set it.
+It needs the `com.apple.developer.carplay-audio` entitlement approved for the App ID and included in the EAS provisioning profile (`eas credentials`).
+To prebuild locally with it:
 
-#### State Management Patterns
-- React Context for global audio state
-- React Query for server state and caching
-- AsyncStorage for persistence (play state, preferences)
-- Network connectivity monitoring with automatic recovery
+```bash
+EXPO_ENABLE_CARPLAY=true npx expo prebuild -p ios --clean
+```
 
-### Platform-Specific Configurations
+Android Auto (`plugins/withAndroidAuto.js`) is always on.
 
-#### iOS (`app.config.ts`)
-- Background audio capabilities
-- CarPlay/AirPlay support
-- Audio session configuration
-- URL scheme handling for Mixcloud integration
-- App Transport Security exceptions
+## Web preview
 
-#### Android
-- Foreground service permissions for background playback
-- Media playback service configuration
-- Wake lock permissions
-
-#### In-car (CarPlay / Android Auto)
-Both are custom Expo config plugins (no third-party CarPlay/Android Auto npm package). They surface react-native-track-player's existing media session — éist logo artwork + play/pause on the current show — in the car. No browse UI beyond a single live-radio item.
-- **Android Auto** (`plugins/withAndroidAuto.js`): **enabled.** Injects a native `MediaBrowserService` (Kotlin) that binds to RNTP's `MusicService`, reflects out its `MediaSessionCompat` token, exposes one playable "éist radio" item, and fixes `DISPLAY_SUBTITLE`. Adds the `automotive_app_desc.xml` + manifest declarations.
-- **CarPlay** (`plugins/withCarPlay.js`): **gated, disabled by default** (behind `EXPO_ENABLE_CARPLAY=true`, see `app.config.ts`) only because the `com.apple.developer.carplay-audio` entitlement needs Apple approval + a matching provisioning profile — not because it's incomplete. When enabled it adds that entitlement and converts the app to the UIScene lifecycle, declaring **both** scene roles: a phone `UIWindowSceneSessionRoleApplication` (`PhoneSceneDelegate`, which now owns the RN root window) and the CarPlay `CPTemplateApplicationSceneSessionRoleApplication` (`CarPlaySceneDelegate`). The full scene conversion is required — declaring only the CarPlay scene orphaned the phone window and black-screened on device. `CarPlaySceneDelegate` roots CarPlay on a one-item `CPListTemplate` ("éist") and *pushes* `CPNowPlayingTemplate.shared` when tapped (Apple forbids the Now Playing template as a root template — it must be pushed onto a browsable root). The Now Playing play/pause button reuses the `MPRemoteCommandCenter` commands handled in `trackPlayerService.js`. **Gotcha:** that button stays disabled unless the RNTP `capabilities` include `Pause` as well as `Play` (`utils/trackPlayerSetup.ts`) — Play/Stop alone leaves it inert.
-  - **To turn CarPlay on** (all three required first): 1) request the CarPlay "audio" entitlement for the App ID in the Apple Developer portal and wait for approval; 2) ensure the EAS provisioning profile includes `com.apple.developer.carplay-audio` (`eas credentials`); 3) build with the flag, e.g. `EXPO_ENABLE_CARPLAY=true eas build -p ios` (or `EXPO_ENABLE_CARPLAY=true npx expo prebuild -p ios --clean` locally).
-
-### Key Features
-- **Live Radio Streaming**: Continuous audio with metadata updates
-- **Background Playback**: Continues playing when app is backgrounded
-- **CarPlay**: Minimal integration with vehicle systems.
-- **Network Recovery**: Automatic reconnection on network changes
-- **Show Schedule**: Live and upcoming show information with FormattedShowTitle component
-- **Notifications**: Per-show reminders and artist subscriptions (local scheduled notifications); the Active Notifications swipe page lists and clears them. Not available on web.
-- **Social Integration**: Links to Discord, Instagram, SoundCloud, Mixcloud, plus "Support us" (eist.radio/support)
-- **Cross-platform**: iOS, Android, and web support
-
-### UI Components
-
-#### FormattedShowTitle Component (`components/FormattedShowTitle.tsx`)
-- **Purpose**: Handles special formatting for show titles containing "éist arís" text
-- **Functionality**: 
-  - Replaces "éist arís" text with repeat icons (Ionicons "repeat")
-  - Handles multiple variations: "éist arís", "eist aris", "(éist arís)", "(eist aris)"
-  - Platform-specific icon alignment adjustments for iOS/Android
-  - Supports both inline (`asContent={true}`) and standalone text rendering
-- **Usage Locations**:
-  - Listen screen: "Next up" and current show titles
-  - Schedule screen: all show titles in the schedule list
-  - Archive screen & archive detail (`app/archive/[slug].tsx`): archived show titles
-  - Notifications screen: show-reminder titles
-  - Show & artist detail pages (`app/show/[slug].tsx`, `app/artist/[slug].tsx`)
-- **Text Wrapping**: No ellipsizeMode - titles wrap naturally over multiple lines within their container constraints
-- **Props**: `title`, `color`, `size`, `style`, `numberOfLines`, `asContent`, etc.
-
-## Important Implementation Notes
-
-### Audio Session Management
-- The app implements comprehensive audio session recovery for iOS CarPlay/AirPlay interruptions
-- Always use `cleanResetPlayer()` before starting new streams to prevent buffering issues
-- Track metadata is preserved during stops for lock screen/CarPlay display
-
-### Build Considerations
-- Uses EAS Build for production builds
-- Development builds required for native dependencies (can't use Expo Go)
-- Environment variables configured through EAS secrets for production builds
-- Apple Developer license required for iOS distribution
-- Never commit superpower plan docs
+`.github/workflows/preview.yml` deploys a web export (`npx expo export --platform web`) to Netlify for every PR.
+It needs the `RADIOCULT_API_KEY`, `NETLIFY_AUTH_TOKEN`, and `NETLIFY_SITE_ID` repo secrets.
+`make preview` does the same export locally and serves it on port 3000.

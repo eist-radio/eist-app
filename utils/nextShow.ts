@@ -1,8 +1,5 @@
 // utils/nextShow.ts
-//
-// Shared helpers for resolving an artist's next (non-repeat) upcoming show
-// from the RadioCult schedule, plus a friendly date formatter. Used by the
-// artist detail page and the Active reminders screen.
+// An artist's next non-repeat show from the RadioCult schedule, plus a date formatter.
 
 import { apiKey } from '../config';
 import { formatClockTime } from './formatTime';

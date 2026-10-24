@@ -6,6 +6,7 @@ import TrackPlayer, {
     Capability,
     IOSCategory
 } from 'react-native-track-player';
+import { Platform } from 'react-native';
 import { setupAndroidNotificationChannel } from './androidNotificationSetup';
 
 export const setupTrackPlayer = async () => {
@@ -16,7 +17,8 @@ export const setupTrackPlayer = async () => {
     // Player setup - Optimized for live radio streaming
     await TrackPlayer.setupPlayer({
       maxBuffer: 8,
-      minBuffer: 3,
+      // Android only. On iOS a non-zero minBuffer turns off AVPlayer's stall waiting, causing tiny skips.
+      minBuffer: Platform.OS === 'ios' ? undefined : 3,
       playBuffer: 1.5,
       backBuffer: 0,
       iosCategory: IOSCategory.Playback,
@@ -25,6 +27,16 @@ export const setupTrackPlayer = async () => {
       autoUpdateMetadata: true,
     });
 
+    await applyPlayerOptions();
+  } catch (error) {
+    console.error('TrackPlayer setup error:', error);
+    throw error;
+  }
+};
+
+// Capabilities and Android behaviour. Also re-applied when setupPlayer() reports "already initialized".
+export const applyPlayerOptions = async () => {
+  try {
     // Options setup - Enhanced for Android Auto
     await TrackPlayer.updateOptions({
       android: {
@@ -32,15 +44,8 @@ export const setupTrackPlayer = async () => {
         alwaysPauseOnInterruption: true,
       },
       
-      // Capabilities for live radio. Play+Pause is the standard pattern for
-      // car/lock-screen: a single toggle button. Stop is intentionally omitted —
-      // TrackPlayer.stop() tears down the Android foreground service, which kills
-      // the MusicService and breaks the MediaBrowserService binding. Android Auto
-      // then can't send play commands and the app appears dead (Google Play
-      // rejection: "pressing stop completely stop app"). Pause keeps the service
-      // alive; the RemotePause handler in trackPlayerService.js treats
-      // pause-while-playing as a live-radio stop, and pause-while-stopped as a
-      // fresh-stream start.
+      // Play+Pause only: stop() kills the Android foreground service. RemotePause handles stop/start for live radio.
+      // Governs the lock screen and notification only. Android Auto's buttons come from transportActions() in plugins/withAndroidAuto.js.
       capabilities: [
         Capability.Play,
         Capability.Pause,
@@ -58,7 +63,7 @@ export const setupTrackPlayer = async () => {
       progressUpdateEventInterval: 1,
     });
   } catch (error) {
-    console.error('TrackPlayer setup error:', error);
+    console.error('TrackPlayer options error:', error);
     throw error;
   }
 };

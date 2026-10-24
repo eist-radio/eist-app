@@ -18,13 +18,8 @@ export const font = {
 export const PAGE_COUNT = 6;
 export const space = { screenX: 30, topGap: 6 } as const;
 
-// shared text fragments (colour applied at call site)
-//
-// Type follows a golden-ratio (φ ≈ 1.618) ladder anchored on the 16px eyebrow:
-// 16 (secondary) → 26 (×φ, row/section titles) → 42 (×φ², page & detail heads).
-// Everything secondary — eyebrow, rowSub, meta, bio — sits at the 16 tier and is
-// differentiated by weight, colour and tracking rather than size, so the three
-// sizes read as one clean φ hierarchy across every page.
+// Shared text fragments (colour applied at call site).
+// Type sizes 16/26/42 follow a φ scale. Secondary text stays at 16 and varies by weight and colour.
 export const type = {
   eyebrow: { fontFamily: font.body, fontWeight: '600', fontSize: 16, letterSpacing: 0.3 } as TextStyle,
   pagehead: { fontFamily: font.headingBold, fontWeight: '700', fontSize: 42, lineHeight: 43, letterSpacing: -0.8 } as TextStyle,

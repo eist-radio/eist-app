@@ -3,26 +3,8 @@ const { mergeContents } = require('@expo/config-plugins/build/utils/generateCode
 const fs = require('fs');
 const path = require('path');
 
-// React Native 0.79 bundles fmt 11.0.2, whose consteval format-string checking
-// fails to compile under the Clang shipped with Xcode 26 (the iOS 26 SDK image
-// the store profiles build against):
-//
-//   call to consteval function 'fmt::basic_format_string<...>' is not a
-//   constant expression
-//
-// fmt's include/fmt/base.h selects consteval based on the compiler and, on
-// Xcode 26's Clang (__cpp_consteval defined, Apple clang >= 14), forces
-// FMT_USE_CONSTEVAL to 1. Crucially that block has NO `#ifndef FMT_USE_CONSTEVAL`
-// guard, so a `-DFMT_USE_CONSTEVAL=0` preprocessor define is simply redefined
-// away by the header itself -- which is why setting GCC_PREPROCESSOR_DEFINITIONS
-// had no effect. The only reliable fix is to edit the header: append an
-// `#undef`/`#define FMT_USE_CONSTEVAL 0` immediately before the `#if
-// FMT_USE_CONSTEVAL` gate so FMT_CONSTEVAL expands to nothing and fmt falls back
-// to runtime format-string checks.
-//
-// This runs in the Podfile post_install (not the Expo dangerous-mod) because the
-// fmt pod sources are only downloaded into Pods/ during `pod install`, after
-// prebuild has finished. The patch is idempotent via the marker comment.
+// RN 0.79's fmt 11.0.2 consteval checks fail under Xcode 26's Clang, and a -D define can't override them.
+// Patch the fmt header in Podfile post_install (pods aren't downloaded at prebuild). Idempotent via a marker.
 const FMT_FIX = `
     # [withFmtConstevalFix] Force fmt 11.0.2 to use runtime (not consteval)
     # format-string checks so it compiles under Xcode 26's Clang. base.h has no
@@ -50,10 +32,7 @@ const FMT_FIX = `
       Pod::UI.warn "[withFmtConstevalFix] fmt base.h not found at #{fmt_base}; skipping consteval patch"
     end`;
 
-/**
- * Expo config plugin: patch the iOS Podfile post_install to disable fmt's
- * consteval format-string checking (Xcode 26 / fmt 11.0.2 incompatibility).
- */
+/** Expo config plugin: disable fmt's consteval checks in Podfile post_install (Xcode 26 fix). */
 function withFmtConstevalFix(config) {
   return withDangerousMod(config, [
     'ios',

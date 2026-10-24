@@ -1,10 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-/**
- * Custom hook to detect timezone changes
- * Returns the current timezone and automatically updates when it changes
- */
+/** Current timezone, updated when it changes. */
 export function useTimezoneChange() {
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   const timezoneRef = useRef(timezone);
@@ -18,11 +15,7 @@ export function useTimezoneChange() {
       }
     };
 
-    // Check timezone when app becomes active (most common scenario for timezone changes)
-    // This covers the vast majority of timezone change scenarios:
-    // - User changes timezone in system settings
-    // - User travels to different timezone
-    // - User returns to app after timezone change
+    // Re-check when the app becomes active (settings change or travel).
     const subscription = AppState.addEventListener('change', (nextState) => {
       if (nextState === 'active') {
         checkTimezone();

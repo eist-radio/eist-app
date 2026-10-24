@@ -1,8 +1,49 @@
 diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
-index b2409a0..42efd37 100644
+index b2409a0..9163e21 100644
 --- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
 +++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/module/MusicModule.kt
-@@ -545,7 +545,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -32,6 +32,8 @@ import javax.annotation.Nonnull
+ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaModule(reactContext),
+     ServiceConnection {
+     private var playerOptions: Bundle? = null
++    // Last updateOptions(), re-applied when a new MusicService is adopted (JS can't see the rebind).
++    private var lastOptions: Bundle? = null
+     private var isServiceBound = false
+     private var playerSetUpPromise: Promise? = null
+     private val scope = MainScope()
+@@ -50,14 +52,19 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+ 
+     override fun onServiceConnected(name: ComponentName, service: IBinder) {
+         scope.launch {
+-            // If a binder already exists, don't get a new one
+-            if (!::musicService.isInitialized) {
+-                val binder: MusicService.MusicBinder = service as MusicService.MusicBinder
++            val binder: MusicService.MusicBinder = service as MusicService.MusicBinder
++
++            // Adopt a new service instance on rebind. The original lateinit guard kept calling the dead one.
++            if (!::musicService.isInitialized || musicService !== binder.service) {
+                 musicService = binder.service
+                 musicService.setupPlayer(playerOptions)
+-                playerSetUpPromise?.resolve(null)
++                lastOptions?.let { musicService.updateOptions(it) }
+             }
+ 
++            // Resolve on every connect, or a rebind leaves setupPlayer() pending forever. Cleared after use.
++            playerSetUpPromise?.resolve(null)
++            playerSetUpPromise = null
++
+             isServiceBound = true
+         }
+     }
+@@ -257,6 +264,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+         val options = Arguments.toBundle(data)
+ 
+         options?.let {
++            lastOptions = it
+             musicService.updateOptions(it)
+         }
+ 
+@@ -545,7 +553,7 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          if (verifyServiceBoundOrReject(callback)) return@launch
  
          if (index >= 0 && index < musicService.tracks.size) {
@@ -11,7 +52,7 @@ index b2409a0..42efd37 100644
          } else {
              callback.resolve(null)
          }
-@@ -584,9 +584,9 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
+@@ -584,9 +592,9 @@ class MusicModule(reactContext: ReactApplicationContext) : ReactContextBaseJavaM
          if (verifyServiceBoundOrReject(callback)) return@launch
          callback.resolve(
              if (musicService.tracks.isEmpty()) null
@@ -24,3 +65,48 @@ index b2409a0..42efd37 100644
          )
      }
  
+diff --git a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
+index afa6b0f..a53dcb9 100644
+--- a/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
++++ b/node_modules/react-native-track-player/android/src/main/java/com/doublesymmetry/trackplayer/service/MusicService.kt
+@@ -94,6 +94,13 @@ class MusicService : HeadlessJsTaskService() {
+     private var compactCapabilities: List<Capability> = emptyList()
+ 
+     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
++        // Null intent = START_STICKY restart after process death. No player and no FGS exemption, so bail out
++        // instead of crashing with ForegroundServiceStartNotAllowedException in a loop.
++        if (intent == null) {
++            stopSelf()
++            return START_NOT_STICKY
++        }
++
+         startTask(getTaskConfig(intent))
+         startAndStopEmptyNotificationToAvoidANR()
+         return START_STICKY
+@@ -120,9 +127,23 @@ class MusicService : HeadlessJsTaskService() {
+             notificationBuilder.foregroundServiceBehavior = NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE
+         }
+         val notification = notificationBuilder.build()
+-        startForeground(EMPTY_NOTIFICATION_ID, notification)
+-        @Suppress("DEPRECATION")
+-        stopForeground(true)
++        try {
++            startForeground(EMPTY_NOTIFICATION_ID, notification)
++            @Suppress("DEPRECATION")
++            stopForeground(true)
++        } catch (error: Exception) {
++            // A refused background start degrades the ANR workaround instead of killing the process.
++            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
++                error is ForegroundServiceStartNotAllowedException
++            ) {
++                Timber.e(
++                    "ForegroundServiceStartNotAllowedException: App tried to start a foreground Service when it was not allowed to do so.",
++                    error
++                )
++            } else {
++                Timber.e("Failed to start the empty ANR-avoidance notification.", error)
++            }
++        }
+     }
+ 
+     @MainThread

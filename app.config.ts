@@ -2,19 +2,13 @@
 import { ConfigContext, ExpoConfig } from '@expo/config';
 
 export default ({ config }: ConfigContext): ExpoConfig => {
-  // CarPlay is gated behind an env flag: the plugin adds the
-  // `com.apple.developer.carplay-audio` entitlement, which Apple must approve on
-  // the App ID and which must be in the EAS signing profile before it can build.
-  // Until then it stays unloaded, so it cannot affect the current build. To work
-  // on it, build with EXPO_ENABLE_CARPLAY=true (see plugins/withCarPlay.js).
+  // CarPlay needs the Apple-approved carplay-audio entitlement, so it only loads with EXPO_ENABLE_CARPLAY=true.
   const carPlayPlugins =
     process.env.EXPO_ENABLE_CARPLAY === 'true' ? ['./plugins/withCarPlay'] : [];
 
   return {
   ...config,
-  // Drives the iOS Xcode project/scheme name (sanitized ASCII). Kept as plain
-  // "eist" so the scheme is "eist" rather than "ist" (the fada in "éist" gets
-  // stripped). The user-facing app name keeps the fada via CFBundleDisplayName.
+  // Plain "eist" so the Xcode scheme isn't "ist". The display name keeps the fada.
   name: 'eist',
   slug: config.slug ?? 'eist-app',
   extra: {
@@ -35,14 +29,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     }],
     ["react-native-google-cast", {
       receiverAppId: "7A2782C8",
-      // Pin the Android Cast framework: the default "+" resolves to 22.x, which
-      // is compiled with Kotlin 2.2.0 metadata and fails compileReleaseKotlin
-      // under Expo SDK 53's Kotlin 2.0.21. 21.4.0 is the latest Kotlin-2.0-safe release.
+      // Cast 22.x needs Kotlin 2.2. 21.4.0 is the latest that builds with SDK 53's Kotlin 2.0.21.
       androidPlayServicesCastFrameworkVersion: "21.4.0",
-      // Must stay false: the native iOS Cast button hides itself while the
-      // state is noDevicesAvailable, so deferring discovery until "first tap"
-      // is a catch-22 (you can't tap a hidden button). Autostarting discovery
-      // at launch lets the button appear as soon as a device is found.
+      // Must stay false: the iOS Cast button stays hidden until discovery finds a device.
       iosStartDiscoveryAfterFirstTapOnCastButton: false,
       iosSuspendSessionsWhenBackgrounded: false
     }],

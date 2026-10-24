@@ -1,8 +1,5 @@
 // hooks/useShareShow.ts
-//
-// Capture + share orchestration for the show share card. Given a ref to an
-// off-screen ShareCard, captures it at a crisp 1080×1920 PNG and opens the
-// system share sheet. Native-only (view-shot / sharing don't exist on web).
+// Captures the off-screen ShareCard as a 1080×1920 PNG and opens the share sheet. Native only.
 import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
 import { Alert, Image, Platform, View } from 'react-native';
@@ -22,9 +19,7 @@ export function useShareShow({
     if (Platform.OS === 'web' || isSharing) return;
     setIsSharing(true);
     try {
-      // Warm the remote artwork into cache so the off-screen card has it painted,
-      // then give it a beat to render before we snapshot. Best-effort: on failure
-      // the card falls back to the bundled éist image and we still capture.
+      // Warm the artwork cache and let the card render before capturing. Falls back to the bundled image.
       if (artworkUrl) {
         try {
           await Image.prefetch(artworkUrl);

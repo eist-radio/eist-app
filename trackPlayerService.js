@@ -1,11 +1,20 @@
 // trackPlayerService.js
 import TrackPlayer, { Event, State } from 'react-native-track-player';
+import { ensurePlayerSetup } from './utils/ensurePlayerSetup';
+import { isRebuildingStream, markStreamRebuild, playIntent } from './utils/playIntent';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
 // Start fresh stream
 const startFreshStream = async () => {
+  // Every remote start goes through here, so this is where the listener's
+  // intent to play is recorded for the recovery paths in TrackPlayerContext.
+  playIntent.current = true;
   try {
+    // CarPlay can reach this without the UI mounting, so make sure the player is set up.
+    await ensurePlayerSetup();
+
+    markStreamRebuild();
     // Stop current playback
     await TrackPlayer.stop().catch(() => {});
     
@@ -48,6 +57,9 @@ const startFreshStream = async () => {
 };
 
 module.exports = async function() {
+  // Set up the player at service start, so remote commands work without the UI.
+  ensurePlayerSetup().catch((e) => console.error('Playback service setup failed:', e));
+
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
     try {
       await startFreshStream();
@@ -83,27 +95,32 @@ module.exports = async function() {
     }
   });
 
-  // For live radio, "pause" means stop while playing. But CarPlay's Now Playing
-  // button is a play/pause toggle, and iOS may route a tap-from-stopped through
-  // the pause/toggle command (RNTP's toggle handler emits RemotePause from any
-  // non-paused state, including .stopped). So make this state-aware: start the
-  // stream when nothing is playing, otherwise pause. This keeps the single car
-  // button working in both directions regardless of which command iOS sends.
-  // We use pause() instead of stop() to keep the Android foreground service alive
-  // so the media session survives and play can resume from Android Auto / car OS.
+  // CarPlay's toggle can send pause while stopped, so start the stream when nothing is playing, otherwise pause.
+  // pause(), not stop(), keeps the Android foreground service alive for Android Auto.
   const NON_PLAYING_STATES = [
     State.Stopped,
     State.Paused,
     State.Ready,
     State.None,
     State.Ended,
+    // An errored player has to be rebuilt. pause() leaves it in error, so a
+    // headset, knob, or toggle press would never get the stream back.
+    State.Error,
   ];
   TrackPlayer.addEventListener(Event.RemotePause, async () => {
     try {
+      await ensurePlayerSetup();
       const { state } = await TrackPlayer.getPlaybackState();
-      if (NON_PLAYING_STATES.includes(state)) {
+      // Still starting up (ready mid-rebuffer, or stopped/none during a rebuild): a pause here means stop.
+      const isStartingUp =
+        playIntent.current &&
+        (state === State.Ready ||
+          ((state === State.Stopped || state === State.None) && isRebuildingStream()));
+      const willRestart = !isStartingUp && NON_PLAYING_STATES.includes(state);
+      if (willRestart) {
         await startFreshStream();
       } else {
+        playIntent.current = false;
         await TrackPlayer.pause();
       }
     } catch (error) {
@@ -120,9 +137,16 @@ module.exports = async function() {
     // nothing
   });
 
-  // Use pause() instead of stop() to keep the Android foreground service alive.
-  // stop() tears down the service, which kills the MusicService and breaks the
-  // MediaBrowserService binding — making it impossible to play again from
-  // Android Auto without restarting the app.
-  TrackPlayer.addEventListener(Event.RemoteStop, () => TrackPlayer.pause());
+  // pause(), not stop(): stop() kills the foreground service and breaks Android Auto.
+  TrackPlayer.addEventListener(Event.RemoteStop, async () => {
+    playIntent.current = false;
+    // A failed setup must not swallow the stop. Pause regardless: on a live
+    // player it stops the audio, and on a dead one it is a harmless no-op.
+    try {
+      await ensurePlayerSetup();
+    } catch (error) {
+      console.error('Remote stop setup error:', error);
+    }
+    await TrackPlayer.pause().catch((error) => console.error('Remote stop error:', error));
+  });
 };

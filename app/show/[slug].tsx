@@ -55,9 +55,7 @@ type Artist = {
 };
 
 async function fetchEventById(id: string): Promise<RawScheduleItem> {
-  // Start the window one day earlier (yesterday 00:00) so a show that began
-  // before today's UTC midnight — including the currently-live and late-night
-  // shows — still falls inside the lookup range (matches ScheduleScreen).
+  // Start from yesterday 00:00 so live and late-night shows fall in range (matches ScheduleScreen).
   const start = new Date();
   start.setDate(start.getDate() - 1);
   const end = new Date();
