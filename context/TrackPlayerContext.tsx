@@ -9,11 +9,10 @@ import {
   useRef,
   useState
 } from 'react';
-import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
-import { shouldStartPlaybackForCarPlay } from '../utils/carPlayPlayRequest';
 import {
   ensurePlayerSetup,
   isPlayerResponsive,
@@ -22,6 +21,7 @@ import {
 } from '../utils/ensurePlayerSetup';
 import { getLiveShowInfo } from '../utils/liveShowInfo';
 import {
+  castPlayback,
   endStreamRebuild,
   isRebuildingStream,
   markStreamRebuild,
@@ -124,15 +124,8 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // User intent to play, shared with the playback service. See utils/playIntent.ts.
   const userPlay = playIntent
 
-  // Stable ref for play() so the CarPlay bridge listener never re-subscribes
-  const playRef = useRef<(options?: { castOnly?: boolean }) => Promise<void>>(async () => {})
-
-  // True while a CarPlay-initiated play is running, to drop duplicate requests. See utils/carPlayPlayRequest.ts.
-  const carPlayPlayInFlight = useRef(false)
-
-  // Live cast state for the CarPlay listener. play() while casting reloads the cast media.
-  const isCastPlayingRef = useRef(isCastPlaying)
-  useEffect(() => { isCastPlayingRef.current = isCastPlaying }, [isCastPlaying])
+  // Live cast state for the playback service's CarPlay handler (trackPlayerService.js).
+  useEffect(() => { castPlayback.playing = isCastPlaying }, [isCastPlaying])
 
   // Unified recovery state - keeps trying as long as user hasn't stopped
   const isRecovering = useRef(false);
@@ -660,8 +653,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isPlayerReady, isWeb, setupPlayer, attemptStreamRestart, cleanResetPlayer, fetchAndUpdateShowMetadata, isCastConnected, castPlay, showTitle, showArtist, showArtworkUrl])
 
-  useEffect(() => { playRef.current = play }, [play])
-
   const stop = useCallback(async () => {
     // Clear user intent when manually stopping, and invalidate any recovery
     // attempt still running so it cannot restart the stream.
@@ -864,53 +855,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
 
     previousNetworkState.current = current
   }, [networkState, attemptStreamRestart, isPlaying]) // Keep isPlaying in deps for logging
-
-  // CarPlay play requests (scene connect or list-item tap) from EistCarPlayBridge. Scene re-activation doesn't play.
-  // Now Playing can't cold-start audio, so the native side asks JS to run play().
-  useEffect(() => {
-    if (isWeb || Platform.OS !== 'ios') return
-    const bridge = NativeModules.EistCarPlayBridge
-    if (!bridge) return
-
-    // Decide from the player's real state, not the sticky UI flag. See utils/carPlayPlayRequest.ts.
-    const handleCarPlayPlayRequest = async () => {
-      // Not while a cast device is playing: play() would reload its media.
-      if (isCastPlayingRef.current) {
-        return
-      }
-
-      // Claim the latch before any await. Only the claimer releases it.
-      const requestInFlight = carPlayPlayInFlight.current
-      if (requestInFlight) {
-        // Duplicate request: return without touching the latch.
-        return
-      }
-      carPlayPlayInFlight.current = true
-
-      try {
-        // No answer counts as not playing. play() runs setupPlayer(), which revives a dead service.
-        const state = await probePlaybackState()
-
-        if (!shouldStartPlaybackForCarPlay({ state, requestInFlight })) {
-          return
-        }
-
-        // Bounded so a play() stuck on a native promise or a stalled JS timer
-        // releases the latch instead of holding it for the life of the runtime.
-        await withTimeout(playRef.current(), RECOVERY_TIMEOUT_MS, 'carplay-play')
-      } catch (error: unknown) {
-        console.error('CarPlay play request failed:', error)
-      } finally {
-        carPlayPlayInFlight.current = false
-      }
-    }
-
-    const emitter = new NativeEventEmitter(bridge)
-    const sub = emitter.addListener('EistCarPlayPlay', () => {
-      void handleCarPlayPlayRequest()
-    })
-    return () => sub.remove()
-  }, [isWeb])
 
   useEffect(() => {
     setupPlayer()

@@ -67,6 +67,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       NSAppleMusicUsageDescription: "This app plays audio content and may access your music library for metadata display.",
       // URL schemes for external apps
       CFBundleURLTypes: [
+        // Setting CFBundleURLTypes stops Expo adding the app's own scheme, so list it here (eistapp://carplay-log).
+        {
+          CFBundleURLName: "eistapp",
+          CFBundleURLSchemes: ["eistapp"]
+        },
         {
           CFBundleURLName: "mixcloud",
           CFBundleURLSchemes: ["mixcloud"]

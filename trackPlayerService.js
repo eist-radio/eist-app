@@ -1,18 +1,29 @@
 // trackPlayerService.js
+import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import TrackPlayer, { Event, State } from 'react-native-track-player';
-import { ensurePlayerSetup } from './utils/ensurePlayerSetup';
-import { isRebuildingStream, markStreamRebuild, playIntent } from './utils/playIntent';
+import { carPlayLog } from './utils/carPlayLog';
+import { shouldStartPlaybackForCarPlay } from './utils/carPlayPlayRequest';
+import { ensurePlayerSetup, probePlaybackState } from './utils/ensurePlayerSetup';
+import { castPlayback, isRebuildingStream, markStreamRebuild, playIntent } from './utils/playIntent';
+import { withTimeout } from './utils/withTimeout';
 
 const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
-// Start fresh stream
-const startFreshStream = async () => {
+// Ceiling on one CarPlay start, so a hung native call releases the in-flight latch.
+const CARPLAY_PLAY_TIMEOUT_MS = 30000;
+
+// Start fresh stream. fromCarPlay skips the cleanup delay and logs each step to the CarPlay log.
+const startFreshStream = async ({ fromCarPlay = false } = {}) => {
+  const step = (message) => {
+    if (fromCarPlay) carPlayLog(message);
+  };
   // Every remote start goes through here, so this is where the listener's
   // intent to play is recorded for the recovery paths in TrackPlayerContext.
   playIntent.current = true;
   try {
     // CarPlay can reach this without the UI mounting, so make sure the player is set up.
     await ensurePlayerSetup();
+    step('player set up');
 
     markStreamRebuild();
     // Stop current playback
@@ -24,9 +35,12 @@ const startFreshStream = async () => {
     
     // Reset queue to clear any buffered data
     await TrackPlayer.reset().catch(() => {});
-    
-    // Small delay to ensure cleanup
-    await new Promise(resolve => setTimeout(resolve, 100));
+    step('queue reset');
+
+    // Small delay to ensure cleanup. Not for CarPlay: a JS timer can stall there while the phone screen is off.
+    if (!fromCarPlay) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
     
     // Re-add fresh stream track with preserved metadata if available
     const trackToAdd = {
@@ -40,13 +54,19 @@ const startFreshStream = async () => {
     };
     
     await TrackPlayer.add(trackToAdd);
-    
+    step(`track added: ${trackToAdd.title}`);
+
+    // TrackPlayerContext ramps volume up from 0 on a timer. Make sure an interrupted ramp can't leave this start silent.
+    await TrackPlayer.setVolume(1);
+
     // Start playback with fresh stream
     await TrackPlayer.play();
+    step('play() resolved');
     
     console.log('Fresh stream started from CarPlay/remote control');
   } catch (error) {
     console.error('Error starting fresh stream:', error);
+    step(`start failed: ${error?.message ?? error}`);
     // Fallback to regular play if fresh stream fails
     try {
       await TrackPlayer.play();
@@ -56,11 +76,62 @@ const startFreshStream = async () => {
   }
 };
 
+// CarPlay play requests (scene connect or list-item tap) from EistCarPlayBridge. Now Playing can't cold-start audio.
+// Handled here, not in TrackPlayerContext, so a CarPlay start doesn't depend on React, the Cast probe, or JS timers.
+let carPlayRequestInFlight = false;
+
+const handleCarPlayPlayRequest = async () => {
+  carPlayLog('play event received');
+  // Not while a cast device is playing: a local start would play over it.
+  if (castPlayback.playing) {
+    carPlayLog('skipped, casting');
+    return;
+  }
+  const requestInFlight = carPlayRequestInFlight;
+  carPlayRequestInFlight = true;
+  try {
+    // Decide from the player's real state. See utils/carPlayPlayRequest.ts.
+    const state = await probePlaybackState();
+    carPlayLog(`player state ${state}`);
+    if (!shouldStartPlaybackForCarPlay({ state, requestInFlight })) {
+      carPlayLog(requestInFlight ? 'skipped, request in flight' : 'skipped, already playing');
+      return;
+    }
+    await withTimeout(startFreshStream({ fromCarPlay: true }), CARPLAY_PLAY_TIMEOUT_MS, 'carplay-play');
+    carPlayLog(`start done, player state ${await probePlaybackState()}`);
+  } catch (error) {
+    carPlayLog(`play request failed: ${error?.message ?? error}`);
+  } finally {
+    // Only the request that claimed the latch releases it.
+    if (!requestInFlight) carPlayRequestInFlight = false;
+  }
+};
+
 module.exports = async function() {
+  carPlayLog('playback service started');
   // Set up the player at service start, so remote commands work without the UI.
-  ensurePlayerSetup().catch((e) => console.error('Playback service setup failed:', e));
+  ensurePlayerSetup().catch((e) => {
+    console.error('Playback service setup failed:', e);
+    carPlayLog(`service setup failed: ${e?.message ?? e}`);
+  });
+
+  // Subscribing here, at JS load, also replays a play request that arrived before JS was ready.
+  const carPlayBridge = Platform.OS === 'ios' ? NativeModules.EistCarPlayBridge : undefined;
+  if (carPlayBridge) {
+    new NativeEventEmitter(carPlayBridge).addListener('EistCarPlayPlay', () => {
+      void handleCarPlayPlayRequest();
+    });
+  }
+
+  TrackPlayer.addEventListener(Event.PlaybackState, ({ state }) => {
+    carPlayLog(`state ${state}`);
+  });
+  TrackPlayer.addEventListener(Event.PlaybackError, (error) => {
+    carPlayLog(`playback error: ${error?.code ?? ''} ${error?.message ?? ''}`);
+  });
 
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
+    carPlayLog('remote play');
     try {
       await startFreshStream();
       // Force metadata refresh for Android Auto after play
@@ -108,6 +179,7 @@ module.exports = async function() {
     State.Error,
   ];
   TrackPlayer.addEventListener(Event.RemotePause, async () => {
+    carPlayLog('remote pause');
     try {
       await ensurePlayerSetup();
       const { state } = await TrackPlayer.getPlaybackState();
@@ -139,6 +211,7 @@ module.exports = async function() {
 
   // pause(), not stop(): stop() kills the foreground service and breaks Android Auto.
   TrackPlayer.addEventListener(Event.RemoteStop, async () => {
+    carPlayLog('remote stop');
     playIntent.current = false;
     // A failed setup must not swallow the stop. Pause regardless: on a live
     // player it stops the audio, and on a dead one it is a harmless no-op.
