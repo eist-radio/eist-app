@@ -9,7 +9,7 @@ import {
   useRef,
   useState
 } from 'react';
-import { AppState, NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import { useCast } from './CastContext';
 import { useNetworkConnectivity } from '../hooks/useNetworkConnectivity';
 import { getLockScreenImage, invalidateLockScreenImage, preloadLockScreenImage } from '../utils/androidLockScreenImage';
@@ -134,7 +134,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
   // instead of the value captured on first render. Kept in sync synchronously
   // alongside every setIsPlayerReady call below.
   const isPlayerReadyRef = useRef(isPlayerReady)
-  const wasPlayingBeforeBackground = useRef(false)
 
   // Separate user intent tracking from actual playback state. Shared with the
   // playback service so remote play/pause/stop keep it accurate. See
@@ -425,7 +424,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // isRecovering is cleared in the finally below, and the recovery work is
     // bounded by RECOVERY_TIMEOUT_MS. Both matter: this flag gates EVERY
     // recovery path (playback error, queue ended, the post-network-change
-    // check, the retry timer, app-foregrounded), so a single await that never
+    // check, the retry timer), so a single await that never
     // settles used to latch it true for the life of the JS runtime and leave
     // the stream dead until the app was restarted. A finally alone would not
     // have run on a hung await, which is why the timeout is the real guard and
@@ -965,7 +964,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     previousNetworkState.current = current
   }, [networkState, attemptStreamRestart, isPlaying]) // Keep isPlaying in deps for logging
 
-  // Start playback whenever the éist CarPlay scene becomes active (and as a fallback, when the hidden list item is tapped). CarPlay's Now Playing
+  // Start playback when éist connects on the car screen, or when the driver
+  // taps the éist list item. Not when the scene merely re-activates: coming
+  // back from another app is not a request to play. CarPlay's Now Playing
   // template can only control the already-active now-playing app — it can't
   // cold-start audio — so the native CarPlay scene posts a notification that the
   // EistCarPlayBridge module (only present in CarPlay builds) forwards here, and we
@@ -985,8 +986,7 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
     // silent until the user tapped the button on the phone. The decision now
     // runs off the real playback state, in utils/carPlayPlayRequest.ts.
     const handleCarPlayPlayRequest = async () => {
-      // Returning to éist from another app resumes playback, but not while a
-      // cast device is playing it.
+      // Not while a cast device is playing: play() would reload its media.
       if (isCastPlayingRef.current) {
         return
       }
@@ -1105,7 +1105,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
           error.message?.includes('carplay') ||
           error.message?.includes('android auto') ||
           error.message?.includes('bluetooth')) {
-          wasPlayingBeforeBackground.current = isPlayingRef.current
           try {
             await stop()
           } catch (stopError) {
@@ -1129,22 +1128,10 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         }
       )
 
-      const onAppState = AppState.addEventListener('change', async (next) => {
-        if (next === 'active') {
-          // Check if we should resume playback after returning from background
-          setTimeout(async () => {
-            if (wasPlayingBeforeBackground.current && !isPlayingRef.current) {
-              wasPlayingBeforeBackground.current = false
-              // Set user intent before attempting restart
-              userPlay.current = true
-              await attemptStreamRestart('app-foregrounded')
-            }
-          }, 1000)
-        } else if (next === 'background' || next === 'inactive') {
-          // Remember if we were playing before going to background
-          wasPlayingBeforeBackground.current = isPlayingRef.current
-        }
-      })
+      // No resume-on-foreground. If playback stopped while the app was in the
+      // background (another app took the audio, an interruption, a car
+      // disconnect), the listener presses play to bring it back. Restarting on
+      // return stole the audio from whatever they were listening to instead.
 
       // Now Playing refresh while playing is scheduled deadline-driven in a
       // dedicated effect below (keyed on isPlaying), off the current show's
@@ -1154,7 +1141,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
         onState.remove()
         onError.remove()
         onQueueEnded.remove()
-        onAppState.remove()
         
         // Clear retry timeout
         if (retryTimeout.current) {

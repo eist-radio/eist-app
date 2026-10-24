@@ -4,11 +4,10 @@
 // the stream.
 //
 // Why this is its own function rather than a line in the listener: the native
-// CarPlaySceneDelegate posts a play request on EVERY foreground activation of
-// éist on the car screen (cold start, warm start, and returning after Maps or
-// Spotify took the now-playing role). Something has to suppress the requests
-// that would tear down a healthy stream, and the signal that job uses has to be
-// the player's real state.
+// CarPlaySceneDelegate posts a play request when the scene connects and when the
+// driver taps the éist list item, and the two can land together on a cold
+// start. Something has to suppress the requests that would tear down a healthy
+// stream, and the signal that job uses has to be the player's real state.
 //
 // The bug this replaces: the listener used to read `isPlayingRef`, which is fed
 // by resolveIsPlaying (utils/playbackUiState.ts). That value is a UI affordance,

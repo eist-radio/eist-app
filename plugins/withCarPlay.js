@@ -42,7 +42,8 @@ const path = require('path');
 
 const CARPLAY_AUDIO_ENTITLEMENT = 'com.apple.developer.carplay-audio';
 
-const CARPLAY_SCENE_DELEGATE_SWIFT = `import CarPlay
+const CARPLAY_SCENE_DELEGATE_SWIFT = `import AVFoundation
+import CarPlay
 import MediaPlayer
 
 // Apple does not allow CPNowPlayingTemplate as an audio app's ROOT template —
@@ -56,9 +57,8 @@ import MediaPlayer
 class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   var interfaceController: CPInterfaceController?
   // Cold-start ordering: sceneDidBecomeActive can fire before setRootTemplate's
-  // completion runs, and pushing Now Playing without a root in place fails. So
-  // activation only auto-plays once the root is set. An earlier activation is
-  // covered by the completion handler, which always starts playback.
+  // completion runs, so activation only touches the template stack once the
+  // root is set.
   private var rootTemplateSet = false
 
   func templateApplicationScene(
@@ -89,25 +89,26 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     rootTemplateSet = false
   }
 
-  // Fires on EVERY foreground activation of éist on the car screen — cold start,
-  // warm start, and returning after another audio app was used. didConnect only
-  // fires once per scene connection, so triggering playback there left the app
-  // dead on re-entry (list showing, disabled play button): the other app owned
-  // the now-playing role and no play request ever reached JS. Auto-playing here
-  // reclaims the session every time the user opens éist. The JS side skips the
-  // request when the stream is already playing, so glancing at Maps and back
-  // does not restart a healthy stream.
+  // Fires on EVERY foreground activation of éist on the car screen, including
+  // returning after another app. It deliberately does not start playback:
+  // auto-playing here stole the audio from whatever the driver had switched to.
+  // Coming back to éist is not a request to play; the driver presses play.
+  //
+  // If another app is playing, Now Playing (still on top of the stack) shows
+  // THAT app's controls, so pressing play there would resume the other app.
+  // Pop back to the éist list instead, where one tap starts éist. If nothing
+  // else is playing, éist still owns Now Playing and its play button works.
   func sceneDidBecomeActive(_ scene: UIScene) {
-    if rootTemplateSet {
-      startPlaybackAndShowNowPlaying(animated: false)
-    }
+    guard rootTemplateSet, AVAudioSession.sharedInstance().isOtherAudioPlaying else { return }
+    interfaceController?.popToRootTemplate(animated: false, completion: nil)
   }
 
   private func makeRootTemplate() -> CPListTemplate {
     let item = CPListItem(text: "éist", detailText: "live")
     item.handler = { [weak self] _, completion in
-      // Fallback path: the list is normally skipped (see sceneDidBecomeActive),
-      // but if the user backs out to it, tapping still starts playback.
+      // Shown when the driver backs out of Now Playing, or comes back to éist
+      // while another app is playing (see sceneDidBecomeActive). Tapping it is
+      // the explicit start.
       self?.startPlaybackAndShowNowPlaying(animated: true)
       completion()
     }
