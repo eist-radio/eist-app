@@ -185,14 +185,14 @@ export default function ArtistScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <Eyebrow>host</Eyebrow>
 
-        <Text
-          style={[t.pagehead, { color: colors.green, marginTop: 8 }]}
+        <FormattedShowTitle
+          title={artist.name ?? ''}
+          color={colors.green}
+          size={42}
+          style={[t.pagehead, { marginTop: 8 }]}
           numberOfLines={3}
           adjustsFontSizeToFit
-          minimumFontScale={0.5}
-        >
-          {artist.name}
-        </Text>
+        />
 
         {nextShow && (
           <Pressable
