@@ -33,7 +33,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
     didConnect interfaceController: CPInterfaceController
   ) {
     self.interfaceController = interfaceController
-    EistCarPlayBridge.log("scene didConnect, app state \\(UIApplication.shared.applicationState.rawValue)")
     interfaceController.setRootTemplate(makeRootTemplate(), animated: false) { [weak self] _, _ in
       guard let self = self else { return }
       self.rootTemplateSet = true
@@ -48,13 +47,11 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   ) {
     self.interfaceController = nil
     rootTemplateSet = false
-    EistCarPlayBridge.log("scene didDisconnect")
   }
 
   // Fires on every activation, including return from another app. Never starts playback.
   // If another app is playing, pop to the éist list so play goes to éist, not the other app's Now Playing.
   func sceneDidBecomeActive(_ scene: UIScene) {
-    EistCarPlayBridge.log("scene didBecomeActive, other audio \\(AVAudioSession.sharedInstance().isOtherAudioPlaying)")
     guard rootTemplateSet, AVAudioSession.sharedInstance().isOtherAudioPlaying else { return }
     interfaceController?.popToRootTemplate(animated: false, completion: nil)
   }
@@ -74,7 +71,6 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
   private func startPlaybackAndShowNowPlaying(animated: Bool) {
     // Set the flag before posting: the bridge replays it if JS isn't listening yet.
     EistCarPlayBridge.pendingPlay = true
-    EistCarPlayBridge.log("play requested, JS listening \\(EistCarPlayBridge.jsListening)")
     NotificationCenter.default.post(name: EistCarPlayBridge.playRequested, object: nil)
     // The play path depends on JS timers, which stall on the display link while
     // the phone screen is off. See syncTimersToPhoneScreen.
@@ -94,7 +90,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 }
 `;
 
-// Native to JS bridge: forwards CarPlay play requests to trackPlayerService.js and keeps the CarPlay log. Only exists in CarPlay builds.
+// Native to JS bridge: forwards CarPlay play requests to trackPlayerService.js. Only exists in CarPlay builds.
 const EIST_CARPLAY_BRIDGE_SWIFT = `import Foundation
 import React
 import UIKit
@@ -111,58 +107,6 @@ class EistCarPlayBridge: RCTEventEmitter {
 
   private var hasListeners = false
 
-  // Set while JS is subscribed. Only read for the log.
-  static var jsListening = false
-
-  // Breadcrumbs for CarPlay debugging, kept in a file because there's no console in the car.
-  // JS reads them on the carplay-log screen (eistapp://carplay-log).
-  private static let logQueue = DispatchQueue(label: "EistCarPlayLog")
-  private static let logLimit = 64 * 1024
-  private static var logURL: URL? {
-    FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
-      .appendingPathComponent("carplay-log.txt")
-  }
-  private static let logDateFormatter: DateFormatter = {
-    let formatter = DateFormatter()
-    formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
-    return formatter
-  }()
-
-  static func log(_ message: String) {
-    NSLog("[EistCarPlay] %@", message)
-    let stamp = Date()
-    logQueue.async {
-      guard let url = EistCarPlayBridge.logURL else { return }
-      let line = "\\(EistCarPlayBridge.logDateFormatter.string(from: stamp)) \\(message)\\n"
-      var contents = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
-      contents += line
-      // Keep the newest half once the file passes the limit.
-      if contents.utf8.count > EistCarPlayBridge.logLimit {
-        contents = String(contents.suffix(EistCarPlayBridge.logLimit / 2))
-      }
-      try? contents.write(to: url, atomically: true, encoding: .utf8)
-    }
-  }
-
-  @objc func appendLog(_ message: String) {
-    EistCarPlayBridge.log("js " + message)
-  }
-
-  @objc func readLog(_ resolve: @escaping RCTPromiseResolveBlock, rejecter reject: @escaping RCTPromiseRejectBlock) {
-    EistCarPlayBridge.logQueue.async {
-      let contents = EistCarPlayBridge.logURL.flatMap { try? String(contentsOf: $0, encoding: .utf8) } ?? ""
-      resolve(contents)
-    }
-  }
-
-  @objc func clearLog() {
-    EistCarPlayBridge.logQueue.async {
-      if let url = EistCarPlayBridge.logURL {
-        try? FileManager.default.removeItem(at: url)
-      }
-    }
-  }
-
   override static func requiresMainQueueSetup() -> Bool { false }
 
   override func supportedEvents() -> [String]! { [EistCarPlayBridge.playEvent] }
@@ -171,14 +115,13 @@ class EistCarPlayBridge: RCTEventEmitter {
   // Switch RCTTiming to its NSTimer-based background mode whenever no phone scene is on screen.
   private static weak var timing: NSObject?
   private static var timerSyncInstalled = false
-  private static var lastPhoneOnScreen: Bool?
 
   static func syncTimersToPhoneScreen() {
     // Async so this runs after RCTTiming's own handler for the same notification.
     DispatchQueue.main.async {
       guard let timing = EistCarPlayBridge.timing else {
         // Log loudly: a React Native upgrade may rename or remove the Timing module.
-        EistCarPlayBridge.log("RCTTiming module not found, JS timers will stall with the phone screen off")
+        NSLog("[EistCarPlay] RCTTiming module not found, JS timers will stall with the phone screen off")
         return
       }
       let phoneOnScreen = UIApplication.shared.connectedScenes.contains { scene in
@@ -186,14 +129,10 @@ class EistCarPlayBridge: RCTEventEmitter {
           (scene.activationState == .foregroundActive || scene.activationState == .foregroundInactive)
       }
       let selector = NSSelectorFromString(phoneOnScreen ? "appDidMoveToForeground" : "appDidMoveToBackground")
-      if phoneOnScreen != EistCarPlayBridge.lastPhoneOnScreen {
-        EistCarPlayBridge.lastPhoneOnScreen = phoneOnScreen
-        EistCarPlayBridge.log("timers \\(phoneOnScreen ? "display link (phone on screen)" : "NSTimer (phone off screen)")")
-      }
       if timing.responds(to: selector) {
         _ = timing.perform(selector)
       } else {
-        EistCarPlayBridge.log("RCTTiming no longer responds to \\(NSStringFromSelector(selector)), JS timers will stall with the phone screen off")
+        NSLog("[EistCarPlay] RCTTiming no longer responds to %@, JS timers will stall with the phone screen off", NSStringFromSelector(selector))
       }
     }
   }
@@ -223,8 +162,6 @@ class EistCarPlayBridge: RCTEventEmitter {
   // RCTEventEmitter calls these when JS adds/removes its first/last listener.
   override func startObserving() {
     hasListeners = true
-    EistCarPlayBridge.jsListening = true
-    EistCarPlayBridge.log("JS subscribed, pending play \\(EistCarPlayBridge.pendingPlay)")
     installTimerSync()
     NotificationCenter.default.addObserver(
       self,
@@ -234,22 +171,18 @@ class EistCarPlayBridge: RCTEventEmitter {
     // Deliver a tap that landed before JS was ready to hear it.
     if EistCarPlayBridge.pendingPlay {
       EistCarPlayBridge.pendingPlay = false
-      EistCarPlayBridge.log("replayed pending play to JS")
       sendEvent(withName: EistCarPlayBridge.playEvent, body: nil)
     }
   }
 
   override func stopObserving() {
     hasListeners = false
-    EistCarPlayBridge.jsListening = false
-    EistCarPlayBridge.log("JS unsubscribed")
     NotificationCenter.default.removeObserver(self)
   }
 
   @objc private func handlePlayRequested() {
     // JS is subscribed, so consume the buffered intent and forward immediately.
     EistCarPlayBridge.pendingPlay = false
-    EistCarPlayBridge.log("play event sent to JS")
     sendEvent(withName: EistCarPlayBridge.playEvent, body: nil)
   }
 }
@@ -261,9 +194,6 @@ const EIST_CARPLAY_BRIDGE_OBJC = `#import <React/RCTBridgeModule.h>
 #import <React/RCTEventEmitter.h>
 
 @interface RCT_EXTERN_MODULE(EistCarPlayBridge, RCTEventEmitter)
-RCT_EXTERN_METHOD(appendLog:(NSString *)message)
-RCT_EXTERN_METHOD(readLog:(RCTPromiseResolveBlock)resolve rejecter:(RCTPromiseRejectBlock)reject)
-RCT_EXTERN_METHOD(clearLog)
 @end
 `;
 
