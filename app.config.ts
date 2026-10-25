@@ -35,7 +35,17 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       iosStartDiscoveryAfterFirstTapOnCastButton: false,
       iosSuspendSessionsWhenBackgrounded: false
     }],
+    ["expo-build-properties", {
+      android: {
+        // R8 shrinking and obfuscation. Play flags release bundles with low DEX optimisation.
+        enableMinifyInReleaseBuilds: true,
+        enableShrinkResourcesInReleaseBuilds: true,
+        // withAndroidAuto reaches into RNTP and kotlinaudio by reflection (MusicService.player, getService, mediaSession).
+        extraProguardRules: "-keep class com.doublesymmetry.** { *; }"
+      }
+    }],
     "./plugins/withAndroidAuto",
+    "./plugins/withLargeScreenOrientation",
     "./plugins/withFmtConstevalFix",
     ...carPlayPlugins
   ],
