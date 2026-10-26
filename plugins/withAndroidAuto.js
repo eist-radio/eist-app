@@ -39,8 +39,9 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         private const val GRACE_MS = 4000L
         // Coalesce prepare + play (AA often sends both) into a single restart.
         private const val DEBOUNCE_MS = 1500L
-        // Give up on a cold-start play after this long (no app process means no player setup).
-        private const val PENDING_PLAY_TIMEOUT_MS = 15000L
+        // Give up on a cold-start play after this long (JS boot, setupPlayer, and wiring all happen inside it).
+        private const val PENDING_PLAY_TIMEOUT_MS = 20000L
+        private const val MUSIC_SERVICE_CLASS = "com.doublesymmetry.trackplayer.service.MusicService"
     }
 
     private var musicService: Any? = null
@@ -208,10 +209,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
     private fun bindToMusicService() {
         try {
             val intent = Intent()
-            intent.component = ComponentName(
-                packageName,
-                "com.doublesymmetry.trackplayer.service.MusicService"
-            )
+            intent.component = ComponentName(packageName, MUSIC_SERVICE_CLASS)
             val bound = bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
             Log.d(TAG, "Binding to MusicService: \$bound")
 
@@ -222,6 +220,20 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         } catch (e: Exception) {
             Log.e(TAG, "Error binding to MusicService", e)
             scheduleRetry()
+        }
+    }
+
+    // Binding never runs JS: RNTP starts its headless task (trackPlayerService.js, which calls setupPlayer) only from
+    // onStartCommand. Without this, a cold start from the car waits forever for a player (the Google Play rejection).
+    // Android Auto is bound to this service, so the app counts as foreground and startService is allowed.
+    private fun startMusicService() {
+        try {
+            val intent = Intent()
+            intent.component = ComponentName(packageName, MUSIC_SERVICE_CLASS)
+            startService(intent)
+            Log.d(TAG, "Started MusicService to boot the playback service JS")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error starting MusicService", e)
         }
     }
 
@@ -464,6 +476,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         } else {
             Log.d(TAG, "RNTP controller not ready; deferring play")
             pendingPlay = true
+            startMusicService()
             if (!isBound) bindToMusicService()
             handler.removeCallbacks(pendingPlayTimeout)
             handler.postDelayed(pendingPlayTimeout, PENDING_PLAY_TIMEOUT_MS)

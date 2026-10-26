@@ -93,9 +93,16 @@ const handleCarPlayPlayRequest = async () => {
   }
 };
 
+// RNTP reruns this function on every MusicService start (setupPlayer, Android Auto cold start).
+// Register once, or each remote play would start the stream several times.
+let listenersRegistered = false;
+
 module.exports = async function() {
-  // Set up the player at service start, so remote commands work without the UI.
+  // Set up the player at service start, so remote commands work without the UI. Memoised, so a rerun is cheap.
   ensurePlayerSetup().catch((e) => console.error('Playback service setup failed:', e));
+
+  if (listenersRegistered) return;
+  listenersRegistered = true;
 
   // Subscribing here, at JS load, also replays a play request that arrived before JS was ready.
   const carPlayBridge = Platform.OS === 'ios' ? NativeModules.EistCarPlayBridge : undefined;
