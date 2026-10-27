@@ -338,6 +338,16 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
                 mirrorCallback = callback
                 controller.registerCallback(callback)
 
+                // Arm the grace window before seeding. A fresh player reports NONE, and mirroring that while a
+                // cold-start play waits makes Android Auto give up with "Could not load your selection".
+                val flushPendingPlay = pendingPlay
+                if (flushPendingPlay) {
+                    pendingPlay = false
+                    val n = System.currentTimeMillis()
+                    lastForwardMs = n
+                    suppressIdleUntil = n + GRACE_MS
+                }
+
                 // Seed the proxy from RNTP's current state so the card is
                 // correct immediately.
                 mirrorMetadata(controller.metadata)
@@ -346,11 +356,7 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
                 Log.i(TAG, "RNTP controller + mirror wired for Android Auto")
 
                 // Flush a cold-start play that arrived before the controller existed.
-                if (pendingPlay) {
-                    pendingPlay = false
-                    val n = System.currentTimeMillis()
-                    lastForwardMs = n
-                    suppressIdleUntil = n + GRACE_MS
+                if (flushPendingPlay) {
                     publishState(PlaybackStateCompat.STATE_BUFFERING)
                     Log.d(TAG, "Flushing deferred cold-start play")
                     try {
@@ -476,6 +482,8 @@ class MediaBrowserService : MediaBrowserServiceCompat() {
         } else {
             Log.d(TAG, "RNTP controller not ready; deferring play")
             pendingPlay = true
+            // Hold BUFFERING for the whole cold-start wait. The timeout or a pause clears it.
+            suppressIdleUntil = now + PENDING_PLAY_TIMEOUT_MS
             startMusicService()
             if (!isBound) bindToMusicService()
             handler.removeCallbacks(pendingPlayTimeout)
