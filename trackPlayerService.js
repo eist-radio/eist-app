@@ -2,7 +2,9 @@
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
 import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { shouldStartPlaybackForCarPlay } from './utils/carPlayPlayRequest';
+import { getLockScreenImage, preloadLockScreenImage } from './utils/androidLockScreenImage';
 import { ensurePlayerSetup, probePlaybackState } from './utils/ensurePlayerSetup';
+import { getLiveShowInfo } from './utils/liveShowInfo';
 import { castPlayback, isRebuildingStream, markStreamRebuild, playIntent } from './utils/playIntent';
 import { withTimeout } from './utils/withTimeout';
 
@@ -10,6 +12,55 @@ const STREAM_URL = 'https://eist-radio.radiocult.fm/stream';
 
 // Ceiling on one CarPlay start, so a hung native call releases the in-flight latch.
 const CARPLAY_PLAY_TIMEOUT_MS = 30000;
+
+// Show info refresh while playing. Checks just after the show ends, bounded so a bad end time still refreshes.
+const SHOW_END_BUFFER_MS = 20000;
+const MIN_SHOW_CHECK_MS = 60000;
+const MAX_SHOW_CHECK_MS = 15 * 60000;
+
+let nextShowCheckAt = 0;
+let lastNowPlayingKey = '';
+
+// Writes the live show to the active track, so CarPlay, Android Auto, and the lock screen show it without the UI.
+// TrackPlayerContext does the same, but only while the UI is mounted and its JS timers are running.
+const refreshNowPlaying = async () => {
+  // Claim the next slot first, so progress events don't pile up requests while this one runs.
+  nextShowCheckAt = Date.now() + MIN_SHOW_CHECK_MS;
+  try {
+    const info = await getLiveShowInfo();
+    if (!info) return;
+
+    const end = info.endDateUtc ? new Date(info.endDateUtc).getTime() : NaN;
+    const untilEnd = Number.isNaN(end) ? MAX_SHOW_CHECK_MS : end + SHOW_END_BUFFER_MS - Date.now();
+    nextShowCheckAt = Date.now() + Math.min(MAX_SHOW_CHECK_MS, Math.max(MIN_SHOW_CHECK_MS, untilEnd));
+
+    // Android only shows remote artwork once it has been checked. A no-op on iOS.
+    await preloadLockScreenImage(info.artworkUrl);
+    const artwork = getLockScreenImage(info.artworkUrl);
+
+    const queue = await TrackPlayer.getQueue();
+    if (!queue || queue.length === 0) return;
+    const activeIndex = await TrackPlayer.getActiveTrackIndex().catch(() => undefined);
+    const index = typeof activeIndex === 'number' && activeIndex < queue.length ? activeIndex : 0;
+
+    const title = info.title || 'éist';
+    const artist = info.djName || '';
+    const key = `${queue[index]?.id}\0${title}\0${artist}\0${String(artwork)}`;
+    if (key === lastNowPlayingKey) return;
+
+    await TrackPlayer.updateMetadataForTrack(index, {
+      title,
+      artist,
+      album: 'éist',
+      artwork,
+      duration: -1,
+      isLiveStream: true,
+    });
+    lastNowPlayingKey = key;
+  } catch (error) {
+    console.warn('Now playing refresh failed:', error);
+  }
+};
 
 // Start fresh stream. fromCarPlay skips the cleanup delay.
 const startFreshStream = async ({ fromCarPlay = false } = {}) => {
@@ -54,8 +105,11 @@ const startFreshStream = async ({ fromCarPlay = false } = {}) => {
 
     // Start playback with fresh stream
     await TrackPlayer.play();
-    
+
     console.log('Fresh stream started from CarPlay/remote control');
+
+    // The queued track only carries the last known show, which is just "éist" on a cold start.
+    void refreshNowPlaying();
   } catch (error) {
     console.error('Error starting fresh stream:', error);
     // Fallback to regular play if fresh stream fails
@@ -114,16 +168,8 @@ module.exports = async function() {
 
   TrackPlayer.addEventListener(Event.RemotePlay, async () => {
     try {
+      // startFreshStream refreshes the show info. Rewriting the track from a queue snapshot here could undo that.
       await startFreshStream();
-      // Force metadata refresh for Android Auto after play
-      const queue = await TrackPlayer.getQueue();
-      if (queue && queue.length > 0) {
-        const currentTrack = queue[0];
-        await TrackPlayer.updateMetadataForTrack(0, {
-          ...currentTrack,
-          _metadata_refresh: Date.now(),
-        });
-      }
     } catch (error) {
       console.error('Remote play error:', error);
     }
@@ -178,6 +224,14 @@ module.exports = async function() {
     } catch (error) {
       console.error('Remote pause error:', error);
       await TrackPlayer.pause().catch(() => {});
+    }
+  });
+
+  // A native heartbeat while playing (progressUpdateEventInterval), so show changes reach the car with the phone
+  // locked or the app in the background, where JS timers stall.
+  TrackPlayer.addEventListener(Event.PlaybackProgressUpdated, () => {
+    if (Date.now() >= nextShowCheckAt) {
+      void refreshNowPlaying();
     }
   });
 
