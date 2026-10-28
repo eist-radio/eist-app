@@ -35,7 +35,17 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       iosStartDiscoveryAfterFirstTapOnCastButton: false,
       iosSuspendSessionsWhenBackgrounded: false
     }],
+    ["expo-build-properties", {
+      android: {
+        // R8 shrinking and obfuscation. Play flags release bundles with low DEX optimisation.
+        enableMinifyInReleaseBuilds: true,
+        enableShrinkResourcesInReleaseBuilds: true,
+        // withAndroidAuto reaches into RNTP and kotlinaudio by reflection (MusicService.player, getService, mediaSession).
+        extraProguardRules: "-keep class com.doublesymmetry.** { *; }"
+      }
+    }],
     "./plugins/withAndroidAuto",
+    "./plugins/withLargeScreenOrientation",
     "./plugins/withFmtConstevalFix",
     ...carPlayPlugins
   ],
@@ -67,6 +77,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       NSAppleMusicUsageDescription: "This app plays audio content and may access your music library for metadata display.",
       // URL schemes for external apps
       CFBundleURLTypes: [
+        // Setting CFBundleURLTypes stops Expo adding the app's own scheme, so list it here.
+        {
+          CFBundleURLName: "eistapp",
+          CFBundleURLSchemes: ["eistapp"]
+        },
         {
           CFBundleURLName: "mixcloud",
           CFBundleURLSchemes: ["mixcloud"]

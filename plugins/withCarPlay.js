@@ -90,7 +90,7 @@ class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegate {
 }
 `;
 
-// Native to JS bridge: forwards CarPlay play requests to TrackPlayerContext. Only exists in CarPlay builds.
+// Native to JS bridge: forwards CarPlay play requests to trackPlayerService.js. Only exists in CarPlay builds.
 const EIST_CARPLAY_BRIDGE_SWIFT = `import Foundation
 import React
 import UIKit
@@ -99,7 +99,7 @@ import UIKit
 class EistCarPlayBridge: RCTEventEmitter {
   // Posted by CarPlaySceneDelegate when playback should start.
   static let playRequested = Notification.Name("EistCarPlayPlayRequested")
-  // Emitted to JS (listened for in TrackPlayerContext).
+  // Emitted to JS (listened for in trackPlayerService.js).
   static let playEvent = "EistCarPlayPlay"
 
   // Play requested before JS subscribed (cold launch). Replayed in startObserving.
