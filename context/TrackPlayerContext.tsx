@@ -615,7 +615,6 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       // Start with existing metadata so car controls go live at once. Fresh metadata follows.
       await cleanResetPlayer()
 
-      await TrackPlayer.setVolume(0)
       await TrackPlayer.play()
       setIsPlaying(true)
       await storeLastPlayedState(true)
@@ -624,23 +623,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       fetchAndUpdateShowMetadata().catch((err) =>
         console.warn('Post-play metadata fetch failed:', err)
       )
-
-      // Wait 2 seconds for proper buffering to avoid startup glitch
-      await new Promise(resolve => setTimeout(resolve, 2000))
-
-      // Gradually restore volume to avoid jarring audio start
-      await TrackPlayer.setVolume(1)
-
     } catch (err) {
       console.error('Play failed:', err)
-      
-      // Ensure volume is restored even if play fails
-      try {
-        await TrackPlayer.setVolume(1)
-      } catch (volumeErr) {
-        console.error('Failed to restore volume after play error:', volumeErr)
-      }
-      
+
       const msg = err instanceof Error ? err.message.toLowerCase() : ''
 
       // Inside attemptStreamRestart, rethrow so its catch schedules the retry.
@@ -823,8 +808,9 @@ export const TrackPlayerProvider = ({ children }: { children: ReactNode }) => {
       (previous.isConnected && !current.isConnected && userPlay.current)
     )
 
+    // On iOS the playback service owns network recovery (trackPlayerService.js), because these timers stall under CarPlay.
     // Check userPlay instead of isPlaying to handle network disconnection cases
-    if (shouldRestart && userPlay.current) {
+    if (shouldRestart && userPlay.current && Platform.OS !== 'ios') {
       // A network change triggers a check, not a restart. One pending check at a time.
       if (networkCheckTimer.current) {
         clearTimeout(networkCheckTimer.current)
