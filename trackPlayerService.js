@@ -1,5 +1,6 @@
 // trackPlayerService.js
 import { NativeEventEmitter, NativeModules, Platform } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
 import TrackPlayer, { Event, State } from 'react-native-track-player';
 import { shouldStartPlaybackForCarPlay } from './utils/carPlayPlayRequest';
 import { getLockScreenImage, preloadLockScreenImage } from './utils/androidLockScreenImage';
@@ -100,9 +101,6 @@ const startFreshStream = async ({ fromCarPlay = false } = {}) => {
     
     await TrackPlayer.add(trackToAdd);
 
-    // TrackPlayerContext ramps volume up from 0 on a timer. Make sure an interrupted ramp can't leave this start silent.
-    await TrackPlayer.setVolume(1);
-
     // Start playback with fresh stream
     await TrackPlayer.play();
 
@@ -144,6 +142,89 @@ const handleCarPlayPlayRequest = async () => {
   } finally {
     // Only the request that claimed the latch releases it.
     if (!requestInFlight) carPlayRequestInFlight = false;
+  }
+};
+
+// iOS stream recovery. AVPlayer (SwiftAudioEx) never fails a dead Icecast connection: after a network change
+// it plays out its buffer, then sits in buffering forever with no error. Recovery is driven by native events
+// (NetInfo, playback state, remote commands), because JS timers stall under CarPlay with the phone screen off.
+// Android leaves this to ExoPlayer, which reconnects by itself, and to TrackPlayerContext.
+
+// A stall this soon after a network change means the old connection is dead.
+const NETWORK_CHANGE_WINDOW_MS = 60000;
+// Buffering longer than this counts as dead. Checked on a best-effort timer and on the next remote command.
+const STALL_TIMEOUT_MS = 15000;
+// Floor between two recoveries, so NetInfo churn during a handover can't rebuild the stream in a loop.
+const MIN_RECOVERY_GAP_MS = 5000;
+
+const STALLED_STATES = [State.Buffering, State.Loading];
+// States a reconnect rebuilds. Paused is left alone: it can be an interruption, and the app never auto-resumes.
+const DEAD_STATES = [State.Buffering, State.Loading, State.Error, State.Stopped, State.None, State.Ended];
+
+let lastState = null;
+let stalledSince = 0;
+let stallTimer = null;
+let lastNetworkChangeAt = 0;
+let lastRecoveryAt = 0;
+let networkConnected = true;
+let lastNetwork = null;
+
+const isStalledTooLong = () => stalledSince > 0 && Date.now() - stalledSince >= STALL_TIMEOUT_MS;
+
+const recoverStream = async (reason) => {
+  if (!playIntent.current || castPlayback.playing || !networkConnected) return;
+  if (isRebuildingStream() || Date.now() - lastRecoveryAt < MIN_RECOVERY_GAP_MS) return;
+  lastRecoveryAt = Date.now();
+  // One recovery per network change. A later rebuffer on the new connection is ordinary.
+  lastNetworkChangeAt = 0;
+  stalledSince = 0;
+  console.log(`Rebuilding stream: ${reason}`);
+  // A fresh track gets a fresh AVURLAsset and a new connection. play() alone would wait on the dead one.
+  await startFreshStream({ fromCarPlay: true });
+};
+
+const onPlaybackStateForRecovery = (state) => {
+  const previous = lastState;
+  lastState = state;
+
+  if (!STALLED_STATES.includes(state)) {
+    stalledSince = 0;
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = null;
+    return;
+  }
+  if (stalledSince > 0) return;
+  stalledSince = Date.now();
+
+  // Rebuild at once only for a stream that was playing. Buffering during a start is the stream loading.
+  if (previous === State.Playing && Date.now() - lastNetworkChangeAt < NETWORK_CHANGE_WINDOW_MS) {
+    void recoverStream('stall-after-network-change');
+    return;
+  }
+  // Fires on time with the screen on. Under CarPlay it can fire late, and the next remote command covers it.
+  if (stallTimer) clearTimeout(stallTimer);
+  stallTimer = setTimeout(() => {
+    stallTimer = null;
+    if (isStalledTooLong()) void recoverStream('stall-timeout');
+  }, STALL_TIMEOUT_MS + 100);
+};
+
+const onNetworkChangeForRecovery = async (netState) => {
+  const connected = Boolean(netState.isConnected);
+  const type = netState.type ?? null;
+  const previous = lastNetwork;
+  lastNetwork = { connected, type };
+  networkConnected = connected;
+  // The first callback reports the current network, not a change.
+  if (!previous || (previous.connected === connected && previous.type === type)) return;
+
+  lastNetworkChangeAt = Date.now();
+  if (!connected || !playIntent.current) return;
+
+  // Back online, or a new network: a stream that isn't playing won't come back on the old connection.
+  const state = await probePlaybackState();
+  if (state === null || DEAD_STATES.includes(state)) {
+    await recoverStream(`network-${previous.type}-to-${type}`);
   }
 };
 
@@ -214,7 +295,9 @@ module.exports = async function() {
         playIntent.current &&
         (state === State.Ready ||
           ((state === State.Stopped || state === State.None) && isRebuildingStream()));
-      const willRestart = !isStartingUp && NON_PLAYING_STATES.includes(state);
+      // A stream stuck buffering is dead (see recoverStream), so a press rebuilds it instead of pausing.
+      const willRestart =
+        (!isStartingUp && NON_PLAYING_STATES.includes(state)) || (playIntent.current && isStalledTooLong());
       if (willRestart) {
         await startFreshStream();
       } else {
@@ -226,6 +309,17 @@ module.exports = async function() {
       await TrackPlayer.pause().catch(() => {});
     }
   });
+
+  if (Platform.OS === 'ios') {
+    TrackPlayer.addEventListener(Event.PlaybackState, ({ state }) => {
+      onPlaybackStateForRecovery(state);
+    });
+    NetInfo.addEventListener((netState) => {
+      void onNetworkChangeForRecovery(netState).catch((error) =>
+        console.error('Network change recovery failed:', error)
+      );
+    });
+  }
 
   // A native heartbeat while playing (progressUpdateEventInterval), so show changes reach the car with the phone
   // locked or the app in the background, where JS timers stall.
