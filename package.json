@@ -32,7 +32,7 @@
     "@tanstack/react-query": "^5.77.2",
     "ajv": "^6.12.6",
     "expo": "~54.0.37",
-    "expo-asset": "~12.0.13",
+    "expo-asset": "~12.0.14",
     "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.14",
     "expo-font": "~14.0.12",
