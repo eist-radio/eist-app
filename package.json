@@ -76,7 +76,8 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "@types/react": "~19.1.10",
-    "postcss": "^8.5.23"
+    "postcss": "^8.5.23",
+    "shell-quote": "^1.11.0"
   },
   "private": true
 }
