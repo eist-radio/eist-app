@@ -54,3 +54,5 @@ docs/
 android/app/release.keystore
 android/keystore.properties
 .wrangler
+reports/
+research_notes/

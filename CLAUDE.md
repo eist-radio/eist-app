@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Build and deploy notes for the éist radio app (React Native, Expo SDK 53, EAS Build).
+Build and deploy notes for the éist radio app (React Native, Expo SDK 54, EAS Build).
 
 ## Rules
 

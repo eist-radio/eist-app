@@ -4,7 +4,6 @@
       "reactNativeDirectoryCheck": {
         "exclude": [
           "react-native-track-player",
-          "@fortawesome/fontawesome-svg-core",
           "@fortawesome/free-brands-svg-icons",
           "react-native-dotenv"
         ],
@@ -25,36 +24,27 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
-    "@fortawesome/fontawesome-svg-core": "^6.7.2",
     "@fortawesome/free-brands-svg-icons": "^6.7.2",
-    "@fortawesome/react-native-fontawesome": "^0.3.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/netinfo": "11.4.1",
-    "@react-navigation/bottom-tabs": "^7.3.10",
     "@react-navigation/elements": "^2.3.8",
     "@react-navigation/native": "^7.1.6",
     "@tanstack/react-query": "^5.77.2",
     "ajv": "^6.12.6",
     "expo": "~54.0.37",
-    "expo-asset": "~12.0.13",
-    "expo-audio": "~1.1.1",
-    "expo-blur": "~15.0.8",
+    "expo-asset": "~12.0.14",
     "expo-build-properties": "~1.0.10",
-    "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.14",
     "expo-font": "~14.0.12",
     "expo-haptics": "~15.0.8",
     "expo-image": "~3.0.11",
-    "expo-image-manipulator": "~14.0.8",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
     "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.24",
     "expo-sharing": "~14.0.8",
     "expo-status-bar": "~3.0.9",
-    "expo-symbols": "~1.0.8",
     "expo-system-ui": "~6.0.9",
-    "expo-video": "~3.0.16",
     "expo-web-browser": "~15.0.11",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -64,7 +54,6 @@
     "react-native-google-cast": "^4.9.0",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
-    "react-native-share": "^12.0.11",
     "react-native-svg": "15.12.1",
     "react-native-track-player": "4.1.2",
     "react-native-view-shot": "^4.0.3",
@@ -86,7 +75,9 @@
   "overrides": {
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "@types/react": "~19.1.10"
+    "@types/react": "~19.1.10",
+    "postcss": "^8.5.23",
+    "shell-quote": "^1.11.0"
   },
   "private": true
 }
