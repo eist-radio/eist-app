@@ -21,7 +21,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     "expo-router",
     "expo-web-browser",
     "expo-font",
-    "expo-video",
     ["expo-notifications", {
       icon: "./assets/images/notification-icon.png",
       color: "#AFFC41"
@@ -61,7 +60,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ],
       NSLocalNetworkUsageDescription: "éist uses the local network to discover Cast devices.",
       NSBonjourServices: ["_googlecast._tcp", "_7A2782C8._googlecast._tcp"],
-      NSMicrophoneUsageDescription: "This app streams audio and does not record you, but a library we use requires an infoPlist entry to work.",
       ITSAppUsesNonExemptEncryption: false,
       // iOS audio session configuration
       AVAudioSessionCategory: "playback",

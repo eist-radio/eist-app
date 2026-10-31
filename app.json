@@ -16,8 +16,7 @@
         "UIBackgroundModes": [
           "audio"
         ],
-        "NSPhotoLibraryUsageDescription": "We save app screenshots to your photo library so that you can access them later.",
-        "NSMicrophoneUsageDescription": "This app streams audio and does not record you, but a library we use requires microphone permissions to function."
+        "NSPhotoLibraryUsageDescription": "We save app screenshots to your photo library so that you can access them later."
       }
     },
     "android": {
@@ -47,7 +46,6 @@
       }
     },
     "plugins": [
-      "expo-video",
       "expo-router",
       "expo-dev-client"
     ],
