@@ -22,7 +22,9 @@ const BUFFER_FIX = `
             "wrapper.automaticallyWaitsToMinimizeStalling = newValue #{sae_marker} buffer left as is"
           )
         if patched.scan(sae_marker).length != 2
-          raise '[withSwiftAudioBuffer] AudioPlayer.swift did not match SwiftAudioEx 1.1.0; update or remove plugins/withSwiftAudioBuffer.js'
+          raise "[withSwiftAudioBuffer] SwiftAudioEx AudioPlayer.swift no longer matches 1.1.0, so the iOS forward buffer would " \\
+            "turn off stall waiting and cause skips. Check whether SwiftAudioEx now decouples bufferDuration and " \\
+            "automaticallyWaitsToMinimizeStalling: if it does, remove plugins/withSwiftAudioBuffer.js, otherwise update its search strings."
         else
           File.chmod(0644, sae_file)
           File.write(sae_file, patched)
@@ -30,7 +32,8 @@ const BUFFER_FIX = `
         end
       end
     else
-      raise "[withSwiftAudioBuffer] #{sae_file} not found; update or remove plugins/withSwiftAudioBuffer.js"
+      raise "[withSwiftAudioBuffer] #{sae_file} not found, so the iOS forward buffer can't be decoupled from stall waiting. " \\
+        "Update the path in plugins/withSwiftAudioBuffer.js, or remove the plugin if SwiftAudioEx is no longer a dependency."
     end`;
 
 /** Expo config plugin: decouple SwiftAudioEx's buffer and stall-waiting setters in Podfile post_install. */
