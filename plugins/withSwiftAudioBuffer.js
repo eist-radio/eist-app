@@ -3,10 +3,8 @@ const { mergeContents } = require('@expo/config-plugins/build/utils/generateCode
 const fs = require('fs');
 const path = require('path');
 
-// SwiftAudioEx 1.1.0 ties bufferDuration to automaticallyWaitsToMinimizeStalling. A forward buffer above 0 turns
-// stall waiting off, so AVPlayer resumes on a near-empty buffer and skips. Setting stall waiting back on zeroes the
-// buffer. This untangles the two setters in AudioPlayer.swift so the app can ask for both (see trackPlayerSetup.ts).
-// Pods aren't downloaded at prebuild, so the edit runs in Podfile post_install. Idempotent via a marker.
+// SwiftAudioEx 1.1.0 couples bufferDuration and automaticallyWaitsToMinimizeStalling, so you can't have both.
+// This decouples them in AudioPlayer.swift during Podfile post_install (pods don't exist at prebuild).
 const BUFFER_FIX = `
     # [withSwiftAudioBuffer] Let SwiftAudioEx keep a forward buffer with stall waiting on.
     sae_file = File.join(installer.sandbox.root.to_s, 'SwiftAudioEx', 'Sources', 'SwiftAudioEx', 'AudioPlayer.swift')
