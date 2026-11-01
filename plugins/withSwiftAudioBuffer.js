@@ -22,7 +22,7 @@ const BUFFER_FIX = `
             "wrapper.automaticallyWaitsToMinimizeStalling = newValue #{sae_marker} buffer left as is"
           )
         if patched.scan(sae_marker).length != 2
-          Pod::UI.warn '[withSwiftAudioBuffer] AudioPlayer.swift did not match SwiftAudioEx 1.1.0; iOS forward buffer not applied'
+          raise '[withSwiftAudioBuffer] AudioPlayer.swift did not match SwiftAudioEx 1.1.0; update or remove plugins/withSwiftAudioBuffer.js'
         else
           File.chmod(0644, sae_file)
           File.write(sae_file, patched)
@@ -30,7 +30,7 @@ const BUFFER_FIX = `
         end
       end
     else
-      Pod::UI.warn "[withSwiftAudioBuffer] #{sae_file} not found; iOS forward buffer not applied"
+      raise "[withSwiftAudioBuffer] #{sae_file} not found; update or remove plugins/withSwiftAudioBuffer.js"
     end`;
 
 /** Expo config plugin: decouple SwiftAudioEx's buffer and stall-waiting setters in Podfile post_install. */
