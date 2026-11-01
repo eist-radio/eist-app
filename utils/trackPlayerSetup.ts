@@ -16,9 +16,13 @@ export const setupTrackPlayer = async () => {
 
     // Player setup - Optimized for live radio streaming
     await TrackPlayer.setupPlayer({
+      // maxBuffer, playBuffer, and backBuffer are Android only.
       maxBuffer: 8,
-      // Android only. On iOS a non-zero minBuffer turns off AVPlayer's stall waiting, causing tiny skips.
-      minBuffer: Platform.OS === 'ios' ? undefined : 3,
+      // On iOS this is AVPlayerItem.preferredForwardBufferDuration: about 1 MB of the 256 kbps stream to ride out
+      // weak signal. Without plugins/withSwiftAudioBuffer.js it would turn off stall waiting and cause tiny skips.
+      minBuffer: Platform.OS === 'ios' ? 30 : 3,
+      // iOS: keep AVPlayer waiting until it can keep up after a stall, rather than resuming on an empty buffer.
+      waitForBuffer: Platform.OS === 'ios' ? true : undefined,
       playBuffer: 1.5,
       backBuffer: 0,
       iosCategory: IOSCategory.Playback,

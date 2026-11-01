@@ -45,6 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     "./plugins/withAndroidAuto",
     "./plugins/withLargeScreenOrientation",
     "./plugins/withFmtConstevalFix",
+    "./plugins/withSwiftAudioBuffer",
     ...carPlayPlugins
   ],
   ios: {
