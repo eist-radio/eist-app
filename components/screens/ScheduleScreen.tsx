@@ -8,6 +8,7 @@ import { Eyebrow } from '../ui/Eyebrow'
 import { FormattedShowTitle } from '../FormattedShowTitle'
 import { apiKey } from '../../config'
 import { useArtistMapping, useArtists } from '../../hooks/useArtists'
+import { joinHostNames } from '../../utils/hostNames'
 import { useTimezoneChange } from '../../hooks/useTimezoneChange'
 import { formatClockTime } from '../../utils/formatTime'
 
@@ -159,7 +160,9 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
   const [extraNames, setExtraNames] = useState<Record<string, string>>({})
 
   const resolveArtistName = useCallback(
-    (id?: string) => (id ? (artistMapping?.[id]?.name ?? artistsById[id] ?? extraNames[id] ?? '') : ''),
+    // RadioCult's own name wins. The mapping can carry the first host's name
+    // against a co-host's id, so it is the last resort.
+    (id?: string) => (id ? (artistsById[id] || extraNames[id] || artistMapping?.[id]?.name || '') : ''),
     [artistMapping, artistsById, extraNames]
   )
 
@@ -271,7 +274,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
           time: it.startTime,
           isLive: it.id === currentShowId,
           title: it.title,
-          artist: resolveArtistName(it.artistIds?.[0]),
+          artist: joinHostNames((it.artistIds ?? []).map(resolveArtistName)),
         })),
       })),
     [sections, currentShowId, resolveArtistName]
@@ -283,8 +286,9 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
     const missing = new Set<string>()
     for (const sec of sections) {
       for (const it of sec.data) {
-        const id = it.artistIds?.[0]
-        if (id && !artistMapping?.[id]?.name && !artistsById[id] && !(id in extraNames)) missing.add(id)
+        for (const id of it.artistIds ?? []) {
+          if (id && !artistsById[id] && !(id in extraNames)) missing.add(id)
+        }
       }
     }
     if (missing.size === 0) return
@@ -419,7 +423,7 @@ export default function ScheduleScreen({ isActive }: { pageIndex: number; isActi
                 </View>
                 <View style={{ flex: 1 }}>
                   <FormattedShowTitle title={r.title} color={r.isLive ? colors.green : colors.text} size={26} style={type.rowTitle} />
-                  <Text style={[type.rowSub, { color: r.isLive ? colors.green : colors.text, marginTop: 4 }]}>{r.artist}</Text>
+                  <Text style={[type.rowSub, { color: r.isLive ? colors.green : colors.text, marginTop: 4 }]} numberOfLines={2}>{r.artist}</Text>
                 </View>
               </Pressable>
             ))}

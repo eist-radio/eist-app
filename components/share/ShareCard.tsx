@@ -43,7 +43,7 @@ export const ShareCard = React.forwardRef<View, ShareCardProps>(
             minimumFontScale={0.6}
             style={s.title}
           />
-          {artistName ? <Text style={s.artist}>{artistName}</Text> : null}
+          {artistName ? <Text style={s.artist} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{artistName}</Text> : null}
           <Text style={s.dateTime}>{dateTime}</Text>
         </View>
       </View>

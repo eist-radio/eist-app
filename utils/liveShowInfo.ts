@@ -1,5 +1,6 @@
 import { apiKey } from '../config'
 import { formatClockTime } from './formatTime'
+import { joinHostNames } from './hostNames'
 
 const STATION_ID = 'eist-radio'
 const API_BASE = `https://api.radiocult.fm/api/station/${STATION_ID}`
@@ -125,18 +126,23 @@ export async function getLiveShowInfo(options?: { timeZone?: string }): Promise<
     }
 
     const content = result?.content || {}
-    const artistId = content.artistIds?.[0]
+    const artistIds: string[] = (content.artistIds ?? []).filter(Boolean)
+    const artistId = artistIds[0]
     let djName = ''
     let artworkUrl: string | undefined
 
-    if (artistId) {
-      try {
-        const artistInfo = await fetchArtistInfo(artistId, headers)
-        djName = artistInfo.name
-        artworkUrl = artistInfo.artworkUrl
-      } catch (error) {
-        console.warn('Failed to fetch artist info:', error)
-      }
+    if (artistIds.length > 0) {
+      // Name every host. Artwork still comes from the first one.
+      const infos = await Promise.all(
+        artistIds.map((id) =>
+          fetchArtistInfo(id, headers).catch((error) => {
+            console.warn('Failed to fetch artist info:', error)
+            return null
+          })
+        )
+      )
+      djName = joinHostNames(infos.map((info) => info?.name ?? ''))
+      artworkUrl = infos[0]?.artworkUrl
     }
 
     if (!djName) {
