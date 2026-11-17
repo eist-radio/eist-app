@@ -1,9 +1,10 @@
 // app/archive/[slug].tsx
 
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { FormattedShowTitle } from '../../components/FormattedShowTitle';
+import { HostLinks } from '../../components/HostLinks';
 import { HeaderLeftNav } from '../../components/ui/HeaderLeftNav';
 import { Eyebrow } from '../../components/ui/Eyebrow';
 import { PageScaffold } from '../../components/ui/PageScaffold';
@@ -11,6 +12,7 @@ import { PlatformDisc } from '../../components/ui/PlatformDisc';
 import { ShowArtworkBackground } from '../../components/ui/ShowArtworkBackground';
 import { SpinningLogo } from '../../components/ui/SpinningLogo';
 import { useArchiveShowBySlug } from '../../hooks/useArchiveShows';
+import { useHosts } from '../../hooks/useHosts';
 import { colors, font, type as t } from '../../theme/tokens';
 import { stripFormatting } from '../../utils/stripFormatting';
 
@@ -44,11 +46,14 @@ function formatDate(isoString: string): string {
 
 export default function ArchiveShowScreen() {
   const { slug } = useLocalSearchParams<{ slug?: string }>();
-  const router = useRouter();
 
   const { data: show, isLoading } = useArchiveShowBySlug(slug);
 
   const [imageFailed, setImageFailed] = useState(false);
+
+  const hostIds = show?.artistIds ?? [];
+  const { hosts } = useHosts(hostIds);
+  const hostsById = Object.fromEntries(hosts.map((h) => [h.id, h]));
 
   if (isLoading || !show) {
     return <PageScaffold left={<HeaderLeftNav />}>{null}</PageScaffold>;
@@ -108,28 +113,23 @@ export default function ArchiveShowScreen() {
             marginTop: 10,
           }}
         >
-          <Pressable
-            onPress={() =>
-              router.push(
-                `/artist/${encodeURIComponent(show.artistSlug)}` +
-                  (show.artistIds?.[0] ? `?id=${encodeURIComponent(show.artistIds[0])}` : '')
-              )
+          <HostLinks
+            hosts={
+              hostIds.length > 0
+                ? hostIds.map((id) => ({
+                    id,
+                    // The archive record only names its first host.
+                    name: hostsById[id]?.name ?? (id === hostIds[0] ? show.artistName : undefined),
+                  }))
+                : [{ id: show.artistSlug, name: show.artistName }]
             }
-          >
-            <Text
-              style={{
-                fontFamily: font.body,
-                fontWeight: '600',
-                fontSize: 16,
-                color: colors.green,
-              }}
-            >
-              {show.artistName}
-            </Text>
-          </Pressable>
-          <Text style={[t.meta, { color: colors.text }]}>
-            {`· ${formatDate(show.start)}`}
-          </Text>
+            trailing={
+              <Text style={[t.meta, { color: colors.text, fontWeight: '500' }]}>
+                {/* Non-breaking spaces keep "· date" together when the line wraps. */}
+                {`  ·\u00A0${formatDate(show.start).replace(/ /g, '\u00A0')}`}
+              </Text>
+            }
+          />
         </View>
 
         {hasPlayable && (

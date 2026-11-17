@@ -22,6 +22,7 @@ import { Eyebrow } from '../ui/Eyebrow'
 import { PageScaffold } from '../ui/PageScaffold'
 import { PlayDisc } from '../ui/PlayDisc'
 import { ShowArtworkBackground } from '../ui/ShowArtworkBackground'
+import { joinHostNames } from '../../utils/hostNames'
 
 
 const placeholderArtistImage = require('../../assets/images/eist_online.png')
@@ -155,6 +156,18 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
     }
   }, [artistCache])
 
+  // Every host's name for the "live now" line and lock screen. The artwork
+  // still comes from the first host.
+  const getHostLine = useCallback(async (ids?: string[]) => {
+    const hostIds = (ids ?? []).filter(Boolean)
+    if (hostIds.length === 0) return getArtistDetails(null)
+    const details = await Promise.all(hostIds.map((id) => getArtistDetails(id)))
+    return {
+      name: joinHostNames(details.map((d) => d.name)),
+      image: details[0].image,
+    }
+  }, [getArtistDetails])
+
   const clearNowPlayingState = useCallback(async () => {
     setShowTitle('')
     setArtistName('éist · off air')
@@ -238,7 +251,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
           setArtistId(newArtistId)
           setIsContentLoading(true)
 
-          const { name, image } = await getArtistDetails(newArtistId)
+          const { name, image } = await getHostLine(content.artistIds)
 
           // Update artist-related state
           setArtistName(name)
@@ -274,7 +287,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
             const cachedArtist = artistCache[artistId]
             await updateMetadata(
               newShowTitle || 'éist',
-              cachedArtist.name,
+              artistName || cachedArtist.name,
               cachedArtist.image?.uri || undefined,
               showTimeRange
             )
@@ -290,7 +303,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         await clearNowPlayingState()
       }
     }
-  }, [artistId, artistCache, artistName, remoteImageUrl, getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
+  }, [artistId, artistCache, artistName, remoteImageUrl, getHostLine, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
 
   const fetchNowPlayingWithArtist = useCallback(async () => {
 
@@ -347,7 +360,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
       )
       liveShowEndRef.current = Date.parse(content.endDateUtc) || null
 
-      const { name, image } = await getArtistDetails(newArtistId)
+      const { name, image } = await getHostLine(content.artistIds)
 
       // Prepare description
       let desc = parseDescription(content.description?.content || [])
@@ -397,7 +410,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         await clearNowPlayingState()
       }
     }
-  }, [getArtistDetails, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
+  }, [getHostLine, updateMetadata, clearNowPlayingState, preloadImage, currentTimezone])
 
   // Next upcoming show, live or off air, for the "Up next" row.
   const fetchNextShow = useCallback(async () => {
@@ -539,7 +552,7 @@ export default function ListenScreen({ isActive }: { pageIndex: number; isActive
         />
       </Pressable>
       <Pressable onPress={() => artistId && router.push(`/artist/${artistId}` as any)} disabled={!artistId}>
-        <Text style={s.artist}>{artistName}</Text>
+        <Text style={s.artist} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{artistName}</Text>
       </Pressable>
 
       {nextShowTitle ? (

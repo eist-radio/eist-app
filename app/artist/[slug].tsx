@@ -114,11 +114,19 @@ export default function ArtistScreen() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Match archive shows by the artist mapping, then normalized name. RadioCult's slug is a last resort (it often differs).
+  // Match archive shows by the host's own name, the same way the website does.
+  // The éist API mapping is built from shows, and a show only carries its first
+  // host's name and slug. So a co-host's id can map to the first host's slug,
+  // which put the first host's past shows on the co-host's page. Only trust a
+  // mapping entry whose name matches this host. RadioCult's slug is a last resort.
   const routeSlug =
     queryId || (artist && slug && slug !== artist.id) ? slug : undefined;
-  const mappedSlug = id ? artistMapping?.[id]?.slug : undefined;
   const nameSlug = artist?.name ? normalizeSlug(artist.name) : undefined;
+  const mapped = id ? artistMapping?.[id] : undefined;
+  const mappedSlug =
+    mapped && nameSlug && normalizeSlug(mapped.name ?? '') === nameSlug
+      ? mapped.slug
+      : undefined;
   const archiveArtistSlug =
     mappedSlug ?? nameSlug ?? routeSlug ?? artist?.slug;
 
